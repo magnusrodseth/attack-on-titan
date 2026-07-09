@@ -59,7 +59,9 @@ viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
 
 - Gameplay: very rare seeded spawn (`hashSeed(seed + ':striker:wave')`), sprints in the
   hunched meme posture noticeably faster than other abnormals, maybe a punting swat with
-  extra knockback. Big score bonus, its own kill banner ("Striker Slain").
+  extra knockback. Big score bonus, its own kill banner ("Striker Slain"). Never spawns
+  alone: the same roll also spawns the Kane titan (next section), so the duo arrives as a
+  single two-titan event.
 - Look (user spec, 2026-07-09): spawns wearing the **Norway home kit** — red jersey with the
   offset navy/white flag cross and a number 9, white shorts — plus the blond ponytail-bun.
   Build the kit from sourced CC0 fabric/knit textures with per-instance tints (the layering
@@ -74,6 +76,33 @@ viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
   - https://foxyprinting.co.uk/cdn/shop/files/erlinghaalandfootball.jpg?v=1700149050
   - https://pbs.twimg.com/media/FZGhAdJX0AAo1Yq.jpg
   - https://media-cldnry.s-nbcnews.com/image/upload/rockcms/2026-07/260705-haaland-norway-world-cup-ww-1524-b41355.jpg (2026 World Cup, Norway kit with shorts — the spawn look)
+
+## Rare titan: the Captain (Harry Kane homage, user idea 2026-07-09)
+
+Companion piece to the Striker above: a Harry Kane titan that always spawns together with
+the Haaland titan, the two number 9s arriving as a pair. Build note (user, 2026-07-09):
+this gets implemented in the same effort as the Striker, but that effort is not started yet;
+when the Striker graduates to the wayfinder map, this section graduates with it.
+
+- **Pair spawn**: one seeded roll spawns both (share the striker stream or a joint
+  `hashSeed(seed + ':strikers:wave')`), so `?seed=` replays get the identical duo. Neither
+  spawns without the other.
+- **Behavior contrast** (suggestion, to be scoped): where the Striker sprints at the player,
+  the Captain drops deep, Kane-style, holding back and lobbing thrown debris from range so
+  the pair squeezes you from two directions. Own kill banner ("Captain Slain") plus a duo
+  bonus with its own banner when both fall in the same wave ("Strike Partnership Broken").
+- **Look**: England 2026 home kit, white jersey with navy crew collar and a red number 9,
+  navy shorts, plus the blue captain's armband as a tinted band on the left arm. Swept-back
+  dark-blond hair and a short full beard as tinted geometry blocks. Same construction as the
+  Striker's kit: sourced CC0 fabric/knit textures with per-instance tints.
+- **Likeness boundary**: same rule as the Striker, photo-free homage only. No Three Lions
+  crest, no brand marks (both are trademarked even in freely licensed photos); the read
+  comes from white-kit-with-red-9 + armband + beard standing next to the Norway red.
+- User-provided visual references (look/proportion only):
+  - https://encrypted-tbn2.gstatic.com/licensed-image?q=tbn:ANd9GcRuvfcMHOouTQSFJifF6qJwkWwERIDwq6v_rwn_fIkrvLV0hveYLsX4klGcDNgNukLC7HDRZe2-B5EdJDo (England v Ghana, 2026 World Cup: white home shirt, captain's armband: the spawn look)
+  - https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJKxDzUpw8h2gd1F3FnHQgHeuKQlkcYpusK0LmGGOxGs2o2RpS1qrZMqIU&s=10 (England home jersey, KANE 9 print, front and back: the kit reference)
+  - https://img.a.transfermarkt.technology/portrait/big/132098-1700211169.jpg?lm=1 (portrait: swept-back hair and beard reference)
+  - https://upload.wikimedia.org/wikipedia/commons/2/2f/Harry_Kane_England_v_Ghana_23_June_2026-024_%28cropped%29.jpg (Wikimedia Commons, same match: hair/beard/build in warm-up top)
 
 ## Boss fight with boss health bar and weak-point phases (user idea, 2026-07-09)
 

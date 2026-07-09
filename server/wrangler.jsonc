@@ -1,0 +1,11 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "aot-party",
+  "main": "index.ts",
+  "compatibility_date": "2026-07-01",
+  "durable_objects": {
+    "bindings": [{ "name": "MatchRoom", "class_name": "MatchRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MatchRoom"] }],
+  "observability": { "enabled": true }
+}

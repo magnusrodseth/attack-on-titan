@@ -4,3 +4,7 @@ dist/
 .DS_Store
 .vercel
 music-candidates/
+
+# Worker secrets (local dev)
+.dev.vars
+server/.dev.vars

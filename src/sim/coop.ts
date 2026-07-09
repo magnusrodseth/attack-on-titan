@@ -39,10 +39,24 @@ export const HISTORY_INTERVAL = 1 / 30
 const HISTORY_MAX = 10 // ~300 ms of titan pose history for lag compensation
 export const SLASH_REWIND = 0.1 // seconds of rewind: interp delay + half a friend-ping
 
+export interface HookAnchor {
+  x: number
+  y: number
+  z: number
+}
+
+/** Cosmetic pose relayed to teammates; the server never acts on it. */
+export interface PlayerPose {
+  yaw: number
+  pitch: number
+  hooks: [HookAnchor | null, HookAnchor | null]
+}
+
 export interface PlayerUpdate {
   pos: Vector3
   vel: Vector3
   onGround: boolean
+  pose?: PlayerPose
 }
 
 export interface CoopPlayer {
@@ -50,6 +64,7 @@ export interface CoopPlayer {
   /** Server copy of the soldier: hp/blades/config/timers are authoritative here; pos/vel mirror reports. */
   body: PlayerState
   onGround: boolean
+  pose: PlayerPose
   alive: boolean
   connected: boolean
   deaths: number
@@ -144,6 +159,7 @@ export function createCoopWorld(seed: string, playerIds: string[]): CoopWorld {
       id,
       body,
       onGround: false,
+      pose: { yaw: 0, pitch: 0, hooks: [null, null] },
       alive: true,
       connected: true,
       deaths: 0,
@@ -189,6 +205,7 @@ export function applyPlayerUpdate(w: CoopWorld, playerId: string, update: Player
   p.body.vel.copy(vel)
   p.body.onGround = update.onGround
   p.onGround = update.onGround
+  if (update.pose) p.pose = update.pose
 }
 
 interface TitanTarget {
@@ -517,6 +534,9 @@ export interface CoopSnapshot {
     vy: number
     vz: number
     onGround: boolean
+    yaw: number
+    pitch: number
+    hooks: [HookAnchor | null, HookAnchor | null]
     hp: number
     maxHp: number
     alive: boolean
@@ -560,6 +580,9 @@ export function coopSnapshot(w: CoopWorld): CoopSnapshot {
       vy: r2(p.body.vel.y),
       vz: r2(p.body.vel.z),
       onGround: p.onGround,
+      yaw: r2(p.pose.yaw),
+      pitch: r2(p.pose.pitch),
+      hooks: p.pose.hooks,
       hp: p.body.hp,
       maxHp: p.body.config.maxHp,
       alive: p.alive,
