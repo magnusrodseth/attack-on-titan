@@ -39,11 +39,16 @@ interface PlayOpts {
 }
 
 const MASTER_VOLUME = 0.8
+const MUSIC_BASE = 0.45 // full-slider music gain; the default 70% lands at the tuned 0.32
 
 export class AudioSystem {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
+  private sfx: GainNode | null = null
+  private musicGain: GainNode | null = null
   private duckedState = false
+  private musicVolume = 0.7
+  private sfxVolume = 1
   private windGain: GainNode | null = null
   private windFilter: BiquadFilterNode | null = null
   private gasGain: GainNode | null = null
@@ -67,6 +72,11 @@ export class AudioSystem {
     this.muffle.frequency.value = 20000
     this.master.connect(this.muffle).connect(ctx.destination)
 
+    // every voiced/synth sound routes through the sfx bus so its volume is one knob
+    this.sfx = ctx.createGain()
+    this.sfx.gain.value = this.sfxVolume
+    this.sfx.connect(this.master)
+
     const noise = this.noiseBuffer(ctx)
 
     // wind loop: band-passed noise whose gain and brightness track player speed
@@ -79,7 +89,7 @@ export class AudioSystem {
     this.windFilter.Q.value = 0.6
     this.windGain = ctx.createGain()
     this.windGain.gain.value = 0
-    windSrc.connect(this.windFilter).connect(this.windGain).connect(this.master)
+    windSrc.connect(this.windFilter).connect(this.windGain).connect(this.sfx)
     windSrc.start()
 
     // gas loop: bright hiss while thrusting
@@ -91,18 +101,18 @@ export class AudioSystem {
     gasFilter.frequency.value = 2800
     this.gasGain = ctx.createGain()
     this.gasGain.gain.value = 0
-    gasSrc.connect(gasFilter).connect(this.gasGain).connect(this.master)
+    gasSrc.connect(gasFilter).connect(this.gasGain).connect(this.sfx)
     gasSrc.start()
 
     // background music: two tracks alternating forever, routed through the master
     // chain so menu ducking and focus muffle apply to it too
-    const musicGain = ctx.createGain()
-    musicGain.gain.value = 0.32
-    musicGain.connect(this.master)
+    this.musicGain = ctx.createGain()
+    this.musicGain.gain.value = MUSIC_BASE * this.musicVolume
+    this.musicGain.connect(this.master)
     this.musicTracks = ['/music/track-1.mp3', '/music/track-2.mp3'].map((url) => {
       const element = new Audio(url)
       element.preload = 'auto'
-      ctx.createMediaElementSource(element).connect(musicGain)
+      ctx.createMediaElementSource(element).connect(this.musicGain!)
       element.addEventListener('ended', () => this.playNextTrack())
       return element
     })
@@ -144,8 +154,23 @@ export class AudioSystem {
     this.master.gain.setTargetAtTime(ducked ? 0 : MASTER_VOLUME, this.ctx.currentTime, 0.05)
   }
 
+  /** 0..1 sliders from the settings menu; safe to call before init. */
+  setMusicVolume(volume: number): void {
+    this.musicVolume = volume
+    if (this.ctx && this.musicGain) {
+      this.musicGain.gain.setTargetAtTime(MUSIC_BASE * volume, this.ctx.currentTime, 0.05)
+    }
+  }
+
+  setSfxVolume(volume: number): void {
+    this.sfxVolume = volume
+    if (this.ctx && this.sfx) {
+      this.sfx.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.05)
+    }
+  }
+
   play(names: SampleName | SampleName[], opts: PlayOpts = {}): void {
-    if (!this.ctx || !this.master) return
+    if (!this.ctx || !this.sfx) return
     const name = Array.isArray(names) ? names[Math.floor(Math.random() * names.length)]! : names
     const buffer = this.buffers.get(name)
     if (!buffer) return
@@ -155,7 +180,7 @@ export class AudioSystem {
     source.playbackRate.value = (opts.rate ?? 1) * (1 + (Math.random() * 2 - 1) * jitter)
     const gain = this.ctx.createGain()
     gain.gain.value = opts.volume ?? 1
-    source.connect(gain).connect(this.master)
+    source.connect(gain).connect(this.sfx)
     source.start()
   }
 
@@ -180,7 +205,7 @@ export class AudioSystem {
   /** Meaty low-end impact; volume ~0.3 body tap, ~0.9 taking a swat. */
   thud(volume: number): void {
     const ctx = this.ctx
-    if (!ctx || !this.master) return
+    if (!ctx || !this.sfx) return
     const osc = ctx.createOscillator()
     osc.type = 'sine'
     osc.frequency.setValueAtTime(95, ctx.currentTime)
@@ -188,7 +213,7 @@ export class AudioSystem {
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(volume, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
-    osc.connect(gain).connect(this.master)
+    osc.connect(gain).connect(this.sfx)
     osc.start()
     osc.stop(ctx.currentTime + 0.22)
     this.noiseBurst(600, 0.06, volume * 0.5, 'lowpass')
@@ -225,7 +250,7 @@ export class AudioSystem {
   /** Wave-clear chime: two soft partials. */
   chime(): void {
     const ctx = this.ctx
-    if (!ctx || !this.master) return
+    if (!ctx || !this.sfx) return
     for (const [freq, delay] of [
       [660, 0],
       [990, 0.12],
@@ -237,7 +262,7 @@ export class AudioSystem {
       gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay)
       gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + delay + 0.02)
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.9)
-      osc.connect(gain).connect(this.master)
+      osc.connect(gain).connect(this.sfx)
       osc.start(ctx.currentTime + delay)
       osc.stop(ctx.currentTime + delay + 1)
     }
@@ -246,7 +271,7 @@ export class AudioSystem {
   /** Player-death sub boom. */
   boom(): void {
     const ctx = this.ctx
-    if (!ctx || !this.master) return
+    if (!ctx || !this.sfx) return
     const osc = ctx.createOscillator()
     osc.type = 'sine'
     osc.frequency.setValueAtTime(70, ctx.currentTime)
@@ -254,7 +279,7 @@ export class AudioSystem {
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0.9, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.85)
-    osc.connect(gain).connect(this.master)
+    osc.connect(gain).connect(this.sfx)
     osc.start()
     osc.stop(ctx.currentTime + 0.9)
   }
@@ -273,7 +298,7 @@ export class AudioSystem {
     type: BiquadFilterType,
   ): void {
     const ctx = this.ctx
-    if (!ctx || !this.master) return
+    if (!ctx || !this.sfx) return
     const source = ctx.createBufferSource()
     source.buffer = this.noiseBuffer(ctx)
     const filter = ctx.createBiquadFilter()
@@ -282,7 +307,7 @@ export class AudioSystem {
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(volume, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
-    source.connect(filter).connect(gain).connect(this.master)
+    source.connect(filter).connect(gain).connect(this.sfx)
     source.start()
     source.stop(ctx.currentTime + duration + 0.02)
   }

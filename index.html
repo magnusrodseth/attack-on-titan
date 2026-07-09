@@ -11,9 +11,26 @@
         src: url('/fonts/cloister-black.ttf') format('truetype');
         font-display: swap;
       }
+      @font-face {
+        font-family: 'Cinzel';
+        src: url('/fonts/cinzel.woff2') format('woff2');
+        font-weight: 400 900;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Alegreya';
+        src: url('/fonts/alegreya.woff2') format('woff2');
+        font-weight: 400 900;
+        font-display: swap;
+      }
       :root {
-        --hud-font: 'Avenir Next', 'Trebuchet MS', system-ui, sans-serif;
         --title-font: 'Cloister Black', 'Times New Roman', serif;
+        --header-font: 'Cinzel', 'Times New Roman', serif;
+        --body-font: 'Alegreya', Georgia, serif;
+        --parchment: #e9dcc0;
+        --brass: #b08a3e;
+        --brass-bright: #d8b25e;
+        --crimson: #a3131d;
       }
       .aot-title {
         font-family: var(--title-font);
@@ -31,7 +48,7 @@
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0e12; }
       canvas { display: block; }
-      #hud { position: fixed; inset: 0; pointer-events: none; font-family: var(--hud-font); color: #f2ede4; user-select: none; }
+      #hud { position: fixed; inset: 0; pointer-events: none; font-family: var(--body-font); color: #f2ede4; user-select: none; }
 
       /* crosshair */
       #crosshair {
@@ -49,8 +66,8 @@
       #crosshair.in-range::after { border-color: #7fe08fd0; transform: scale(1.15); }
 
       /* bottom left: gas + blades */
-      #meters { position: absolute; left: 24px; bottom: 24px; width: 240px; }
-      .meter-label { font-size: 11px; letter-spacing: 2px; opacity: 0.85; margin-bottom: 3px; }
+      #meters { position: absolute; left: 24px; bottom: 24px; width: 250px; }
+      .meter-label { font-family: var(--header-font); font-size: 13px; font-weight: 600; letter-spacing: 3px; opacity: 0.9; margin-bottom: 3px; }
       #gas-bar, #blade-bar, #focus-bar { height: 10px; background: #ffffff22; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
       #gas-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #6fc3df, #a8e6ff); transition: width 0.1s linear; }
       #blade-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #cfd6dd, #ffffff); transition: width 0.1s linear; }
@@ -64,36 +81,36 @@
         background: radial-gradient(ellipse at center, transparent 45%, #2b1e6bcc 130%);
       }
       #focus-vignette.on { opacity: 1; }
-      #blade-pairs { font-size: 13px; letter-spacing: 1px; opacity: 0.9; }
+      #blade-pairs { font-size: 14px; letter-spacing: 1px; opacity: 0.9; }
       #meters .low { animation: pulse-red 0.8s infinite; }
       @keyframes pulse-red { 50% { filter: drop-shadow(0 0 6px #ff5544) } }
 
       /* top left: hearts */
-      #hearts { position: absolute; left: 24px; top: 20px; font-size: 24px; letter-spacing: 4px; color: #ff5566; text-shadow: 0 0 8px #ff556688; }
+      #hearts { position: absolute; left: 24px; top: 20px; font-size: 26px; letter-spacing: 4px; color: #ff5566; text-shadow: 0 0 8px #ff556688; }
 
       /* top right: score */
       #scorebox { position: absolute; right: 24px; top: 20px; text-align: right; }
-      #score { font-size: 30px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 2px 8px #000a; }
-      #combo { font-size: 15px; color: #ffd57a; min-height: 20px; text-shadow: 0 0 10px #ffb347aa; }
-      #best { font-size: 11px; opacity: 0.7; letter-spacing: 1px; }
-      #speedo { position: absolute; right: 24px; bottom: 24px; font-size: 13px; letter-spacing: 2px; opacity: 0.75; text-align: right; }
+      #score { font-family: var(--header-font); font-size: 34px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 2px 8px #000a; }
+      #combo { font-size: 17px; color: #ffd57a; min-height: 22px; text-shadow: 0 0 10px #ffb347aa; }
+      #best { font-family: var(--header-font); font-size: 12px; opacity: 0.75; letter-spacing: 2px; }
+      #speedo { position: absolute; right: 24px; bottom: 24px; font-family: var(--header-font); font-size: 15px; letter-spacing: 2px; opacity: 0.8; text-align: right; }
       #speedo .fast { color: #9fe2ff; }
 
       /* wave banner + point popups */
       #banner {
         position: absolute; left: 50%; top: 18%; transform: translateX(-50%);
-        font-size: 52px; white-space: nowrap;
+        font-size: 54px; white-space: nowrap;
         opacity: 0; transition: opacity 0.3s;
       }
       #banner.show { opacity: 1; }
       #popup {
         position: absolute; left: 50%; top: 42%; transform: translateX(-50%);
-        font-size: 22px; font-weight: 700; color: #ffd57a; text-shadow: 0 0 12px #ffb347;
-        opacity: 0;
+        font-family: var(--header-font); font-size: 24px; font-weight: 700; color: #ffd57a; text-shadow: 0 0 12px #ffb347;
+        opacity: 0; white-space: nowrap;
       }
       #popup.pop { animation: floatup 0.9s ease-out; }
       @keyframes floatup { 0% { opacity: 1; transform: translate(-50%, 0) } 100% { opacity: 0; transform: translate(-50%, -46px) } }
-      #prompt { position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); font-size: 15px; letter-spacing: 3px; opacity: 0.9; text-shadow: 0 0 8px #000; }
+      #prompt { position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); font-family: var(--header-font); font-size: 16px; letter-spacing: 3px; opacity: 0.9; text-shadow: 0 0 8px #000; }
 
       /* damage vignette + slash flash */
       #vignette { position: absolute; inset: 0; box-shadow: inset 0 0 140px 40px #c1121f; opacity: 0; transition: opacity 0.15s; }
@@ -104,31 +121,130 @@
       /* overlays */
       .overlay {
         position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: #0b0e12d8; pointer-events: auto; text-align: center; gap: 14px;
+        background: radial-gradient(ellipse at 50% 30%, #16111ae6 0%, #07060af5 78%);
+        pointer-events: auto; text-align: center; gap: 16px;
       }
       .overlay.hidden { display: none; }
-      .overlay h1 { font-size: 76px; }
-      .overlay h2 { font-size: 54px; }
-      .overlay .sub { opacity: 0.75; font-size: 14px; letter-spacing: 2px; max-width: 560px; line-height: 1.7; }
-      .overlay .keys { font-size: 13px; opacity: 0.85; line-height: 2; letter-spacing: 1px; }
-      .overlay .keys b { color: #a8e6ff; }
+      .overlay h1 { font-size: 84px; }
+      .overlay h2 { font-size: 58px; }
+      .overlay .sub { color: var(--parchment); opacity: 0.85; font-size: 21px; max-width: 720px; line-height: 1.6; }
+      .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.1; letter-spacing: 0.5px; }
+      .overlay .keys b { font-family: var(--header-font); font-size: 15px; color: var(--brass-bright); letter-spacing: 1px; }
+      .menu-col { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 6px; }
+
+      /* AoT plate buttons: chamfered steel over dark linen, brass rim, crimson underglow.
+         The plate lives on ::before (clipped); the rim is offset drop-shadows on the
+         button itself, so it follows the chamfered silhouette instead of getting cut. */
       .overlay button {
-        pointer-events: auto; cursor: pointer; font-family: var(--hud-font);
-        font-size: 16px; letter-spacing: 3px; padding: 12px 34px; border-radius: 6px;
-        border: 1px solid #a8e6ff66; background: #16323f; color: #e8f6ff;
+        pointer-events: auto; cursor: pointer; position: relative;
+        font-family: var(--header-font); font-weight: 700; text-transform: uppercase;
+        font-size: 18px; letter-spacing: 5px; color: var(--parchment);
+        min-width: 300px; padding: 15px 46px;
+        border: none; background: none;
+        filter:
+          drop-shadow(1.5px 0 0 var(--brass)) drop-shadow(-1.5px 0 0 var(--brass))
+          drop-shadow(0 1.5px 0 var(--brass)) drop-shadow(0 -1.5px 0 var(--brass))
+          drop-shadow(0 8px 12px #000b);
+        text-shadow: 0 2px 3px #000d;
+        transition: color 0.15s, filter 0.2s, transform 0.12s;
       }
-      .overlay button:hover { background: #1e4458; }
-      #upgrade-cards { display: flex; gap: 18px; }
+      .overlay button::before {
+        content: ''; position: absolute; inset: 0; z-index: -1;
+        background:
+          linear-gradient(180deg, #2a2218e6, #150f09f2),
+          url('/textures/linen.jpg') center / 260px;
+        clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px), calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+        box-shadow: inset 0 0 26px #000c;
+        transition: box-shadow 0.15s;
+      }
+      .overlay button:hover {
+        color: #fff6e2; transform: translateY(-1px);
+        filter:
+          drop-shadow(1.5px 0 0 var(--brass-bright)) drop-shadow(-1.5px 0 0 var(--brass-bright))
+          drop-shadow(0 1.5px 0 var(--brass-bright)) drop-shadow(0 -1.5px 0 var(--brass-bright))
+          drop-shadow(0 0 12px #c1121f66) drop-shadow(0 8px 12px #000b);
+        text-shadow: 0 0 14px #ffd57a70, 0 2px 3px #000d;
+      }
+      .overlay button:hover::before {
+        box-shadow: inset 0 0 26px #000a, inset 0 -18px 34px -14px #c1121fb0;
+      }
+      .overlay button:active { transform: translateY(1px); }
+      .overlay button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 3px; }
+      .overlay button.primary {
+        font-size: 22px; letter-spacing: 7px; padding: 18px 58px; min-width: 340px;
+        filter:
+          drop-shadow(1.5px 0 0 var(--brass-bright)) drop-shadow(-1.5px 0 0 var(--brass-bright))
+          drop-shadow(0 1.5px 0 var(--brass-bright)) drop-shadow(0 -1.5px 0 var(--brass-bright))
+          drop-shadow(0 0 10px #a3131d99) drop-shadow(0 8px 12px #000b);
+      }
+      .overlay button.primary::before {
+        background:
+          linear-gradient(180deg, #32201aeb, #170d0bf4),
+          url('/textures/linen.jpg') center / 260px;
+        box-shadow: inset 0 0 30px #000c, inset 0 -16px 30px -14px #a3131d80;
+      }
+      .overlay button.primary:hover {
+        filter:
+          drop-shadow(1.5px 0 0 #e8c977) drop-shadow(-1.5px 0 0 #e8c977)
+          drop-shadow(0 1.5px 0 #e8c977) drop-shadow(0 -1.5px 0 #e8c977)
+          drop-shadow(0 0 14px #c1121faa) drop-shadow(0 8px 12px #000b);
+      }
+
+      /* upgrade cards: field-modification plaques, same plate construction */
+      #upgrade-cards { display: flex; gap: 20px; }
       .card {
-        pointer-events: auto; cursor: pointer; width: 210px; padding: 20px 16px; border-radius: 10px;
-        border: 1px solid #ffffff2a; background: #141a22ee; transition: transform 0.12s, border-color 0.12s;
+        pointer-events: auto; cursor: pointer; position: relative; width: 230px; padding: 24px 18px;
+        filter:
+          drop-shadow(1.5px 0 0 #8a6d38) drop-shadow(-1.5px 0 0 #8a6d38)
+          drop-shadow(0 1.5px 0 #8a6d38) drop-shadow(0 -1.5px 0 #8a6d38)
+          drop-shadow(0 8px 12px #000b);
+        transition: transform 0.12s, filter 0.2s;
       }
-      .card:hover { transform: translateY(-6px); border-color: #ffd57a; }
-      .card .card-name { font-size: 17px; font-weight: 700; color: #ffd57a; margin-bottom: 10px; letter-spacing: 1px; }
-      .card .card-desc { font-size: 13px; opacity: 0.85; line-height: 1.6; }
-      .stats { font-size: 15px; letter-spacing: 2px; line-height: 2.1; }
-      .stats b { color: #ffd57a; }
-      .seedline { font-size: 12px; opacity: 0.6; letter-spacing: 1px; }
+      .card::before {
+        content: ''; position: absolute; inset: 0; z-index: -1;
+        background:
+          linear-gradient(180deg, #241d15eb, #120d08f4),
+          url('/textures/linen.jpg') center / 260px;
+        clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+        box-shadow: inset 0 0 24px #000b;
+        transition: box-shadow 0.15s;
+      }
+      .card:hover {
+        transform: translateY(-6px);
+        filter:
+          drop-shadow(1.5px 0 0 var(--brass-bright)) drop-shadow(-1.5px 0 0 var(--brass-bright))
+          drop-shadow(0 1.5px 0 var(--brass-bright)) drop-shadow(0 -1.5px 0 var(--brass-bright))
+          drop-shadow(0 0 12px #c1121f77) drop-shadow(0 8px 12px #000b);
+      }
+      .card:hover::before {
+        box-shadow: inset 0 0 24px #0009, inset 0 -16px 30px -12px #c1121f90;
+      }
+      .card .card-name { font-family: var(--header-font); font-size: 20px; font-weight: 700; color: #e8c15a; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 2px 3px #000c; }
+      .card .card-desc { font-size: 17px; color: var(--parchment); opacity: 0.9; line-height: 1.6; }
+      .stats { font-family: var(--header-font); font-size: 18px; letter-spacing: 2px; line-height: 2.2; color: #d9cfbc; }
+      .stats b { color: #ffd57a; font-size: 22px; }
+      .seedline { font-size: 15px; color: var(--parchment); opacity: 0.6; letter-spacing: 1px; }
+
+      /* settings */
+      .set-rows { display: flex; flex-direction: column; gap: 20px; margin: 10px 0 14px; }
+      .set-row { display: flex; align-items: center; gap: 18px; }
+      .set-label { font-family: var(--header-font); font-size: 17px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--parchment); width: 260px; text-align: right; }
+      .set-val { font-size: 19px; color: var(--brass-bright); width: 68px; text-align: left; }
+      .set-row input[type='range'] {
+        -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: pointer;
+        width: 280px; height: 8px; border: 1px solid #6b5124; background: #191410;
+        background-image: linear-gradient(90deg, var(--brass) var(--fill, 50%), transparent var(--fill, 50%));
+      }
+      .set-row input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 18px; height: 18px;
+        background: radial-gradient(circle at 35% 30%, var(--brass-bright), #7a5c22);
+        border: 1px solid #241b0e; transform: rotate(45deg);
+      }
+      .set-row input[type='range']::-moz-range-thumb {
+        width: 16px; height: 16px; border-radius: 0;
+        background: radial-gradient(circle at 35% 30%, var(--brass-bright), #7a5c22);
+        border: 1px solid #241b0e; transform: rotate(45deg);
+      }
     </style>
   </head>
   <body>
@@ -164,8 +280,33 @@
           <b>Mouse</b> look &nbsp;·&nbsp; <b>LMB / RMB</b> (or <b>J / K</b>) hold to hook &amp; winch in, release to let go<br />
           <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost burst &nbsp;·&nbsp; <b>Q</b> focus (slow time) &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply
         </div>
-        <button id="start-btn">DEPLOY</button>
+        <div class="menu-col">
+          <button id="start-btn" class="primary">Deploy</button>
+          <button id="settings-btn">Settings</button>
+        </div>
         <div class="seedline" id="seed-line"></div>
+      </div>
+
+      <div id="settings" class="overlay hidden">
+        <h2 class="aot-title">Settings</h2>
+        <div class="set-rows">
+          <div class="set-row">
+            <span class="set-label">Music</span>
+            <input id="set-music" type="range" min="0" max="100" step="5" />
+            <span class="set-val" id="set-music-val"></span>
+          </div>
+          <div class="set-row">
+            <span class="set-label">Sound Effects</span>
+            <input id="set-sfx" type="range" min="0" max="100" step="5" />
+            <span class="set-val" id="set-sfx-val"></span>
+          </div>
+          <div class="set-row">
+            <span class="set-label">Mouse Sensitivity</span>
+            <input id="set-sens" type="range" min="30" max="200" step="5" />
+            <span class="set-val" id="set-sens-val"></span>
+          </div>
+        </div>
+        <button id="settings-back">Back</button>
       </div>
 
       <div id="upgrade" class="overlay hidden">
@@ -177,7 +318,7 @@
       <div id="death" class="overlay hidden">
         <h2 class="aot-title">Devoured</h2>
         <div class="stats" id="death-stats"></div>
-        <button id="retry-btn">ONCE MORE</button>
+        <button id="retry-btn" class="primary">Once More</button>
         <div class="seedline" id="death-seed"></div>
       </div>
     </div>

@@ -13,6 +13,14 @@ export interface HudFrame {
   hookInRange: boolean
 }
 
+export interface SettingsValues {
+  music: number
+  sfx: number
+  sensitivity: number
+}
+
+const SLIDER_IDS = ['set-music', 'set-sfx', 'set-sens'] as const
+
 export class Hud {
   private crosshair = el('crosshair')
   private hearts = el('hearts')
@@ -37,17 +45,67 @@ export class Hud {
   private upgradeCards = el('upgrade-cards')
   private death = el('death')
   private deathStats = el('death-stats')
+  private settingsPanel = el('settings')
   private bannerTimer: number | undefined
 
   onStart: () => void = () => {}
   onRetry: () => void = () => {}
   onPickUpgrade: (id: string) => void = () => {}
+  onOpenSettings: () => void = () => {}
+  onCloseSettings: () => void = () => {}
+  onSettingsChange: (values: SettingsValues) => void = () => {}
 
   constructor(seed: string) {
     el('seed-line').textContent = `seed: ${seed} — share the URL with ?seed=${encodeURIComponent(seed)} to race the same city`
     el('death-seed').textContent = `seed: ${seed}`
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
     el<HTMLButtonElement>('retry-btn').addEventListener('click', () => this.onRetry())
+    el<HTMLButtonElement>('settings-btn').addEventListener('click', () => this.onOpenSettings())
+    el<HTMLButtonElement>('settings-back').addEventListener('click', () => this.onCloseSettings())
+    for (const id of SLIDER_IDS) {
+      el<HTMLInputElement>(id).addEventListener('input', () => {
+        this.refreshSettingsDisplay()
+        this.onSettingsChange(this.readSettings())
+      })
+    }
+  }
+
+  initSettings(values: SettingsValues): void {
+    el<HTMLInputElement>('set-music').value = String(Math.round(values.music * 100))
+    el<HTMLInputElement>('set-sfx').value = String(Math.round(values.sfx * 100))
+    el<HTMLInputElement>('set-sens').value = String(Math.round(values.sensitivity * 100))
+    this.refreshSettingsDisplay()
+  }
+
+  private refreshSettingsDisplay(): void {
+    for (const id of SLIDER_IDS) {
+      const input = el<HTMLInputElement>(id)
+      const min = Number(input.min)
+      const pct = ((input.valueAsNumber - min) / (Number(input.max) - min)) * 100
+      input.style.setProperty('--fill', `${pct.toFixed(0)}%`)
+      el(`${id}-val`).textContent = `${input.value}%`
+    }
+  }
+
+  private readSettings(): SettingsValues {
+    return {
+      music: el<HTMLInputElement>('set-music').valueAsNumber / 100,
+      sfx: el<HTMLInputElement>('set-sfx').valueAsNumber / 100,
+      sensitivity: el<HTMLInputElement>('set-sens').valueAsNumber / 100,
+    }
+  }
+
+  showSettings(): void {
+    this.start.classList.add('hidden')
+    this.settingsPanel.classList.remove('hidden')
+  }
+
+  hideSettings(): void {
+    this.settingsPanel.classList.add('hidden')
+  }
+
+  get settingsOpen(): boolean {
+    return !this.settingsPanel.classList.contains('hidden')
   }
 
   update(game: GameState, frame: HudFrame): void {

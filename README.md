@@ -25,6 +25,9 @@ Click **DEPLOY** (grabs pointer lock), then:
 | R | Resupply gas, canisters and blades at the green plaza ring |
 | Esc | Pause / resume |
 
+Music volume, sound-effect volume and mouse sensitivity live under **Settings** in the pause
+menu; they apply immediately and persist across sessions.
+
 You carry a gas tank plus 3 spare canisters; an empty tank auto-swaps a canister in.
 When the last one runs dry, only a resupply refills you.
 
@@ -71,7 +74,10 @@ is synthesized at runtime with WebAudio.
 - Titan roars, grunts, flinches, slice, groans, scream: [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx) by rubberduck (OpenGameArt)
 - Blade whooshes: [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes) by StarNinjas (OpenGameArt)
 
-Title font: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free).
+Fonts: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free) for
+titles; [Cinzel](https://fonts.google.com/specimen/Cinzel) and
+[Alegreya](https://fonts.google.com/specimen/Alegreya) (both SIL Open Font License, self-hosted)
+for labels and body text.
 
 Music (two tracks alternating in-game):
 - "Five Armies" by Kevin MacLeod ([incompetech.com](https://incompetech.com)) — licensed under [Creative Commons: By Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)

@@ -65,8 +65,9 @@ window.addEventListener('mouseup', (e) => {
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 window.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return
-  yaw -= e.movementX * 0.0023
-  pitch = Math.min(1.45, Math.max(-1.45, pitch - e.movementY * 0.0023))
+  const look = 0.0023 * settings.sensitivity
+  yaw -= e.movementX * look
+  pitch = Math.min(1.45, Math.max(-1.45, pitch - e.movementY * look))
 })
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
@@ -83,6 +84,12 @@ document.addEventListener('pointerlockchange', () => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Escape') return
+  if (hud.settingsOpen) {
+    // Escape backs out of settings to the menu underneath instead of resuming
+    hud.hideSettings()
+    hud.showStart(game.phase === 'playing')
+    return
+  }
   if (game.phase !== 'playing' || document.pointerLockElement === renderer.domElement) return
   const wait = Math.max(0, 1350 - (performance.now() - lastUnlockAt))
   window.clearTimeout(resumeTimer)
@@ -137,6 +144,40 @@ function beginRun(): void {
     hud.showBanner('Wave 1')
   }
   lockPointer()
+}
+
+// settings: persisted sliders applied live to the audio buses and mouse look
+const SETTINGS_KEY = 'aot-odm-settings'
+function loadSettings(): { music: number; sfx: number; sensitivity: number } {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<{ music: number; sfx: number; sensitivity: number }>
+      return { music: parsed.music ?? 0.7, sfx: parsed.sfx ?? 1, sensitivity: parsed.sensitivity ?? 1 }
+    }
+  } catch {
+    // corrupt storage falls through to defaults
+  }
+  return { music: 0.7, sfx: 1, sensitivity: 1 }
+}
+const settings = loadSettings()
+audio.setMusicVolume(settings.music)
+audio.setSfxVolume(settings.sfx)
+hud.initSettings(settings)
+hud.onOpenSettings = () => hud.showSettings()
+hud.onCloseSettings = () => {
+  hud.hideSettings()
+  hud.showStart(game.phase === 'playing')
+}
+hud.onSettingsChange = (values) => {
+  Object.assign(settings, values)
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+  } catch {
+    // private mode: settings just do not persist
+  }
+  audio.setMusicVolume(values.music)
+  audio.setSfxVolume(values.sfx)
 }
 
 hud.onStart = beginRun
@@ -271,12 +312,13 @@ renderer.setAnimationLoop(() => {
   }
 
   if (game.phase !== prevPhase) {
-    if (game.phase === 'upgrading') {
+    if (game.phase === 'upgrading' || game.phase === 'dead') {
       document.exitPointerLock()
-      hud.showUpgrades(game.offers)
-    } else if (game.phase === 'dead') {
-      document.exitPointerLock()
-      hud.showDeath(game)
+      hud.hideStart() // a lingering pause overlay must not sit under the new menu
+      hud.hideSettings()
+      pauseShown = false
+      if (game.phase === 'upgrading') hud.showUpgrades(game.offers)
+      else hud.showDeath(game)
     }
     prevPhase = game.phase
   }
