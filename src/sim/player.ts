@@ -122,7 +122,7 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
 }
 
 const BOOST_IMPULSE = 13
-const BOOST_COST = 14
+export const BOOST_COST = 14 // the HUD segments the gas bar into taps of this size
 const BOOST_COOLDOWN = 0.5
 
 /** Click-burst dash along the look direction (full 3D). Airborne only. */

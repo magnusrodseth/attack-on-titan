@@ -65,13 +65,23 @@
       }
       #crosshair.in-range::after { border-color: #7fe08fd0; transform: scale(1.15); }
 
-      /* bottom left: gas + blades */
-      #meters { position: absolute; left: 24px; bottom: 24px; width: 250px; }
-      .meter-label { font-family: var(--header-font); font-size: 13px; font-weight: 600; letter-spacing: 3px; opacity: 0.9; margin-bottom: 3px; }
-      #gas-bar, #blade-bar, #focus-bar { height: 10px; background: #ffffff22; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
-      #gas-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #6fc3df, #a8e6ff); transition: width 0.1s linear; }
-      #blade-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #cfd6dd, #ffffff); transition: width 0.1s linear; }
-      #focus-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #9b7bff, #d3c2ff); transition: width 0.1s linear; }
+      /* bottom left: health + gas + blades + focus, brass-framed field gauges */
+      #meters { position: absolute; left: 24px; bottom: 24px; width: 260px; }
+      .meter-label { font-family: var(--header-font); font-size: 13px; font-weight: 600; letter-spacing: 3px; color: var(--parchment); opacity: 0.95; margin-bottom: 4px; text-shadow: 0 1px 2px #000c; }
+      #hearts { font-size: 22px; letter-spacing: 5px; line-height: 1; color: #ff5566; text-shadow: 0 0 8px #ff556688; margin-bottom: 12px; }
+      #hearts .empty { color: #55272e; text-shadow: none; }
+      .bar { position: relative; height: 12px; margin-bottom: 12px; background: #14100b; border: 1px solid #6b5124; box-shadow: inset 0 1px 5px #000d, 0 1px 0 #00000088; }
+      .bar .fill { height: 100%; width: 100%; transition: width 0.1s linear; }
+      #gas-fill { background: linear-gradient(180deg, #f0cb6b, #a97c2c); }
+      #blade-fill { background: linear-gradient(180deg, #f4f8fb, #93a1ad); }
+      #focus-fill { background: linear-gradient(180deg, #c3adff, #6d4fd0); }
+      /* segmented gauges read as countable uses; separators overlay the fill */
+      .bar.segmented::after {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: repeating-linear-gradient(90deg,
+          transparent 0 calc(100% / var(--segs, 1) - 2px),
+          #0b0e12e6 calc(100% / var(--segs, 1) - 2px) calc(100% / var(--segs, 1)));
+      }
       #minimap {
         position: absolute; top: 118px; right: 24px; border-radius: 50%;
         background: rgba(10, 14, 18, 0.55); box-shadow: 0 0 0 2px #ffffff2a;
@@ -81,12 +91,8 @@
         background: radial-gradient(ellipse at center, transparent 45%, #2b1e6bcc 130%);
       }
       #focus-vignette.on { opacity: 1; }
-      #blade-pairs { font-size: 14px; letter-spacing: 1px; opacity: 0.9; }
       #meters .low { animation: pulse-red 0.8s infinite; }
       @keyframes pulse-red { 50% { filter: drop-shadow(0 0 6px #ff5544) } }
-
-      /* top left: hearts */
-      #hearts { position: absolute; left: 24px; top: 20px; font-size: 26px; letter-spacing: 4px; color: #ff5566; text-shadow: 0 0 8px #ff556688; }
 
       /* top right: score */
       #scorebox { position: absolute; right: 24px; top: 20px; text-align: right; }
@@ -258,19 +264,20 @@
   <body>
     <div id="hud">
       <div id="crosshair"></div>
-      <div id="hearts"></div>
       <div id="scorebox">
         <div id="score">0</div>
         <div id="combo"></div>
         <div id="best"></div>
       </div>
       <div id="meters">
+        <div class="meter-label">HEALTH</div>
+        <div id="hearts"></div>
         <div class="meter-label">GAS <span id="gas-canisters"></span></div>
-        <div id="gas-bar"><div id="gas-fill"></div></div>
+        <div id="gas-bar" class="bar segmented"><div id="gas-fill" class="fill"></div></div>
         <div class="meter-label">BLADE <span id="blade-pairs"></span></div>
-        <div id="blade-bar"><div id="blade-fill"></div></div>
+        <div id="blade-bar" class="bar segmented"><div id="blade-fill" class="fill"></div></div>
         <div class="meter-label">FOCUS</div>
-        <div id="focus-bar"><div id="focus-fill"></div></div>
+        <div id="focus-bar" class="bar"><div id="focus-fill" class="fill"></div></div>
       </div>
       <canvas id="minimap" width="170" height="170"></canvas>
       <div id="focus-vignette"></div>

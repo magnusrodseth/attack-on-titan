@@ -1,4 +1,5 @@
 import type { GameState } from './sim/game'
+import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
 
 function el<T extends HTMLElement>(id: string): T {
@@ -27,8 +28,10 @@ export class Hud {
   private score = el('score')
   private combo = el('combo')
   private best = el('best')
+  private gasBar = el('gas-bar')
   private gasFill = el('gas-fill')
   private gasCanisters = el('gas-canisters')
+  private bladeBar = el('blade-bar')
   private focusFill = el('focus-fill')
   private focusVignette = el('focus-vignette')
   private bladeFill = el('blade-fill')
@@ -142,7 +145,10 @@ export class Hud {
   update(game: GameState, frame: HudFrame): void {
     const p = game.player
     this.crosshair.classList.toggle('in-range', frame.hookInRange)
-    this.hearts.textContent = '♥ '.repeat(Math.max(0, p.hp)).trim()
+    const hp = Math.max(0, p.hp)
+    const lost = Math.max(0, p.config.maxHp - hp)
+    this.hearts.innerHTML =
+      '♥ '.repeat(hp).trim() + (lost > 0 ? ` <span class="empty">${'♥ '.repeat(lost).trim()}</span>` : '')
     this.score.textContent = String(game.score.score)
     this.combo.textContent =
       game.score.combo > 1 ? `×${(1 + 0.25 * Math.min(game.score.combo, 12)).toFixed(2)} chain (${game.score.combo})` : ''
@@ -153,6 +159,9 @@ export class Hud {
     this.gasCanisters.textContent = `×${p.canisters}`
     this.bladeFill.style.width = `${((p.bladeHp / p.config.bladeDurability) * 100).toFixed(1)}%`
     this.bladePairs.textContent = `×${p.blades}`
+    // segment the gauges into countable uses (upgrades can change both counts)
+    this.gasBar.style.setProperty('--segs', String(Math.max(1, Math.floor(p.config.maxGas / BOOST_COST))))
+    this.bladeBar.style.setProperty('--segs', String(Math.max(1, p.config.bladeDurability)))
     this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
 
     this.focusFill.style.width = `${game.focus.toFixed(1)}%`
