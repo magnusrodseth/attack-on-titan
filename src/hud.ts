@@ -91,7 +91,6 @@ export class Hud {
   onCloseLeaderboard: () => void = () => {}
 
   constructor(seed: string) {
-    el('seed-line').textContent = `seed: ${seed} — share the URL with ?seed=${encodeURIComponent(seed)} to race the same city`
     el('death-seed').textContent = `seed: ${seed}`
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
     el<HTMLButtonElement>('restart-btn').addEventListener('click', () => this.onRestart())
@@ -269,6 +268,7 @@ export class Hud {
 
   showStart(resume = false): void {
     this.start.classList.remove('hidden')
+    this.start.classList.toggle('paused', resume) // pause menu lays the buttons out as a two-column grid
     this.start.querySelector('h1')!.textContent = resume ? 'Paused' : 'Wings of Freedom'
     el<HTMLButtonElement>('start-btn').textContent = resume ? 'Resume' : 'Deploy Your Soldier'
     el<HTMLButtonElement>('restart-btn').classList.toggle('hidden', !resume) // mid-run only

@@ -141,12 +141,14 @@
         .overlay h1 { font-size: 52px; }
         .overlay h2 { font-size: 40px; }
         .overlay .sub { font-size: 18px; padding: 0 22px; }
+        #start.paused .menu-col { grid-template-columns: 1fr; }
       }
       .overlay .sub { color: var(--parchment); opacity: 0.85; font-size: 21px; max-width: 720px; line-height: 1.6; }
       .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.1; letter-spacing: 0.5px; }
       .overlay .keys b { font-family: var(--header-font); font-size: 15px; color: var(--brass-bright); letter-spacing: 1px; }
       .menu-col { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 6px; }
       .menu-col button.hidden { display: none; }
+      #start.paused .menu-col { display: grid; grid-template-columns: 1fr 1fr; }
 
       /* AoT plate buttons: chamfered steel over dark linen, brass rim, crimson underglow.
          The plate lives on ::before (clipped); the rim is offset drop-shadows on the
@@ -424,16 +426,15 @@
         <div class="menu-col">
           <button id="start-btn" class="primary">Deploy Your Soldier</button>
           <button id="restart-btn" class="hidden solo-only">Restart Run</button>
-          <button id="coop-btn" class="solo-only">Play With Friends</button>
+          <button id="coop-btn" class="solo-only">Multiplayer</button>
           <button id="modes-btn" class="solo-only">Game Mode</button>
           <button id="leaderboard-btn">Leaderboard</button>
           <button id="settings-btn">Settings</button>
         </div>
-        <div class="seedline" id="seed-line"></div>
       </div>
 
       <div id="coop" class="overlay hidden">
-        <h2 class="aot-title">Play With Friends</h2>
+        <h2 class="aot-title">Multiplayer</h2>
         <div id="coop-auth" class="hidden">
           <div class="sub">Enlist a soldier name to muster with your squad. No email, just a handle and a password.</div>
           <div class="coop-rows">
