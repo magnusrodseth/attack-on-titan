@@ -377,7 +377,7 @@ export class Hud {
       const name = player.id === me ? `${player.id} · you` : player.id
       row.innerHTML =
         `<span class="rr-rank">${player.mvp ? '♛' : index + 1}</span>` +
-        `<span class="rr-name">${name}${player.mvp ? ' — MVP' : ''}</span>` +
+        `<span class="rr-name">${name}${player.mvp ? ' · MVP' : ''}</span>` +
         `<span class="rr-stats">${player.kills} kills · ${player.deaths} deaths</span>` +
         `<span class="rr-score">${player.score}</span>`
       rows.appendChild(row)

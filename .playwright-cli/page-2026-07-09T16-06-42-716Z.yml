@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - generic: "0"
+      - generic: BEST 0 · WAVE 0
+    - generic:
+      - generic: HEALTH
+      - generic: ♥ ♥ ♥ ♥ ♥
+      - generic: GAS ×3
+      - generic: BLADE ×4
+      - generic: FOCUS
+    - generic: 0 km/h
+    - generic [ref=e2]:
+      - heading "Play With Friends" [level=2] [ref=e3]
+      - generic [ref=e4]:
+        - generic [ref=e5]: Enlist a soldier name to muster with your squad. No email, just a handle and a password.
+        - generic [ref=e6]:
+          - textbox "Soldier handle" [ref=e7]
+          - textbox "Password" [ref=e8]
+          - button "Enlist" [ref=e9] [cursor=pointer]
+          - button "Sign In" [ref=e10] [cursor=pointer]
+      - button "Back" [ref=e11] [cursor=pointer]

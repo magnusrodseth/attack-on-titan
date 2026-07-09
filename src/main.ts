@@ -514,7 +514,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
           document.exitPointerLock()
           effects.addShake(1)
           audio.play('player-death', { volume: 0.7, rate: 0.85 })
-          hud.showBanner('Devoured — Watching the Squad', 2600)
+          hud.showBanner('Devoured · Watching the Squad', 2600)
         } else {
           hud.addFeedLine(`<b>${event.playerId}</b> was devoured`)
         }
@@ -778,7 +778,7 @@ renderer.setAnimationLoop(() => {
 
   if (coopBattle && coop) {
     const intermission = coop.buf.b?.phase === 'upgrading'
-    if (piloting && locked) {
+    if (piloting && (locked || debug.autopilot)) {
       if (pauseShown) {
         hud.hideStart()
         pauseShown = false
@@ -791,7 +791,7 @@ renderer.setAnimationLoop(() => {
         handleCoopIntents(game.events)
         acc -= SIM_DT
       }
-    } else if (piloting && !intermission && !debug.silent && !pauseShown) {
+    } else if (piloting && !intermission && !debug.autopilot && !debug.silent && !pauseShown) {
       hud.showStart(true)
       pauseShown = true
     }

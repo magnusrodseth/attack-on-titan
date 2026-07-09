@@ -108,7 +108,14 @@ export function connectRoom(
   })
   socket.addEventListener('message', (event) => {
     const msg = parseServerMsg(event.data as unknown)
-    if (msg) onMessage(msg)
+    if (!msg) return
+    // lightweight tap for automated verification: counts per message type
+    const stats = ((window as unknown as Record<string, unknown>).__aotNet ??= {}) as Record<string, number>
+    stats[msg.type] = (stats[msg.type] ?? 0) + 1
+    if (msg.type === 'events') {
+      for (const e of msg.events) stats[`ev:${e.type}`] = (stats[`ev:${e.type}`] ?? 0) + 1
+    }
+    onMessage(msg)
   })
   socket.addEventListener('close', onClose)
   let closedByUs = false
