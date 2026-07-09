@@ -66,3 +66,9 @@ is synthesized at runtime with WebAudio.
 - Blade whooshes: [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes) by StarNinjas (OpenGameArt)
 
 Title font: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free).
+
+## Art credits (all CC0)
+
+- Textures (plaster, clay roof tiles, cobblestone, castle wall) from [Poly Haven](https://polyhaven.com/textures)
+- Tree clumps and mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg
+- Clouds from [Kenney Starter Kit 3D Platformer](https://github.com/KenneyNL/Starter-Kit-3D-Platformer)

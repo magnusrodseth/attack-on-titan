@@ -143,7 +143,7 @@ export class Effects {
 
     // wind streaks: only at speed, aligned with velocity
     const speed = playerVel.length()
-    const strength = Math.min(1, Math.max(0, (speed - 16) / 42))
+    const strength = Math.min(1, Math.max(0, (speed - 12) / 26))
     this.streakMat.opacity = strength * 0.45
     this.streaks.visible = strength > 0.01
     if (this.streaks.visible) {

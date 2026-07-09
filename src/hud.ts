@@ -65,7 +65,8 @@ export class Hud {
     this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
 
     const kmh = Math.round(frame.speed * 3.6)
-    this.speedo.innerHTML = frame.speed > 20 ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
+    this.speedo.innerHTML =
+      frame.speed >= p.config.killSpeed ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
 
     this.prompt.textContent =
       frame.nearStation && game.phase === 'playing' ? 'R — RESUPPLY' : ''

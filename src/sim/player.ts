@@ -29,28 +29,31 @@ export interface PlayerConfig {
   speedCap: number
 }
 
+// Balance anchored in swing physics (see docs/research/odm-mechanics.md): a natural
+// pendulum bottoms out near 11 m/s, nape strikes need ~17 m/s, and sustained thrust
+// beyond ~3g is blackout territory — so speed must be earned over several seconds.
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   maxGas: 100,
   gasCanisters: 3,
-  gasThrust: 40,
+  gasThrust: 12,
   gasBurn: 22,
-  airBoostThrust: 24,
+  airBoostThrust: 16,
   runSpeed: 8,
   runAccel: 40,
   airControl: 14,
   jumpSpeed: 9,
-  drag: 0.04,
-  reelSpeed: 14,
+  drag: 0.06,
+  reelSpeed: 8,
   hookRange: 90,
   minRopeLength: 3,
   bladePairs: 4,
   bladeDurability: 6,
-  killSpeed: 22,
+  killSpeed: 17,
   slashRange: 6,
   slashCooldown: 0.45,
   maxHp: 3,
   gasKillRefund: 0,
-  speedCap: 75,
+  speedCap: 40,
 }
 
 export interface InputState {
@@ -153,17 +156,13 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
     p.onGround = false
   }
 
-  const boosting = input.gas && p.gas > 0
+  // boost is airborne-only: jump or winch off the ground first, then burn gas
+  const boosting = input.gas && p.gas > 0 && !wasOnGround
   if (boosting) {
     const dir = new Vector3(input.move.x, 0, input.move.z)
     if (dir.lengthSq() === 0) dir.set(input.lookDir.x, 0, input.lookDir.z)
     if (dir.lengthSq() > 0) {
       dir.normalize()
-      if (wasOnGround && anchors.length > 0) {
-        // ODM launch: pop off the ground so the rope takes over from run friction
-        p.vel.y = Math.max(p.vel.y, cfg.jumpSpeed * 0.7)
-        p.onGround = false
-      }
       p.vel.addScaledVector(dir, cfg.gasThrust * dt)
       p.gas = Math.max(0, p.gas - cfg.gasBurn * dt)
     }
@@ -201,7 +200,10 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   }
 
   if (!wasOnGround) {
-    p.vel.multiplyScalar(Math.max(0, 1 - cfg.drag * dt))
+    // linear + quadratic aero drag: a soft ceiling that makes top speed something you
+    // hold onto rather than sit at
+    const speed = p.vel.length()
+    p.vel.multiplyScalar(Math.max(0, 1 - (cfg.drag + 0.009 * speed) * dt))
   }
 
   // the winch is automatic: slack ratchets up instantly, and the rope winds in at a

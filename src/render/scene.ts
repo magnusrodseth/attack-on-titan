@@ -135,9 +135,20 @@ function addHouses(scene: Scene, arena: Arena): void {
 
   const bodyGeometry = new BoxGeometry(1, 1, 1)
   bodyGeometry.translate(0, 0.5, 0)
-  const bodies = new InstancedMesh(
+  // roughly a third of the district is warm brick, the rest tinted plaster
+  const isBrick = (tint: number) => tint < 0.35
+  const plasterBodies = new InstancedMesh(
     bodyGeometry,
     new MeshStandardMaterial({ map: tex('/textures/plaster.jpg', 2, 1), roughness: 0.95 }),
+    houses.length,
+  )
+  const brickBodies = new InstancedMesh(
+    bodyGeometry,
+    new MeshStandardMaterial({
+      map: tex('/textures/brick.jpg', 2, 1),
+      normalMap: tex('/textures/brick_nor.jpg', 2, 1, false),
+      roughness: 0.95,
+    }),
     houses.length,
   )
   const roofs = new InstancedMesh(
@@ -145,9 +156,11 @@ function addHouses(scene: Scene, arena: Arena): void {
     new MeshStandardMaterial({ map: tex('/textures/roof.jpg', 3, 3), roughness: 0.85 }),
     houses.length,
   )
-  bodies.castShadow = true
-  bodies.receiveShadow = true
+  plasterBodies.castShadow = brickBodies.castShadow = true
+  plasterBodies.receiveShadow = brickBodies.receiveShadow = true
   roofs.castShadow = true
+  let plasterCount = 0
+  let brickCount = 0
 
   // emissive-look window quads: shutters dark, ~30% glowing warm
   const windowSlots: Array<{ pos: Vector3; rotY: number; lit: boolean }> = []
@@ -161,10 +174,19 @@ function addHouses(scene: Scene, arena: Arena): void {
     const roofRise = house.h * 0.3
     const eave = house.h - roofRise
     matrix.compose(new Vector3(house.x, 0, house.z), quat, new Vector3(house.w, eave, house.d))
-    bodies.setMatrixAt(i, matrix)
-    // plaster tones: cream, tan, pale ochre — per-instance tint multiplies the texture
-    color.setHSL(0.07 + house.tint * 0.06, 0.26 + house.tint * 0.12, 0.66 + (house.tint % 0.31) * 0.35)
-    bodies.setColorAt(i, color)
+    if (isBrick(house.tint)) {
+      brickBodies.setMatrixAt(brickCount, matrix)
+      // bricks keep their own color; jitter brightness only
+      color.setHSL(0.07, 0.2, 0.72 + (house.tint % 0.18) * 1.2)
+      brickBodies.setColorAt(brickCount, color)
+      brickCount++
+    } else {
+      plasterBodies.setMatrixAt(plasterCount, matrix)
+      // plaster tones: cream, tan, pale ochre — per-instance tint multiplies the texture
+      color.setHSL(0.07 + house.tint * 0.06, 0.26 + house.tint * 0.12, 0.66 + (house.tint % 0.31) * 0.35)
+      plasterBodies.setColorAt(plasterCount, color)
+      plasterCount++
+    }
 
     const alongX = house.ridgeAxis === 'x'
     matrix.compose(
@@ -196,7 +218,9 @@ function addHouses(scene: Scene, arena: Arena): void {
       }
     }
   })
-  scene.add(bodies, roofs)
+  plasterBodies.count = plasterCount
+  brickBodies.count = brickCount
+  scene.add(plasterBodies, brickBodies, roofs)
 
   const windows = new InstancedMesh(
     new PlaneGeometry(1.1, 1.5),

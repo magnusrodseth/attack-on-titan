@@ -266,7 +266,7 @@ renderer.setAnimationLoop(() => {
   camera.rotation.x = pitch
   camera.position.copy(game.player.pos)
   const speed = game.player.vel.length()
-  const targetFov = 75 + 22 * Math.min(1, Math.max(0, (speed - 12) / 55))
+  const targetFov = 75 + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
   camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8)
   camera.updateProjectionMatrix()
   effects.applyShake(camera)

@@ -142,7 +142,7 @@ export class AudioSystem {
 
   setWind(speed: number): void {
     if (!this.ctx || !this.windGain || !this.windFilter) return
-    const target = Math.min(0.4, Math.max(0, (speed - 10) / 60) * 0.5)
+    const target = Math.min(0.4, Math.max(0, (speed - 8) / 34) * 0.5)
     this.windGain.gain.setTargetAtTime(target, this.ctx.currentTime, 0.1)
     this.windFilter.frequency.setTargetAtTime(300 + speed * 28, this.ctx.currentTime, 0.15)
   }

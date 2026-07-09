@@ -67,18 +67,38 @@ describe('stepPlayer', () => {
     expect(p.vel.y).toBeLessThan(0.01) // gravity only; no vertical thrust from boost
   })
 
-  it('launches off the ground when boosting with a hook attached', () => {
+  it('boost does nothing on the ground (airborne-only)', () => {
+    const boosted = createPlayer()
+    const baseline = createPlayer()
+    for (const p of [boosted, baseline]) {
+      p.pos.set(0, EYE_HEIGHT, 0)
+      stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
+    }
+    const withGas = idle()
+    withGas.gas = true
+    withGas.move.set(1, 0, 0)
+    const noGas = idle()
+    noGas.move.set(1, 0, 0)
+    stepPlayer(boosted, withGas, DT, emptyArena())
+    stepPlayer(baseline, noGas, DT, emptyArena())
+    expect(boosted.gas).toBe(boosted.config.maxGas) // no burn
+    expect(boosted.vel.toArray()).toEqual(baseline.vel.toArray())
+  })
+
+  it('jump then boost gets a hooked player moving', () => {
     const p = createPlayer()
     p.pos.set(0, EYE_HEIGHT, 0)
     stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
     attachHook(p.hooks[0], new Vector3(30, 40, 0), p.pos)
-    const input = idle()
-    input.gas = true
-    input.move.set(1, 0, 0)
-    for (let i = 0; i < 60; i++) stepPlayer(p, input, DT, emptyArena())
+    const jumpInput = idle()
+    jumpInput.jump = true
+    stepPlayer(p, jumpInput, DT, emptyArena())
+    const boostInput = idle()
+    boostInput.gas = true
+    boostInput.move.set(1, 0, 0)
+    for (let i = 0; i < 60; i++) stepPlayer(p, boostInput, DT, emptyArena())
     expect(p.onGround).toBe(false)
-    expect(p.pos.y).toBeGreaterThan(EYE_HEIGHT)
-    expect(p.vel.x).toBeGreaterThan(1) // boosting, not pinned by ground friction
+    expect(p.vel.x).toBeGreaterThan(1)
   })
 
   it('makes boost a no-op when tank and all canisters are empty', () => {
@@ -184,7 +204,7 @@ describe('stepPlayer', () => {
     input.move.set(0, 0, 1)
     for (let i = 0; i < 120; i++) stepPlayer(p, input, DT, emptyArena())
     expect(p.vel.z).toBeGreaterThan(10)
-    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(24) // steering, not braking
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(17) // steering redirects; only drag bleeds speed
   })
 
   it('caps speed at the configured maximum', () => {
