@@ -13,6 +13,7 @@ export interface SlashResult {
   speed: number
   bladeBroke: boolean
   titanId?: number
+  ankleSide?: 0 | 1
 }
 
 /**
@@ -70,6 +71,7 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
             speed,
             bladeBroke,
             titanId: t.id,
+            ankleSide: side,
           }
         }
       }

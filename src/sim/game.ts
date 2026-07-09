@@ -8,13 +8,13 @@ import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { NavGrid } from './nav'
 import { buildNavGrid } from './nav'
 import type { InputState, PlayerState } from './player'
-import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
+import { BOOST_COST, createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import type { Rng } from './rng'
 import { createRng, hashSeed } from './rng'
 import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from './rope'
 import type { ScoreState } from './score'
 import { createScore, registerKill, stepScore } from './score'
-import type { TitanState } from './titan'
+import type { TitanKind, TitanState } from './titan'
 import { aggroRange, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
@@ -31,9 +31,10 @@ export type GameEvent =
   | { type: 'hook'; index: 0 | 1; point: Vector3 }
   | { type: 'unhook'; index: 0 | 1 }
   | { type: 'slash'; hit: boolean; napeHit: boolean }
-  | { type: 'ankleSliced'; titanId: number; remaining: number }
+  | { type: 'ankleSliced'; titanId: number; remaining: number; side: 0 | 1 }
   | { type: 'crippled'; titanId: number }
-  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean }
+  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean; kind: TitanKind }
+  | { type: 'empty'; kind: 'blades' | 'gas' }
   | { type: 'bladeBroke' }
   | { type: 'playerHit'; hp: number }
   | { type: 'waveClear'; wave: number; bonus: number }
@@ -170,41 +171,57 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   }
 
   const canistersBefore = p.canisters
-  if (input.gas && !g.prevInput.gas && tryBoost(p, input.lookDir)) {
-    g.events.push({ type: 'boost' })
+  if (input.gas && !g.prevInput.gas) {
+    if (tryBoost(p, input.lookDir)) {
+      g.events.push({ type: 'boost' })
+    } else if (!p.onGround && p.boostCooldown <= 0 && p.gas < BOOST_COST && p.canisters <= 0) {
+      g.events.push({ type: 'empty', kind: 'gas' }) // truly dry, not just cooling down
+    }
   }
 
   handleHookEdge(g, 0, input.hookL, g.prevInput.hookL, input)
   handleHookEdge(g, 1, input.hookR, g.prevInput.hookR, input)
 
   if (input.slash && !g.prevInput.slash) {
-    const airborne = !p.onGround
-    const result = trySlash(p, g.titans)
-    g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
-    if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
-    if (result.ankleHit && result.titanId !== undefined) {
-      const titan = g.titans.find((t) => t.id === result.titanId)
-      const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
-      g.events.push({ type: 'ankleSliced', titanId: result.titanId, remaining })
-      if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
-    }
-    if (result.killed && result.titanId !== undefined) {
-      const points = registerKill(
-        g.score,
-        { speed: result.speed, airborne, oneCut: result.oneCut },
-        p.config.killSpeed,
-      )
-      p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
-      const heartGained = p.hp < p.config.maxHp
-      if (heartGained) p.hp += 1 // every kill buys a heart back
-      g.events.push({
-        type: 'kill',
-        titanId: result.titanId,
-        points,
-        oneCut: result.oneCut,
-        speed: result.speed,
-        heartGained,
-      })
+    if (p.blades <= 0) {
+      g.events.push({ type: 'empty', kind: 'blades' }) // nothing to swing: jam, don't sweep
+    } else {
+      const airborne = !p.onGround
+      const result = trySlash(p, g.titans)
+      g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
+      if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
+      if (result.ankleHit && result.titanId !== undefined) {
+        const titan = g.titans.find((t) => t.id === result.titanId)
+        const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
+        g.events.push({
+          type: 'ankleSliced',
+          titanId: result.titanId,
+          remaining,
+          side: result.ankleSide ?? 0,
+        })
+        if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
+      }
+      if (result.killed && result.titanId !== undefined) {
+        const killed = g.titans.find((t) => t.id === result.titanId)
+        const abnormal = killed?.kind === 'abnormal'
+        const points = registerKill(
+          g.score,
+          { speed: result.speed, airborne, oneCut: result.oneCut, abnormal },
+          p.config.killSpeed,
+        )
+        p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+        const heartGained = p.hp < p.config.maxHp
+        if (heartGained) p.hp += 1 // every kill buys a heart back
+        g.events.push({
+          type: 'kill',
+          titanId: result.titanId,
+          points,
+          oneCut: result.oneCut,
+          speed: result.speed,
+          heartGained,
+          kind: killed?.kind ?? 'normal',
+        })
+      }
     }
   }
 

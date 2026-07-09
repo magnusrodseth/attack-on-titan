@@ -23,6 +23,9 @@ const SAMPLE_NAMES = [
   'slice',
   'death-groan',
   'player-death',
+  'empty-click',
+  'gas-empty',
+  'aberrant-slain',
 ] as const
 
 export type SampleName = (typeof SAMPLE_NAMES)[number]
@@ -138,6 +141,11 @@ export class AudioSystem {
     return this.buffers.size
   }
 
+  /** Whether a sample actually loaded (callers pick synth fallbacks when it did not). */
+  has(name: SampleName): boolean {
+    return this.buffers.has(name)
+  }
+
   get state(): string {
     return this.ctx?.state ?? 'uninitialized'
   }
@@ -239,6 +247,12 @@ export class AudioSystem {
   setMuffled(muffled: boolean): void {
     if (!this.ctx || !this.muffle) return
     this.muffle.frequency.setTargetAtTime(muffled ? 650 : 20000, this.ctx.currentTime, 0.08)
+  }
+
+  /** Dark kill punctuation: a deep hit with a short steam-hiss tail. */
+  killHit(volume = 0.7): void {
+    this.thud(volume)
+    this.noiseBurst(1400, 0.3, volume * 0.35, 'bandpass')
   }
 
   /** Resupply hiss-clunk. */

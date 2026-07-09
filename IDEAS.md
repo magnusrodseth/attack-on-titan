@@ -49,6 +49,22 @@ visual references:
 
 (Reference images are for look/proportion only — actual assets must be sourced free/CC0.)
 
+## Rare titan: the Striker (Haaland homage)
+
+A rare abnormal variant inspired by the mid-2026 meme wave comparing Erling Braut Haaland's
+sprint (hunched posture, low center of gravity, massive strides, 1.95m battering-ram energy,
+viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
+([Know Your Meme](https://knowyourmeme.com/memes/erling-haaland-running),
+[meme origin video](https://www.youtube.com/watch?v=Qy5Kw4SI5DE)).
+
+- Gameplay: very rare seeded spawn (`hashSeed(seed + ':striker:wave')`), sprints in the
+  hunched meme posture noticeably faster than other abnormals, maybe a punting swat with
+  extra knockback. Big score bonus, its own kill banner ("Striker Slain").
+- Look: a stylized homage only — blond crew-cut hair block, sky-blue kit tint over the
+  standard titan skin. NO real photographs of a real person's face (likeness rights; the
+  repo texture rule requires sourced free assets, and a photo of a living person is not
+  one). If it does not read as him without a photo, it stays a fun blond fast titan.
+
 ## Multiplayer direction (recorded, not scoped)
 
 Realtime multiplayer on PartyKit (rooms carry ephemeral realtime state over websockets),

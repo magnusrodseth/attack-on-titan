@@ -15,7 +15,7 @@ import { restoreRun, serializeRun } from './sim/persist'
 import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
 import { neutralInput } from './sim/player'
-import { napeCenter } from './sim/titan'
+import { anklePos, napeCenter } from './sim/titan'
 
 function dailySeed(): string {
   const d = new Date()
@@ -309,21 +309,43 @@ function handleEvents(events: GameEvent[]): void {
         break
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
+        const aberrant = event.kind === 'abnormal'
         if (titan) {
-          effects.burst(napeCenter(titan), 0xd42b35)
-          const dist = titan.pos.distanceTo(game.player.pos)
-          audio.playAt('death-groan', dist, { volume: 1.2 })
+          const nape = napeCenter(titan)
+          effects.burst(nape, 0xd42b35, aberrant ? 52 : 40) // blood
+          effects.burst(nape.clone().add(new Vector3(0, 2.2, 0)), 0xbfc7cc, 26) // steam
+          audio.playAt('death-groan', titan.pos.distanceTo(game.player.pos), { volume: 1.2 })
         }
-        effects.addShake(0.4)
-        audio.thud(0.6)
+        effects.addShake(aberrant ? 0.6 : 0.45)
+        hitstop = aberrant ? 0.14 : 0.09 // a heartbeat of frozen time sells the cut
+        audio.killHit(aberrant ? 0.85 : 0.65)
+        if (audio.has('aberrant-slain')) {
+          audio.play('aberrant-slain', { volume: aberrant ? 0.95 : 0.4, rate: aberrant ? 1 : 1.25 })
+        }
+        if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
         hud.popPoints(event.points, event.oneCut, event.heartGained)
         break
       }
-      case 'ankleSliced':
+      case 'ankleSliced': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        if (titan) effects.burst(anklePos(titan, event.side), 0xd42b35, 18)
         hud.popText(event.remaining > 0 ? 'Ankle!' : 'Both Ankles!')
         audio.play('slice', { volume: 0.7, rate: 1.25 })
         audio.play(FLINCHES, { volume: 0.7 })
         effects.addShake(0.15)
+        break
+      }
+      case 'empty':
+        if (event.kind === 'blades') {
+          blade.jam()
+          if (audio.has('empty-click')) audio.play('empty-click', { volume: 0.8 })
+          else audio.click()
+          hud.popText('Out of Blades · Resupply!')
+        } else {
+          if (audio.has('gas-empty')) audio.play('gas-empty', { volume: 0.8 })
+          else audio.click()
+          hud.popText('Out of Gas · Resupply!')
+        }
         break
       case 'crippled': {
         const titan = game.titans.find((t) => t.id === event.titanId)
@@ -383,6 +405,7 @@ let prevPhase = game.phase
 let pauseShown = false
 let prevCrippled = new Set<number>()
 let saveTimer = 0
+let hitstop = 0 // brief sim freeze on kills; rendering continues
 
 renderer.setAnimationLoop(() => {
   const now = performance.now()
@@ -397,7 +420,8 @@ renderer.setAnimationLoop(() => {
       pauseShown = false
     }
     const input = buildInput()
-    acc += dt * (game.focusActive ? FOCUS_TIME_SCALE : 1)
+    if (hitstop > 0) hitstop -= dt
+    else acc += dt * (game.focusActive ? FOCUS_TIME_SCALE : 1)
     while (acc >= SIM_DT) {
       stepGame(game, input, SIM_DT)
       handleEvents(game.events)

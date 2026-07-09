@@ -10,6 +10,8 @@ export interface KillInfo {
   speed: number
   airborne: boolean
   oneCut: boolean
+  /** Abnormals are rarer and deadlier: killing one pays a rarity bonus. */
+  abnormal?: boolean
 }
 
 export const COMBO_WINDOW = 6
@@ -22,8 +24,9 @@ export function registerKill(s: ScoreState, info: KillInfo, killSpeed: number): 
   const speedMult = Math.max(1, info.speed / killSpeed)
   const airMult = info.airborne ? 1.25 : 1
   const cutMult = info.oneCut ? 1.5 : 1
+  const rareMult = info.abnormal ? 1.75 : 1
   const chainMult = 1 + 0.25 * Math.min(s.combo, 12)
-  const points = Math.round(100 * speedMult * airMult * cutMult * chainMult)
+  const points = Math.round(100 * speedMult * airMult * cutMult * rareMult * chainMult)
   s.score += points
   s.combo += 1
   s.comboTimer = COMBO_WINDOW

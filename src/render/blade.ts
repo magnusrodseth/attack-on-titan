@@ -78,6 +78,7 @@ export class BladeView {
   private trail: Mesh
   private t = 1
   private side = 1
+  private jamT = -1
 
   constructor(camera: Camera) {
     camera.add(this.root)
@@ -144,7 +145,20 @@ export class BladeView {
     this.trail.scale.x = this.side
   }
 
+  /** Aborted half-flick for an empty rig: the arm starts, the gear refuses. */
+  jam(): void {
+    if (this.t >= 1) this.jamT = 0
+  }
+
   update(dt: number): void {
+    if (this.jamT >= 0) {
+      this.jamT = Math.min(1, this.jamT + dt / 0.22)
+      const k = Math.sin(this.jamT * Math.PI)
+      this.pivot.rotation.z = REST_ANGLE - 0.45 * k
+      this.root.position.set(REST_POS.x, REST_POS.y + 0.02 * k, REST_POS.z)
+      if (this.jamT >= 1) this.jamT = -1
+      return
+    }
     if (this.t < 1) {
       this.t = Math.min(1, this.t + dt / SWEEP_TIME)
       const eased = this.t * this.t * (3 - 2 * this.t) // smoothstep: fast through the middle

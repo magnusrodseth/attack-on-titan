@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
 import { isWalkable } from './nav'
 import { neutralInput } from './player'
-import { createTitan, napeCenter } from './titan'
+import { anklePos, createTitan, napeCenter } from './titan'
 
 const DT = 1 / 120
 
@@ -259,6 +259,69 @@ describe('titan navigation through the game loop', () => {
     expect(engaged.length).toBeGreaterThan(0)
     expect(engaged.length).toBeLessThanOrEqual(MAX_CHASERS)
     expect(engaged.map((t) => t.id).sort()).toEqual([100, 101, 102])
+  })
+})
+
+describe('empty resources', () => {
+  it('slashing with no blade pairs left emits an empty event instead of a slash', () => {
+    const game = playingGame()
+    game.player.blades = 0
+    game.player.bladeHp = 0
+    const input = neutralInput()
+    input.slash = true
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'empty' && e.kind === 'blades')).toBe(true)
+    expect(game.events.some((e) => e.type === 'slash')).toBe(false)
+  })
+
+  it('boosting with a dry tank and no canisters emits an empty gas event', () => {
+    const game = playingGame()
+    game.player.pos.set(0, 30, 0)
+    game.player.onGround = false
+    game.player.gas = 2
+    game.player.canisters = 0
+    const input = neutralInput()
+    input.gas = true
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'empty' && e.kind === 'gas')).toBe(true)
+    expect(game.events.some((e) => e.type === 'boost')).toBe(false)
+  })
+})
+
+describe('aberrant kills and ankle feedback', () => {
+  it('kill events carry the titan kind and abnormals score a rarity bonus', () => {
+    const run = (kind: 'normal' | 'abnormal') => {
+      const game = playingGame()
+      game.titans = [createTitan({ id: 50, kind, height: 12, x: 0, z: 0 })]
+      const titan = game.titans[0]!
+      game.player.pos.copy(napeCenter(titan))
+      game.player.vel.set(30, 0, 0)
+      game.player.onGround = false
+      const input = neutralInput()
+      input.slash = true
+      stepGame(game, input, DT)
+      const kill = game.events.find((e) => e.type === 'kill')
+      return kill && kill.type === 'kill' ? kill : null
+    }
+    const normal = run('normal')
+    const abnormal = run('abnormal')
+    expect(normal?.kind).toBe('normal')
+    expect(abnormal?.kind).toBe('abnormal')
+    expect(abnormal!.points).toBeGreaterThan(normal!.points)
+  })
+
+  it('ankle slices report which ankle was cut', () => {
+    const game = playingGame()
+    game.titans = [createTitan({ id: 51, kind: 'normal', height: 14, x: 0, z: 0 })]
+    const titan = game.titans[0]!
+    titan.facing = 0
+    game.player.pos.copy(anklePos(titan, 1))
+    game.player.vel.set(2, 0, 0)
+    const input = neutralInput()
+    input.slash = true
+    stepGame(game, input, DT)
+    const event = game.events.find((e) => e.type === 'ankleSliced')
+    expect(event && event.type === 'ankleSliced' && event.side).toBe(1)
   })
 })
 
