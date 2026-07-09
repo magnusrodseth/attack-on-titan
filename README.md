@@ -26,7 +26,9 @@ Click **DEPLOY** (grabs pointer lock), then:
 | Esc | Pause / resume |
 
 Music volume, sound-effect volume and mouse sensitivity live under **Settings** in the pause
-menu; they apply immediately and persist across sessions.
+menu; they apply immediately and persist across sessions. **Game Mode** in the same menu picks
+the run type (Wave Survival today; the registry in `src/sim/modes.ts` is built for more —
+`?mode=` in the URL also selects one).
 
 You carry a gas tank plus 3 spare canisters; an empty tank auto-swaps a canister in.
 When the last one runs dry, only a resupply refills you.
