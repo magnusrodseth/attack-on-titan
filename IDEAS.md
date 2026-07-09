@@ -115,11 +115,3 @@ full day and night cycles.
   darkening everything else; consider warm lamp glow at the resupply plaza and dimmer minimap.
 - **Gameplay flavor** (optional later): titans slow at night per lore (they need sunlight);
   could become a night-survival wrinkle or a mode on the GameMode registry.
-
-## Multiplayer direction (recorded, not scoped)
-
-Realtime multiplayer on PartyKit (rooms carry ephemeral realtime state over websockets),
-Neon Postgres + Drizzle ORM for durable meta-state (accounts, leaderboards, run history,
-unlocks). Until then all meta-state stays local-first behind the existing localStorage seams
-('aot-odm-best', 'aot-odm-settings', 'aot-odm-mode', 'aot-odm-run') so a sync layer can adopt
-those keys wholesale.

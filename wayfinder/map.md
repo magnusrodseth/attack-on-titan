@@ -51,5 +51,6 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
 
 ## Out of scope
 
-- Multiplayer (AOTTG's co-op is its own project; destination is a solo score-chaser).
+- Multiplayer — redrawn into its own effort on 2026-07-09: see
+  [the multiplayer map](map-multiplayer.md). This map stays the authority for the solo game.
 - Licensed AoT assets/IP names in shipped UI — original low-poly look instead.
