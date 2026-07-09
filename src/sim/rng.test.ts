@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRng, hashSeed } from './rng'
+import { createRng, hashSeed, resumeRng } from './rng'
 
 describe('createRng', () => {
   it('produces the same sequence for the same seed', () => {
@@ -24,6 +24,15 @@ describe('createRng', () => {
       const v = rng()
       expect(v).toBeGreaterThanOrEqual(0)
       expect(v).toBeLessThan(1)
+    }
+  })
+
+  it('resumes a stream mid-flight from its captured state', () => {
+    const original = createRng(42)
+    for (let i = 0; i < 137; i++) original()
+    const resumed = resumeRng(original.state())
+    for (let i = 0; i < 50; i++) {
+      expect(resumed()).toBe(original())
     }
   })
 })

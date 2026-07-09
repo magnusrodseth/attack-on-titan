@@ -43,7 +43,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   airControl: 14,
   jumpSpeed: 9,
   drag: 0.05,
-  reelSpeed: 8,
+  reelSpeed: 10,
   hookRange: 90,
   minRopeLength: 3,
   bladePairs: 4,
@@ -200,11 +200,12 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
     } else {
       // above run speed the ground is a skid: steer and bleed, never add — legs can't
       // outrun momentum; real speed comes from swinging, not from holding W.
-      // Exception: with a hook attached the rope is doing the work and the feet just
-      // cycle under the arc, so a tethered graze costs nothing per second (touchdown
-      // takes a one-time dent and liftoff returns the banked swing speed below).
-      // Releasing on the ground hands the speed back to the skid.
-      const friction = anchors.length > 0 ? 0 : move.lengthSq() > 0 ? 8 : 12
+      // Exception: with a hook attached the rope is doing the work, so a tethered graze
+      // costs nothing, and legs pumping WITH the swing add speed on top — sprinting the
+      // arc bottom is how you bank extra velocity. Releasing on the ground hands the
+      // speed back to the skid.
+      const tethered = anchors.length > 0
+      const friction = tethered ? 0 : move.lengthSq() > 0 ? 8 : 12
       const decel = friction * dt
       const newSpeed = Math.max(0, horizSpeed - decel)
       if (horizSpeed > 1e-6) {
@@ -213,6 +214,11 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
         p.vel.z *= scale
       }
       if (move.lengthSq() > 0) steerHorizontal(p.vel, move, 2.4 * dt)
+      if (tethered && move.lengthSq() > 0 && horizSpeed > 1e-6) {
+        const boosted = (horizSpeed + 6 * dt) / horizSpeed
+        p.vel.x *= boosted
+        p.vel.z *= boosted
+      }
     }
   } else if (move.lengthSq() > 0) {
     steerHorizontal(p.vel, move, 1.5 * dt)
@@ -235,7 +241,7 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
     if (dist < hook.length) hook.length = Math.max(cfg.minRopeLength, dist)
     // stronger low-speed winch: climbing early in a swing banks the height that the
     // next pendulum converts back into speed
-    const rate = cfg.reelSpeed * Math.min(1, (3 + speedNow * 0.22) / 14)
+    const rate = cfg.reelSpeed * Math.min(1, (4 + speedNow * 0.24) / 14)
     reelHook(hook, rate * dt, cfg.minRopeLength)
   }
 
@@ -252,11 +258,9 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
     p.pos.y = ground
     if (p.vel.y < 0) p.vel.y = 0
     if (!wasOnGround && anchors.length > 0) {
-      // tethered touchdown: bank the swing's speed; the graze dents the ground run a
-      // little and the rope hands the rest back the moment it lifts the runner again
+      // tethered touchdown: bank the swing's speed so liftoff can never hand back less
+      // than the runner arrived with (the graze itself is free)
       p.bankedSpeed = Math.hypot(p.vel.x, p.vel.z)
-      p.vel.x *= 0.92
-      p.vel.z *= 0.92
     }
     if (anchors.length === 0) p.bankedSpeed = 0 // let go on the ground: the bank is gone
     p.onGround = true

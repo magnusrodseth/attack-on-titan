@@ -10,6 +10,8 @@ import { SIM_DT } from './sim/constants'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, startGame, stepGame } from './sim/game'
 import { DEFAULT_MODE_ID, GAME_MODES } from './sim/modes'
+import type { SavedRun } from './sim/persist'
+import { restoreRun, serializeRun } from './sim/persist'
 import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
 import { neutralInput } from './sim/player'
@@ -29,8 +31,22 @@ function storedModeId(): string | null {
   }
 }
 
-const seed = new URLSearchParams(location.search).get('seed') ?? dailySeed()
-const modeId = new URLSearchParams(location.search).get('mode') ?? storedModeId() ?? DEFAULT_MODE_ID
+// refresh-proof persistence: a saved run pins its own seed and mode, so a plain reload
+// (no explicit URL overrides) drops back into exactly the run that was interrupted
+const RUN_KEY = 'aot-odm-run'
+function loadRunSave(): SavedRun | null {
+  try {
+    const raw = localStorage.getItem(RUN_KEY)
+    return raw ? (JSON.parse(raw) as SavedRun) : null
+  } catch {
+    return null
+  }
+}
+const runSave = loadRunSave()
+
+const urlParams = new URLSearchParams(location.search)
+const seed = urlParams.get('seed') ?? runSave?.seed ?? dailySeed()
+const modeId = urlParams.get('mode') ?? runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID
 const game = createGame(seed, undefined, modeId)
 const { scene, updateScenery } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
@@ -154,6 +170,7 @@ function beginRun(): void {
     startGame(game)
     prevPhase = game.phase
     hud.showBanner(game.mode.id === 'waves' ? `Wave ${game.wave}` : game.mode.name)
+    persistRun()
   }
   lockPointer()
 }
@@ -222,9 +239,49 @@ hud.onPickUpgrade = (id) => {
   prevPhase = game.phase
   hud.hideUpgrades()
   hud.showBanner(`Wave ${game.wave}`)
+  persistRun()
   lockPointer()
 }
-hud.showStart()
+
+// --- run persistence: refreshing the page loses nothing --------------------
+
+function persistRun(): void {
+  if (game.phase !== 'playing' && game.phase !== 'upgrading') return
+  try {
+    localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun(game, { yaw, pitch })))
+  } catch {
+    // storage full or private mode: the run simply is not refresh-proof
+  }
+}
+
+function clearRun(): void {
+  try {
+    localStorage.removeItem(RUN_KEY)
+  } catch {
+    // nothing to clear
+  }
+}
+
+window.addEventListener('pagehide', persistRun)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') persistRun()
+})
+
+const restored = runSave !== null && restoreRun(runSave, game)
+if (restored) {
+  if (runSave?.view) {
+    yaw = runSave.view.yaw
+    pitch = runSave.view.pitch
+  }
+  if (game.phase === 'upgrading') {
+    hud.hideStart()
+    hud.showUpgrades(game.offers)
+  } else {
+    hud.showStart(true) // straight back to the paused run: one click resumes
+  }
+} else {
+  hud.showStart()
+}
 
 // --- events from the sim ----------------------------------------------------
 
@@ -319,6 +376,7 @@ let acc = 0
 let prevPhase = game.phase
 let pauseShown = false
 let prevCrippled = new Set<number>()
+let saveTimer = 0
 
 renderer.setAnimationLoop(() => {
   const now = performance.now()
@@ -351,8 +409,13 @@ renderer.setAnimationLoop(() => {
       hud.hideSettings()
       hud.hideModes()
       pauseShown = false
-      if (game.phase === 'upgrading') hud.showUpgrades(game.offers)
-      else hud.showDeath(game)
+      if (game.phase === 'upgrading') {
+        hud.showUpgrades(game.offers)
+        persistRun()
+      } else {
+        hud.showDeath(game)
+        clearRun() // a finished run must not resurrect on refresh
+      }
     }
     prevPhase = game.phase
   }
@@ -414,6 +477,12 @@ renderer.setAnimationLoop(() => {
   const nearStation =
     Math.hypot(game.player.pos.x - game.arena.station.x, game.player.pos.z - game.arena.station.z) <= 10
   hud.update(game, { speed, nearStation, hookInRange })
+
+  saveTimer += dt
+  if (saveTimer >= 1) {
+    saveTimer = 0
+    persistRun()
+  }
 
   renderer.render(scene, camera)
 })

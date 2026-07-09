@@ -26,7 +26,12 @@ Click **DEPLOY** (grabs pointer lock), then:
 | Esc | Pause / resume |
 
 Music volume, sound-effect volume and mouse sensitivity live under **Settings** in the pause
-menu; they apply immediately and persist across sessions. **Game Mode** in the same menu picks
+menu; they apply immediately and persist across sessions.
+
+**A page refresh loses nothing**: the full simulation (position, momentum, hooks, titans,
+score, even the camera direction) autosaves to localStorage about once a second and on tab
+hide, and restores exactly on reload — you come back to a paused run one click from resuming.
+Dying clears the save. Everything stays in your browser. **Game Mode** in the same menu picks
 the run type (Wave Survival today; the registry in `src/sim/modes.ts` is built for more —
 `?mode=` in the URL also selects one).
 

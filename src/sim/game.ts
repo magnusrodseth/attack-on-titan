@@ -7,6 +7,7 @@ import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { InputState, PlayerState } from './player'
 import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
+import type { Rng } from './rng'
 import { createRng, hashSeed } from './rng'
 import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from './rope'
 import type { ScoreState } from './score'
@@ -62,7 +63,7 @@ export interface GameState {
   events: GameEvent[]
   best: BestStats
   storage: StorageLike | null
-  rngLive: () => number
+  rngLive: Rng
   prevInput: InputState
   nextTitanId: number
   focus: number
