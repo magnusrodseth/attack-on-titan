@@ -23,6 +23,7 @@ import {
   RepeatWrapping,
   RingGeometry,
   Scene,
+  SphereGeometry,
   SRGBColorSpace,
   Texture,
   TextureLoader,
@@ -46,15 +47,6 @@ const kaykitManager = new LoadingManager()
 kaykitManager.setURLModifier((url) => (url.endsWith('colormap.png') ? WHITE_PIXEL : url))
 const kaykitLoader = new GLTFLoader(kaykitManager)
 
-function flatColor(root: Object3D, color: number): void {
-  const material = new MeshStandardMaterial({ color, roughness: 0.95 })
-  root.traverse((obj) => {
-    if (obj instanceof Mesh) {
-      obj.material = material
-      obj.castShadow = true
-    }
-  })
-}
 
 function tex(path: string, repeatX = 1, repeatY = 1, srgb = true): Texture {
   const texture = loader.load(path)
@@ -246,9 +238,10 @@ function addHouses(scene: Scene, arena: Arena): void {
   slateRoofs.count = slateCount
   scene.add(plasterBodies, brickBodies, terraRoofs, slateRoofs)
 
+  // photo window texture: neutral tint reads as dark glass, overbright warm tint as lamplight
   const windows = new InstancedMesh(
-    new PlaneGeometry(1.1, 1.5),
-    new MeshBasicMaterial({ side: DoubleSide }),
+    new PlaneGeometry(1.2, 1.6),
+    new MeshBasicMaterial({ map: tex('/textures/window.png'), side: DoubleSide }),
     windowSlots.length,
   )
   const windowQuat = new Quaternion()
@@ -257,9 +250,9 @@ function addHouses(scene: Scene, arena: Arena): void {
     matrix.compose(slot.pos, windowQuat, new Vector3(1, 1, 1))
     windows.setMatrixAt(i, matrix)
     if (slot.lit) {
-      color.setHSL(0.1, 0.85, 0.6 + rng() * 0.15) // warm lamplight
+      color.setRGB(2.4, 1.9, 1.1) // overbright warm glow through the glass
     } else {
-      color.setHSL(0.6, 0.12, 0.14 + rng() * 0.08) // dark shutter
+      color.setScalar(0.85 + rng() * 0.3)
     }
     windows.setColorAt(i, color)
   })
@@ -382,25 +375,39 @@ function addScenery(scene: Scene, arena: Arena): (dt: number) => void {
     }
   })
 
-  kaykitLoader.load('/models/kaykit/trees.glb', (gltf) => {
-    flatColor(gltf.scene, 0x55803c)
-    let placed = 0
-    let attempts = 0
-    while (placed < 22 && attempts < 300) {
-      attempts++
-      const angle = rng() * Math.PI * 2
-      const radius = arena.plazaRadius + 12 + rng() * (arena.wallRadius - arena.plazaRadius - 30)
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      if (groundHeightAt(arena, x, z) > 0) continue
-      const trees = gltf.scene.clone(true)
-      trees.position.set(x, 0, z)
-      trees.scale.setScalar(9 + rng() * 5)
-      trees.rotation.y = rng() * Math.PI * 2
-      scene.add(trees)
-      placed++
+  // textured procedural trees: bark trunk + leafy canopy blobs
+  const barkMat = new MeshStandardMaterial({ map: tex('/textures/bark.jpg', 1, 2), roughness: 1 })
+  const leafMat = new MeshStandardMaterial({ map: tex('/textures/leaves.jpg', 2, 2), roughness: 1 })
+  const trunkGeometry = new CylinderGeometry(0.22, 0.38, 3.4, 7)
+  const canopyGeometry = new SphereGeometry(1, 9, 7)
+  let placed = 0
+  let attempts = 0
+  while (placed < 24 && attempts < 300) {
+    attempts++
+    const angle = rng() * Math.PI * 2
+    const radius = arena.plazaRadius + 12 + rng() * (arena.wallRadius - arena.plazaRadius - 30)
+    const x = Math.cos(angle) * radius
+    const z = Math.sin(angle) * radius
+    if (groundHeightAt(arena, x, z) > 0) continue
+    const tree = new Group()
+    const trunk = new Mesh(trunkGeometry, barkMat)
+    trunk.position.y = 1.7
+    trunk.castShadow = true
+    tree.add(trunk)
+    const blobs = 2 + Math.floor(rng() * 2)
+    for (let b = 0; b < blobs; b++) {
+      const canopy = new Mesh(canopyGeometry, leafMat)
+      canopy.position.set((rng() - 0.5) * 1.6, 3.2 + b * 1.1 + rng() * 0.5, (rng() - 0.5) * 1.6)
+      canopy.scale.setScalar(1.5 + rng() * 0.9)
+      canopy.castShadow = true
+      tree.add(canopy)
     }
-  })
+    tree.position.set(x, 0, z)
+    tree.scale.setScalar(1.6 + rng() * 1.2)
+    tree.rotation.y = rng() * Math.PI * 2
+    scene.add(tree)
+    placed++
+  }
 
   // birds: cheap V-shaped billboards drifting in circles
   const birdGeometry = new BufferGeometry()
