@@ -3,23 +3,37 @@ import {
   BufferAttribute,
   BufferGeometry,
   Camera,
+  ConeGeometry,
   CylinderGeometry,
+  Group,
   LineBasicMaterial,
   LineSegments,
   Mesh,
   MeshStandardMaterial,
   Points,
   PointsMaterial,
+  RepeatWrapping,
   Scene,
+  SRGBColorSpace,
+  TextureLoader,
   Vector3,
 } from 'three'
 import type { PlayerState } from '../sim/player'
 
 const STREAK_COUNT = 46
 const ROPE_UP = new Vector3(0, 1, 0)
+const ROPE_SEGMENTS = 12
+const HOOK_FLIGHT_SPEED = 300 // m/s visual travel of the grapple head
+
+interface RopeVisual {
+  segments: Mesh[]
+  head: Group
+  flight: number // 0..1 launch progress; 1 = landed
+  wobble: number // decaying cable oscillation energy
+}
 
 export class Effects {
-  private ropes: [Mesh, Mesh]
+  private ropes: [RopeVisual, RopeVisual]
   private streaks: LineSegments
   private streakOffsets: Vector3[] = []
   private streakMat: LineBasicMaterial
@@ -51,33 +65,114 @@ export class Effects {
     }
   }
 
-  private makeRope(): Mesh {
-    // a unit cylinder stretched between hand and anchor each frame: cable with volume
-    const rope = new Mesh(
-      new CylinderGeometry(0.016, 0.016, 1, 6, 1, true),
-      new MeshStandardMaterial({ color: 0x241f1a, roughness: 0.6, metalness: 0.4 }),
-    )
-    rope.frustumCulled = false
-    rope.visible = false
-    this.scene.add(rope)
-    return rope
+  private makeRope(): RopeVisual {
+    // segmented steel cable so it can bow and "boing" during hook flight
+    const cableTexture = new TextureLoader().load('/textures/metal.jpg')
+    cableTexture.colorSpace = SRGBColorSpace
+    cableTexture.wrapS = cableTexture.wrapT = RepeatWrapping
+    cableTexture.repeat.set(0.25, 4)
+    const cableMat = new MeshStandardMaterial({
+      map: cableTexture,
+      color: 0x8a8072,
+      roughness: 0.55,
+      metalness: 0.5,
+    })
+    const geometry = new CylinderGeometry(0.016, 0.016, 1, 6, 1, true)
+    const segments: Mesh[] = []
+    for (let i = 0; i < ROPE_SEGMENTS; i++) {
+      const segment = new Mesh(geometry, cableMat)
+      segment.frustumCulled = false
+      segment.visible = false
+      this.scene.add(segment)
+      segments.push(segment)
+    }
+
+    // AoT grapple head: central spike with three back-swept barbs
+    const head = new Group()
+    const headMat = new MeshStandardMaterial({
+      map: cableTexture,
+      color: 0x71767c,
+      metalness: 0.65,
+      roughness: 0.4,
+    })
+    const spike = new Mesh(new ConeGeometry(0.09, 0.5, 6), headMat)
+    spike.position.y = 0.22
+    head.add(spike)
+    for (let b = 0; b < 3; b++) {
+      const barb = new Mesh(new ConeGeometry(0.055, 0.3, 5), headMat)
+      const angle = (b / 3) * Math.PI * 2
+      barb.position.set(Math.cos(angle) * 0.12, -0.05, Math.sin(angle) * 0.12)
+      barb.rotation.set(Math.sin(angle) * 2.6, 0, Math.cos(angle) * 2.6)
+      head.add(barb)
+    }
+    head.visible = false
+    this.scene.add(head)
+
+    return { segments, head, flight: 1, wobble: 0 }
   }
 
-  syncRopes(player: PlayerState, camera: Camera): void {
+  /** Called on the sim's hook event: restart the visual launch for that cable. */
+  launchHook(index: 0 | 1): void {
+    const rope = this.ropes[index]!
+    rope.flight = 0
+    rope.wobble = 1
+  }
+
+  syncRopes(player: PlayerState, camera: Camera, dt: number): void {
     player.hooks.forEach((hook, i) => {
       const rope = this.ropes[i]!
       if (hook.state !== 'attached') {
-        rope.visible = false
+        for (const segment of rope.segments) segment.visible = false
+        rope.head.visible = false
         return
       }
-      rope.visible = true
       const hand = new Vector3(i === 0 ? -0.35 : 0.35, -0.32, -0.5)
       camera.localToWorld(hand)
       const span = new Vector3().subVectors(hook.anchor, hand)
-      const length = Math.max(span.length(), 0.01)
-      rope.position.copy(hand).addScaledVector(span, 0.5)
-      rope.scale.set(1, length, 1)
-      rope.quaternion.setFromUnitVectors(ROPE_UP, span.divideScalar(length))
+      const dist = Math.max(span.length(), 0.01)
+      const dir = span.clone().divideScalar(dist)
+
+      if (rope.flight < 1) {
+        rope.flight = Math.min(1, rope.flight + (dt * HOOK_FLIGHT_SPEED) / Math.max(dist, 1))
+      } else {
+        rope.wobble *= Math.exp(-5 * dt)
+      }
+      const tipParam = rope.flight * (2 - rope.flight) // ease-out: fast launch, soft arrival
+
+      // wobble plane perpendicular to the cable
+      const perp = new Vector3().crossVectors(dir, ROPE_UP)
+      if (perp.lengthSq() < 1e-6) perp.set(1, 0, 0)
+      perp.normalize()
+      const amplitude = Math.min(1.4, dist * 0.05) * rope.wobble
+      const time = performance.now() * 0.001
+
+      const points: Vector3[] = []
+      for (let s = 0; s <= ROPE_SEGMENTS; s++) {
+        const along = (s / ROPE_SEGMENTS) * tipParam
+        const point = new Vector3().copy(hand).addScaledVector(span, along)
+        const envelope = Math.sin(Math.PI * (s / ROPE_SEGMENTS)) // pinned at both ends
+        point.addScaledVector(perp, Math.sin(along * Math.PI * 3 - time * 26) * amplitude * envelope)
+        points.push(point)
+      }
+
+      for (let s = 0; s < ROPE_SEGMENTS; s++) {
+        const segment = rope.segments[s]!
+        const a = points[s]!
+        const b = points[s + 1]!
+        const seg = new Vector3().subVectors(b, a)
+        const len = Math.max(seg.length(), 0.001)
+        segment.visible = true
+        segment.position.copy(a).addScaledVector(seg, 0.5)
+        segment.scale.set(1, len, 1)
+        segment.quaternion.setFromUnitVectors(ROPE_UP, seg.divideScalar(len))
+      }
+
+      const tip = points[ROPE_SEGMENTS]!
+      const tail = points[ROPE_SEGMENTS - 1]!
+      const tipDir = new Vector3().subVectors(tip, tail).normalize()
+      rope.head.visible = true
+      rope.head.position.copy(tip)
+      rope.head.quaternion.setFromUnitVectors(ROPE_UP, tipDir)
     })
   }
 

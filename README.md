@@ -69,7 +69,7 @@ Title font: [Cloister Black](https://www.dafont.com/cloister-black.font) by Diet
 
 ## Art credits (all CC0)
 
-- Textures (plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves) from [Poly Haven](https://polyhaven.com/textures)
+- Textures (plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate) from [Poly Haven](https://polyhaven.com/textures)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
+- Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)
 - Mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg
-- Clouds from [Kenney Starter Kit 3D Platformer](https://github.com/KenneyNL/Starter-Kit-3D-Platformer)

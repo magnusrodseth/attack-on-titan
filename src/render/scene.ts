@@ -37,7 +37,6 @@ import { createRng } from '../sim/rng'
 
 const SKY = new Color(0xb9cfe2)
 const loader = new TextureLoader()
-const gltfLoader = new GLTFLoader()
 
 // KayKit GLBs reference a Textures/colormap.png that ships separately; we flat-color the
 // meshes anyway, so satisfy the lookup with a 1px placeholder to keep the console clean.
@@ -58,7 +57,7 @@ function tex(path: string, repeatX = 1, repeatY = 1, srgb = true): Texture {
 
 export interface BuiltScene {
   scene: Scene
-  updateScenery: (dt: number) => void
+  updateScenery: (dt: number, camera?: Object3D) => void
 }
 
 /** Gable roof prism with planar UVs: unit footprint, ridge along local X at y=1. */
@@ -318,9 +317,10 @@ function addStation(scene: Scene, arena: Arena): void {
   const banner = new Mesh(
     new BoxGeometry(4.5, 3, 0.15),
     new MeshStandardMaterial({
-      color: 0x1f6e43,
+      map: tex('/textures/linen.jpg', 2, 2),
+      color: 0x3f9e5c,
       emissive: 0x2fa35f,
-      emissiveIntensity: 0.55,
+      emissiveIntensity: 0.3,
       side: DoubleSide,
     }),
   )
@@ -341,22 +341,31 @@ function addStation(scene: Scene, arena: Arena): void {
 }
 
 /** Clouds, birds, trees and a mountain ring: motion and depth beyond the gameplay set. */
-function addScenery(scene: Scene, arena: Arena): (dt: number) => void {
+function addScenery(scene: Scene, arena: Arena): (dt: number, camera?: Object3D) => void {
   const rng = createRng(0x5eed)
   const clouds = new Group()
   scene.add(clouds)
 
-  gltfLoader.load('/models/starter/cloud.glb', (gltf) => {
-    for (let i = 0; i < 9; i++) {
-      const cloud = gltf.scene.clone(true)
-      const radius = 80 + rng() * 240
-      const angle = rng() * Math.PI * 2
-      cloud.position.set(Math.cos(angle) * radius, 120 + rng() * 60, Math.sin(angle) * radius)
-      cloud.scale.set(14 + rng() * 8, 7 + rng() * 4, 14 + rng() * 8) // flattened puffs, not boulders
-      cloud.rotation.y = rng() * Math.PI * 2
-      clouds.add(cloud)
-    }
-  })
+  // realistic cloud billboards (CC0 transparent renders); faced to the camera each frame
+  const cloudGeometry = new PlaneGeometry(1, 1)
+  const cloudBillboards: Mesh[] = []
+  for (let i = 0; i < 10; i++) {
+    const material = new MeshBasicMaterial({
+      map: tex(i % 2 === 0 ? '/textures/cloud1.png' : '/textures/cloud2.png'),
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      fog: false,
+    })
+    const cloud = new Mesh(cloudGeometry, material)
+    const radius = 90 + rng() * 260
+    const angle = rng() * Math.PI * 2
+    cloud.position.set(Math.cos(angle) * radius, 130 + rng() * 70, Math.sin(angle) * radius)
+    const size = 60 + rng() * 60
+    cloud.scale.set(size, size * 0.55, 1)
+    cloudBillboards.push(cloud)
+    clouds.add(cloud)
+  }
 
   kaykitLoader.load('/models/kaykit/mountain.glb', (gltf) => {
     // KayKit UVs are atlas islands, so a rock texture reads as varied craggy patches
@@ -440,9 +449,14 @@ function addScenery(scene: Scene, arena: Arena): (dt: number) => void {
   }
 
   let time = 0
-  return (dt: number) => {
+  return (dt: number, camera?: Object3D) => {
     time += dt
     clouds.rotation.y += dt * 0.004
+    if (camera) {
+      for (const cloud of cloudBillboards) {
+        cloud.quaternion.copy(camera.quaternion)
+      }
+    }
     for (const bird of birds) {
       bird.angle += bird.speed * dt
       const flap = Math.sin(time * 7 + bird.phase)

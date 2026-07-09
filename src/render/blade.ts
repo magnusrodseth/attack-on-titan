@@ -6,8 +6,21 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  RepeatWrapping,
   RingGeometry,
+  SRGBColorSpace,
+  TextureLoader,
 } from 'three'
+
+const textureLoader = new TextureLoader()
+
+function metalTexture(repeatY: number) {
+  const texture = textureLoader.load('/textures/metal.jpg')
+  texture.colorSpace = SRGBColorSpace
+  texture.wrapS = texture.wrapT = RepeatWrapping
+  texture.repeat.set(0.2, repeatY)
+  return texture
+}
 
 const SWEEP_TIME = 0.16
 const SWEEP_FROM = 1.25
@@ -33,7 +46,11 @@ export class BladeView {
     camera.add(this.root)
     this.root.position.set(REST_POS.x, REST_POS.y, REST_POS.z)
 
-    const bladeMat = new MeshBasicMaterial({ color: 0xdde7ee, depthTest: false })
+    const bladeMat = new MeshBasicMaterial({
+      map: metalTexture(3),
+      color: 0xe8eef4,
+      depthTest: false,
+    })
     const blade = new Mesh(new BoxGeometry(0.013, 0.52, 0.006), bladeMat)
     blade.position.y = 0.3
     blade.renderOrder = 999
@@ -42,7 +59,7 @@ export class BladeView {
     edge.renderOrder = 999
     const grip = new Mesh(
       new BoxGeometry(0.024, 0.11, 0.024),
-      new MeshBasicMaterial({ color: 0x2a2622, depthTest: false }),
+      new MeshBasicMaterial({ map: metalTexture(1), color: 0x453b30, depthTest: false }),
     )
     grip.position.y = -0.015
     grip.renderOrder = 999

@@ -224,6 +224,7 @@ function handleEvents(events: GameEvent[]): void {
         break
       case 'hook':
         audio.click()
+        effects.launchHook(event.index)
         break
       case 'unhook':
         break // ropes render straight from state
@@ -288,9 +289,9 @@ renderer.setAnimationLoop(() => {
   effects.applyShake(camera)
 
   titanPool.sync(game.titans, dt)
-  updateScenery(dt)
+  updateScenery(dt, camera)
   blade.update(dt)
-  effects.syncRopes(game.player, camera)
+  effects.syncRopes(game.player, camera, dt)
   effects.update(dt, camera, game.player.vel)
 
   audio.setWind(simActive ? speed : 0)
@@ -379,6 +380,9 @@ function snapshot() {
   },
   fxSlash() {
     blade.slash()
+  },
+  fxHook(index: 0 | 1 = 0) {
+    effects.launchHook(index)
   },
   setSilent(value: boolean) {
     debug.silent = value

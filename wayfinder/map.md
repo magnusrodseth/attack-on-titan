@@ -23,6 +23,8 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
 - [Renderer](tickets/007-renderer.md) — AoT district look per user reference images (instanced gabled row-houses, towers, 50m wall), procedural grinning pure titans, ropes/streaks/shake/FOV effects, full DOM HUD.
 - [Browser verification](tickets/008-browser-verify.md) — full loop verified live in Chrome via playwriter debug hook with screenshot evidence; 73 tests green, tsc clean, production build 144 kB gzip.
 - Controls v2 (user request, 2026-07-09) — Space jump, Shift horizontal boost; no reel button: holding a hook winches automatically at a speed-scaled rate with a ratcheting rope, releasing detaches. Velocity steering on slides/air fixed slipperiness. 3 spare gas canisters auto-swap on empty. Houses raised to 14-22m for bigger pendulum drops. First-person blade sweep viewmodel; volumetric rope cables; Cloister Black titles.
+- Titan interaction rework (user request, 2026-07-09) — hooks attach to titans with anchors that track them; ankle-slice system (both ankles → 60s kneel with lowered nape, then full-health rise); titans collide with buildings and navigate corridors; 30% slower with rate-limited turning. Speed rebalanced to physics research: killSpeed 17 m/s, cap 40 m/s, air-only boost.
+- Texture mandate (user rule, 2026-07-09) — recorded in repo CLAUDE.md: every visible surface texture must be a sourced free online asset (subagent-verified, CC0), never an invented flat color. City fully textured via scout results (Poly Haven + OpenGameArt): plaster/brick walls, terracotta/slate roofs, cobblestone, castle wall, rock mountains, bark/leaf trees, photo windows.
 - Audio (user request, 2026-07-09) — CC0 samples from OpenGameArt (creature SFX by rubberduck, sword whooshes by StarNinjas) for voiced sounds; procedural WebAudio for speed-tracked wind, gas hiss, impacts and chimes; distance-attenuated ambient titan roars. `src/audio.ts`, credits in README. Skipped a CC-BY pack to stay attribution-free at the asset level.
 
 ## Not yet specified
@@ -30,9 +32,8 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
 - Additional titan variants (crawlers, boss/armored titan finale) and rare events (abnormal stampede).
 - Post-processing polish (motion blur/speed lines, bloom on nape glow) if perf budget allows.
 - Mobile/touch support — unclear it can ever feel good for this control scheme.
-- Hooking titans themselves (AOTTG allows it; needs moving anchors that track the titan).
-- Titan-vs-building interaction (titans currently walk through houses; steering or crushing both plausible).
 - A canal district and gate structures in the wall for more Trost fidelity.
+- Titan skin / blade metal / banner fabric textures (scouts in flight at time of writing).
 
 ## Out of scope
 
