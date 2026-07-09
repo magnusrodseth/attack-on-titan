@@ -14,3 +14,6 @@ server/.dev.vars
 server/.wrangler/
 .wrangler/
 .vercel
+
+# playwright-cli session snapshots (agent browser verification runs)
+.playwright-cli/
