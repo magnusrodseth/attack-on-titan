@@ -54,6 +54,7 @@ export class Hud {
   private bannerTimer: number | undefined
 
   onStart: () => void = () => {}
+  onRestart: () => void = () => {}
   onRetry: () => void = () => {}
   onPickUpgrade: (id: string) => void = () => {}
   onOpenSettings: () => void = () => {}
@@ -67,6 +68,7 @@ export class Hud {
     el('seed-line').textContent = `seed: ${seed} — share the URL with ?seed=${encodeURIComponent(seed)} to race the same city`
     el('death-seed').textContent = `seed: ${seed}`
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
+    el<HTMLButtonElement>('restart-btn').addEventListener('click', () => this.onRestart())
     el<HTMLButtonElement>('retry-btn').addEventListener('click', () => this.onRetry())
     el<HTMLButtonElement>('settings-btn').addEventListener('click', () => this.onOpenSettings())
     el<HTMLButtonElement>('settings-back').addEventListener('click', () => this.onCloseSettings())
@@ -216,6 +218,7 @@ export class Hud {
     this.start.classList.remove('hidden')
     this.start.querySelector('h1')!.textContent = resume ? 'Paused' : 'Wings of Freedom'
     el<HTMLButtonElement>('start-btn').textContent = resume ? 'Resume' : 'Deploy Your Soldier'
+    el<HTMLButtonElement>('restart-btn').classList.toggle('hidden', !resume) // mid-run only
   }
 
   hideStart(): void {

@@ -60,10 +60,20 @@ viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
 - Gameplay: very rare seeded spawn (`hashSeed(seed + ':striker:wave')`), sprints in the
   hunched meme posture noticeably faster than other abnormals, maybe a punting swat with
   extra knockback. Big score bonus, its own kill banner ("Striker Slain").
-- Look: a stylized homage only — blond crew-cut hair block, sky-blue kit tint over the
-  standard titan skin. NO real photographs of a real person's face (likeness rights; the
-  repo texture rule requires sourced free assets, and a photo of a living person is not
-  one). If it does not read as him without a photo, it stays a fun blond fast titan.
+- Look (user spec, 2026-07-09): spawns wearing the **Norway home kit** — red jersey with the
+  offset navy/white flag cross and a number 9, white shorts — plus the blond ponytail-bun.
+  Build the kit from sourced CC0 fabric/knit textures with per-instance tints (the layering
+  the texture rule encourages, like the banner linen); hair as a tinted geometry block.
+- Likeness boundary: game-ready Haaland face models/textures DO exist (FIFA/PES face-mod
+  communities — the first reference below is one), but they are neither freely licensed nor
+  clear of likeness rights, so none can be shipped. The homage stays photo-free: kit + hair +
+  the run should read as him instantly.
+- User-provided visual references (look/proportion only):
+  - https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU7JeIBXpzTCIUWoEq7Tpu4ikMD-V2OXmmH02ty2XCne61tFdjJ7BTXJfX&s=10 (game face-mod render, slicked-back blond hair)
+  - https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmDn_-U2M7aAUvitfyQsjvsTyJeL3EJLZ9dbySEyY8mSUR-LbtDsI5nXc&s=10 (red Norway home jersey, flag cross, ponytail-bun)
+  - https://foxyprinting.co.uk/cdn/shop/files/erlinghaalandfootball.jpg?v=1700149050
+  - https://pbs.twimg.com/media/FZGhAdJX0AAo1Yq.jpg
+  - https://media-cldnry.s-nbcnews.com/image/upload/rockcms/2026-07/260705-haaland-norway-world-cup-ww-1524-b41355.jpg (2026 World Cup, Norway kit with shorts — the spawn look)
 
 ## Day/night cycle with a realistic sky (user idea, 2026-07-09)
 

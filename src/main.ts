@@ -238,6 +238,19 @@ hud.onPickMode = (id) => {
 
 hud.onStart = beginRun
 hud.onRetry = beginRun
+hud.onRestart = () => {
+  // abandon the current round and take the field again from wave 1, same seed and mode
+  if (touchOnly) return
+  audio.init()
+  hud.hideStart()
+  pauseShown = false
+  clearRun()
+  startGame(game)
+  prevPhase = game.phase
+  hud.showBanner(game.mode.id === 'waves' ? `Wave ${game.wave}` : game.mode.name)
+  persistRun()
+  lockPointer()
+}
 hud.onPickUpgrade = (id) => {
   audio.init()
   audio.chime()
