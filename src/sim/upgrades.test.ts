@@ -37,10 +37,11 @@ describe('applyUpgrade', () => {
 
   it('heart raises max hp and heals to full', () => {
     const p = createPlayer()
+    const baseMax = p.config.maxHp
     p.hp = 1
     applyUpgrade(p, 'heart')
-    expect(p.config.maxHp).toBe(4)
-    expect(p.hp).toBe(4)
+    expect(p.config.maxHp).toBe(baseMax + 1)
+    expect(p.hp).toBe(baseMax + 1)
   })
 
   it('every pool upgrade applies without throwing', () => {

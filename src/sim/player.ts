@@ -51,7 +51,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   killSpeed: 17,
   slashRange: 6,
   slashCooldown: 0.45,
-  maxHp: 3,
+  maxHp: 5,
   gasKillRefund: 0,
   speedCap: 40,
 }

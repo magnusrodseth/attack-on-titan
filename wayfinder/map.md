@@ -31,6 +31,7 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
 - Health economy (user request, 2026-07-09) — full heal when a new wave starts and at resupply; each titan kill returns one heart (capped at max), flagged on the kill event for HUD feedback.
 - Menu branding (user request, 2026-07-09) — Cloister Black titles, Cinzel subtitles/labels/buttons, Alegreya body (both SIL OFL, self-hosted woff2 in public/fonts); chamfered plate buttons and upgrade cards built as clipped ::before plates with drop-shadow brass rims that follow the silhouette; larger menu type throughout; settings menu (music/SFX buses in AudioSystem, mouse sensitivity multiplier) persisted under 'aot-odm-settings'.
 - Game mode system (user request, 2026-07-09) — `src/sim/modes.ts` GameMode interface (start/step/chooseUpgrade hooks over shared core systems); waves extracted as the first registry entry with parity and determinism pinned by tests; menu Game Mode panel selects a mode, persisted under 'aot-odm-mode' and carried in the ?mode= URL param (switching reloads). Future modes (time trial, parkour rings) plug in by appending to GAME_MODES.
+- Blade viewmodel v2 (sword scout + user reference images, 2026-07-09) — scout found no crossguard-free CC0 sword model, so the ODM blade is a hand-built extruded profile (long thin single-edged bar, diagonal tip clip, three spine notches, trigger grip) skinned with ambientCG Metal012 brushed steel (CC0); sweep animation untouched on the pivot. Default hearts raised 3 → 5.
 - Audio (user request, 2026-07-09) — CC0 samples from OpenGameArt (creature SFX by rubberduck, sword whooshes by StarNinjas) for voiced sounds; procedural WebAudio for speed-tracked wind, gas hiss, impacts and chimes; distance-attenuated ambient titan roars. `src/audio.ts`, credits in README. Skipped a CC-BY pack to stay attribution-free at the asset level.
 
 ## Not yet specified
@@ -40,7 +41,6 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
 - Post-processing polish (motion blur/speed lines, bloom on nape glow) if perf budget allows.
 - Mobile/touch support — unclear it can ever feel good for this control scheme.
 - A canal district and gate structures in the wall for more Trost fidelity.
-- Titan skin / blade metal / banner fabric textures (scouts in flight at time of writing).
 
 ## Out of scope
 

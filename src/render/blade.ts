@@ -3,11 +3,13 @@ import {
   BoxGeometry,
   Camera,
   DoubleSide,
+  ExtrudeGeometry,
   Group,
   Mesh,
   MeshBasicMaterial,
   RepeatWrapping,
   RingGeometry,
+  Shape,
   SRGBColorSpace,
   TextureLoader,
 } from 'three'
@@ -20,6 +22,41 @@ function metalTexture(repeatY: number) {
   texture.wrapS = texture.wrapT = RepeatWrapping
   texture.repeat.set(0.2, repeatY)
   return texture
+}
+
+/** Brushed machined steel (ambientCG Metal012, CC0) with the grain run along the blade. */
+function steelTexture() {
+  const texture = textureLoader.load('/textures/blade-steel.jpg')
+  texture.colorSpace = SRGBColorSpace
+  texture.wrapS = texture.wrapT = RepeatWrapping
+  texture.center.set(0.5, 0.5)
+  texture.rotation = Math.PI / 2
+  texture.repeat.set(22, 1.6)
+  return texture
+}
+
+/**
+ * The ODM blade silhouette: a long thin single-edged bar (box-cutter profile) with a
+ * diagonally clipped tip and three replacement notches along the spine. Drawn in the
+ * pivot's XY plane (y = along the blade) and extruded to its thickness.
+ */
+function bladeGeometry() {
+  const spine = -0.017
+  const edge = 0.017
+  const shape = new Shape()
+  shape.moveTo(spine, 0.04)
+  shape.lineTo(edge, 0.04)
+  shape.lineTo(edge, 0.56) // the cutting edge runs the full length
+  shape.lineTo(spine, 0.5) // diagonal tip clip back to the spine
+  for (const notch of [0.44, 0.32, 0.2]) {
+    shape.lineTo(spine, notch)
+    shape.lineTo(spine + 0.007, notch - 0.01)
+    shape.lineTo(spine, notch - 0.02)
+  }
+  shape.lineTo(spine, 0.04)
+  const geometry = new ExtrudeGeometry(shape, { depth: 0.006, bevelEnabled: false })
+  geometry.translate(0, 0, -0.003)
+  return geometry
 }
 
 const SWEEP_TIME = 0.16
@@ -47,23 +84,40 @@ export class BladeView {
     this.root.position.set(REST_POS.x, REST_POS.y, REST_POS.z)
 
     const bladeMat = new MeshBasicMaterial({
-      map: metalTexture(3),
-      color: 0xe8eef4,
+      map: steelTexture(),
+      color: 0xdfe6ec,
       depthTest: false,
     })
-    const blade = new Mesh(new BoxGeometry(0.013, 0.52, 0.006), bladeMat)
-    blade.position.y = 0.3
+    const blade = new Mesh(bladeGeometry(), bladeMat)
     blade.renderOrder = 999
-    const edge = new Mesh(new BoxGeometry(0.004, 0.52, 0.009), new MeshBasicMaterial({ color: 0xffffff, depthTest: false }))
-    edge.position.set(0.008, 0.3, 0)
-    edge.renderOrder = 999
-    const grip = new Mesh(
-      new BoxGeometry(0.024, 0.11, 0.024),
-      new MeshBasicMaterial({ map: metalTexture(1), color: 0x453b30, depthTest: false }),
+    // bright honed strip along the cutting edge, stopping short of the tip clip
+    const edge = new Mesh(
+      new BoxGeometry(0.0035, 0.46, 0.0075),
+      new MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
     )
-    grip.position.y = -0.015
+    edge.position.set(0.017, 0.27, 0)
+    edge.renderOrder = 999
+    const guard = new Mesh(
+      new BoxGeometry(0.042, 0.012, 0.03),
+      new MeshBasicMaterial({ map: steelTexture(), color: 0x9aa2ab, depthTest: false }),
+    )
+    guard.position.y = 0.036
+    guard.renderOrder = 999
+    const grip = new Mesh(
+      new BoxGeometry(0.026, 0.115, 0.026),
+      new MeshBasicMaterial({ map: metalTexture(1), color: 0x3a322a, depthTest: false }),
+    )
+    grip.position.y = -0.028
+    grip.rotation.z = -0.06
     grip.renderOrder = 999
-    this.pivot.add(blade, edge, grip)
+    const trigger = new Mesh(
+      new BoxGeometry(0.008, 0.034, 0.018),
+      new MeshBasicMaterial({ map: metalTexture(1), color: 0x2c2620, depthTest: false }),
+    )
+    trigger.position.set(0.019, -0.005, 0)
+    trigger.rotation.z = 0.35
+    trigger.renderOrder = 999
+    this.pivot.add(blade, edge, guard, grip, trigger)
     this.pivot.rotation.z = REST_ANGLE
 
     this.trailMat = new MeshBasicMaterial({
