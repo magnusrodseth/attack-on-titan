@@ -86,7 +86,8 @@ pnpm typecheck   # tsc --noEmit (client) + tsc -p server
 pnpm build       # production bundle in dist/
 ```
 
-The multiplayer backend lives in `server/` (Cloudflare Worker, partyserver + Drizzle):
+The multiplayer backend lives in `server/` (Cloudflare Worker: Hono routing, partyserver
+rooms, Drizzle over D1):
 
 ```bash
 pnpm server:dev     # wrangler dev on localhost:8787 (local D1 included, no env needed)

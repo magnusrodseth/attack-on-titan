@@ -1,4 +1,6 @@
 import { eq } from 'drizzle-orm'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import { MIN_PASSWORD_LENGTH, USERNAME_RE, hashPassword, verifyPassword } from './auth'
 import { createDb } from './db/client'
 import { readLeaderboard } from './db/matches'
@@ -15,24 +17,6 @@ export function isAllowedOrigin(origin: string): boolean {
   return false
 }
 
-function corsHeaders(request: Request): HeadersInit {
-  const origin = request.headers.get('Origin') ?? ''
-  if (!isAllowedOrigin(origin)) return {}
-  return {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400',
-  }
-}
-
-function json(request: Request, status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
-  })
-}
-
 async function readBody(request: Request): Promise<Record<string, unknown> | null> {
   try {
     const body = (await request.json()) as Record<string, unknown>
@@ -42,79 +26,80 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
-function bearerToken(request: Request): string {
-  const header = request.headers.get('Authorization') ?? ''
-  return header.startsWith('Bearer ') ? header.slice(7) : ''
-}
+/** The REST surface, mounted at /api by the worker entry. */
+export const api = new Hono<{ Bindings: Env }>()
 
-export async function handleApi(request: Request, env: Env): Promise<Response> {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders(request) })
+api.use(
+  '*',
+  cors({
+    // deny = return null so no CORS headers are set, same as the hand-rolled version
+    origin: (origin) => (isAllowedOrigin(origin) ? origin : null),
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400,
+  }),
+)
+
+api.get('/health', (c) => c.json({ ok: true }))
+
+api.post('/register', async (c) => {
+  const db = createDb(c.env.DB)
+  const body = await readBody(c.req.raw)
+  const username = typeof body?.username === 'string' ? body.username.trim() : ''
+  const password = typeof body?.password === 'string' ? body.password : ''
+  if (!USERNAME_RE.test(username)) {
+    return c.json({ error: 'Handle must be 3-16 letters, digits, - or _' }, 400)
   }
-  const path = new URL(request.url).pathname
-  const db = createDb(env.DB)
-
-  if (path === '/api/health') return json(request, 200, { ok: true })
-
-  if (path === '/api/register' && request.method === 'POST') {
-    const body = await readBody(request)
-    const username = typeof body?.username === 'string' ? body.username.trim() : ''
-    const password = typeof body?.password === 'string' ? body.password : ''
-    if (!USERNAME_RE.test(username)) {
-      return json(request, 400, { error: 'Handle must be 3-16 letters, digits, - or _' })
-    }
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      return json(request, 400, { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` })
-    }
-    const taken = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.usernameLower, username.toLowerCase()))
-      .limit(1)
-    if (taken.length > 0) return json(request, 409, { error: 'That handle is already enlisted' })
-    try {
-      const inserted = await db
-        .insert(users)
-        .values({
-          username,
-          usernameLower: username.toLowerCase(),
-          passwordHash: await hashPassword(password),
-        })
-        .returning({ id: users.id })
-      const token = await createSession(db, inserted[0]!.id)
-      return json(request, 201, { token, username })
-    } catch {
-      // unique-constraint race: two registrations of the same handle at once
-      return json(request, 409, { error: 'That handle is already enlisted' })
-    }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return c.json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400)
   }
-
-  if (path === '/api/login' && request.method === 'POST') {
-    const body = await readBody(request)
-    const username = typeof body?.username === 'string' ? body.username.trim() : ''
-    const password = typeof body?.password === 'string' ? body.password : ''
-    const rows = await db
-      .select({ id: users.id, username: users.username, passwordHash: users.passwordHash })
-      .from(users)
-      .where(eq(users.usernameLower, username.toLowerCase()))
-      .limit(1)
-    const user = rows[0]
-    if (!user || !(await verifyPassword(password, user.passwordHash))) {
-      return json(request, 401, { error: 'Wrong handle or password' })
-    }
-    const token = await createSession(db, user.id)
-    return json(request, 200, { token, username: user.username })
+  const taken = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.usernameLower, username.toLowerCase()))
+    .limit(1)
+  if (taken.length > 0) return c.json({ error: 'That handle is already enlisted' }, 409)
+  try {
+    const inserted = await db
+      .insert(users)
+      .values({
+        username,
+        usernameLower: username.toLowerCase(),
+        passwordHash: await hashPassword(password),
+      })
+      .returning({ id: users.id })
+    const token = await createSession(db, inserted[0]!.id)
+    return c.json({ token, username }, 201)
+  } catch {
+    // unique-constraint race: two registrations of the same handle at once
+    return c.json({ error: 'That handle is already enlisted' }, 409)
   }
+})
 
-  if (path === '/api/me' && request.method === 'GET') {
-    const session = await validateSessionToken(db, bearerToken(request))
-    if (!session) return json(request, 401, { error: 'Not signed in' })
-    return json(request, 200, { username: session.username })
+api.post('/login', async (c) => {
+  const db = createDb(c.env.DB)
+  const body = await readBody(c.req.raw)
+  const username = typeof body?.username === 'string' ? body.username.trim() : ''
+  const password = typeof body?.password === 'string' ? body.password : ''
+  const rows = await db
+    .select({ id: users.id, username: users.username, passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.usernameLower, username.toLowerCase()))
+    .limit(1)
+  const user = rows[0]
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    return c.json({ error: 'Wrong handle or password' }, 401)
   }
+  const token = await createSession(db, user.id)
+  return c.json({ token, username: user.username }, 200)
+})
 
-  if (path === '/api/leaderboard' && request.method === 'GET') {
-    return json(request, 200, await readLeaderboard(db))
-  }
+api.get('/me', async (c) => {
+  const header = c.req.header('Authorization') ?? ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+  const session = await validateSessionToken(createDb(c.env.DB), token)
+  if (!session) return c.json({ error: 'Not signed in' }, 401)
+  return c.json({ username: session.username }, 200)
+})
 
-  return json(request, 404, { error: 'Not found' })
-}
+api.get('/leaderboard', async (c) => c.json(await readLeaderboard(createDb(c.env.DB)), 200))
