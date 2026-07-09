@@ -58,7 +58,7 @@ export interface RecruitStyle {
   tint: string | null
 }
 
-const recruitStyle: RecruitStyle = { height: 4.0, tint: null }
+const recruitStyle: RecruitStyle = { height: 2.5, tint: null }
 const liveVisuals = new Set<SoldierVisual>()
 
 export function getRecruitStyle(): RecruitStyle {
