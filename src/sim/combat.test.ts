@@ -23,10 +23,10 @@ describe('trySlash', () => {
     expect(t.hp).toBe(0)
   })
 
-  it('has a generous nape hitbox: a kill lands from 6m off the nape center', () => {
+  it('has a generous nape hitbox: a kill lands from 7m off the nape center', () => {
     const { p, t } = setup(25)
     p.pos.copy(napeCenter(t))
-    p.pos.y += 6
+    p.pos.y += 7
     const result = trySlash(p, [t])
     expect(result.napeHit).toBe(true)
     expect(result.killed).toBe(true)
@@ -102,10 +102,10 @@ describe('trySlash', () => {
     expect(t.state).not.toBe('crippled')
   })
 
-  it('has a forgiving ankle hitbox: the cut lands from 3m off the ankle', () => {
+  it('has a forgiving ankle hitbox: the cut lands from 4m off the ankle', () => {
     const { p, t } = setup(12)
     p.pos.copy(anklePos(t, 0))
-    p.pos.y += 3
+    p.pos.y += 4
     const result = trySlash(p, [t])
     expect(result.ankleHit).toBe(true)
     expect(t.ankles[0]).toBe(true)
@@ -129,8 +129,11 @@ describe('trySlash', () => {
     p.pos.copy(anklePos(t, 0))
     trySlash(p, [t])
     p.slashTimer = 0
+    // the grown radius spans both feet, so the second cut lands on the other tendon,
+    // never the already-cut one
     const result = trySlash(p, [t])
-    expect(result.ankleHit).toBe(false) // same spot again: only body remains
+    expect(result.ankleHit).toBe(true)
+    expect(result.ankleSide).toBe(1)
   })
 
   it('respects the slash cooldown', () => {
