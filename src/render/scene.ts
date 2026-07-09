@@ -151,16 +151,30 @@ function addHouses(scene: Scene, arena: Arena): void {
     }),
     houses.length,
   )
-  const roofs = new InstancedMesh(
-    gablePrismGeometry(),
-    new MeshStandardMaterial({ map: tex('/textures/roof.jpg', 3, 3), roughness: 0.85 }),
+  // most roofs are weathered terracotta, a fifth are mossy grey slate
+  const isSlate = (tint: number) => tint > 0.8
+  const roofGeometry = gablePrismGeometry()
+  const terraRoofs = new InstancedMesh(
+    roofGeometry,
+    new MeshStandardMaterial({
+      map: tex('/textures/roof.jpg', 3, 3),
+      normalMap: tex('/textures/roof_nor.jpg', 3, 3, false),
+      roughness: 0.85,
+    }),
+    houses.length,
+  )
+  const slateRoofs = new InstancedMesh(
+    roofGeometry,
+    new MeshStandardMaterial({ map: tex('/textures/roof_slate.jpg', 3, 3), roughness: 0.85 }),
     houses.length,
   )
   plasterBodies.castShadow = brickBodies.castShadow = true
   plasterBodies.receiveShadow = brickBodies.receiveShadow = true
-  roofs.castShadow = true
+  terraRoofs.castShadow = slateRoofs.castShadow = true
   let plasterCount = 0
   let brickCount = 0
+  let terraCount = 0
+  let slateCount = 0
 
   // emissive-look window quads: shutters dark, ~30% glowing warm
   const windowSlots: Array<{ pos: Vector3; rotY: number; lit: boolean }> = []
@@ -170,7 +184,7 @@ function addHouses(scene: Scene, arena: Arena): void {
   const rotated = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2)
   const color = new Color()
   const rng = createRng(0xc0ffee)
-  houses.forEach((house, i) => {
+  houses.forEach((house) => {
     const roofRise = house.h * 0.3
     const eave = house.h - roofRise
     matrix.compose(new Vector3(house.x, 0, house.z), quat, new Vector3(house.w, eave, house.d))
@@ -194,9 +208,17 @@ function addHouses(scene: Scene, arena: Arena): void {
       alongX ? quat : rotated,
       alongX ? new Vector3(house.w, roofRise, house.d) : new Vector3(house.d, roofRise, house.w),
     )
-    roofs.setMatrixAt(i, matrix)
-    color.setHSL(0.03 + house.tint * 0.035, 0.52, 0.32 + (house.tint % 0.23) * 0.5)
-    roofs.setColorAt(i, color)
+    if (isSlate(house.tint)) {
+      slateRoofs.setMatrixAt(slateCount, matrix)
+      color.setHSL(0.6, 0.04, 0.55 + (house.tint % 0.12) * 2)
+      slateRoofs.setColorAt(slateCount, color)
+      slateCount++
+    } else {
+      terraRoofs.setMatrixAt(terraCount, matrix)
+      color.setHSL(0.03 + house.tint * 0.035, 0.4, 0.5 + (house.tint % 0.23) * 0.8)
+      terraRoofs.setColorAt(terraCount, color)
+      terraCount++
+    }
 
     // two floors of windows on both long faces
     const longSpan = alongX ? house.w : house.d
@@ -220,7 +242,9 @@ function addHouses(scene: Scene, arena: Arena): void {
   })
   plasterBodies.count = plasterCount
   brickBodies.count = brickCount
-  scene.add(plasterBodies, brickBodies, roofs)
+  terraRoofs.count = terraCount
+  slateRoofs.count = slateCount
+  scene.add(plasterBodies, brickBodies, terraRoofs, slateRoofs)
 
   const windows = new InstancedMesh(
     new PlaneGeometry(1.1, 1.5),
@@ -338,7 +362,15 @@ function addScenery(scene: Scene, arena: Arena): (dt: number) => void {
   })
 
   kaykitLoader.load('/models/kaykit/mountain.glb', (gltf) => {
-    flatColor(gltf.scene, 0x9096a0)
+    // KayKit UVs are atlas islands, so a rock texture reads as varied craggy patches
+    const rockMat = new MeshStandardMaterial({
+      map: tex('/textures/rock.jpg', 2, 2),
+      color: 0xb8bcc4,
+      roughness: 1,
+    })
+    gltf.scene.traverse((obj) => {
+      if (obj instanceof Mesh) obj.material = rockMat
+    })
     for (let i = 0; i < 7; i++) {
       const mountain = gltf.scene.clone(true)
       const angle = (i / 7) * Math.PI * 2 + rng() * 0.5
