@@ -58,7 +58,6 @@ export interface InputState {
   lookDir: Vector3
   gas: boolean
   jump: boolean
-  reel: boolean
   slash: boolean
   hookL: boolean
   hookR: boolean
@@ -71,7 +70,6 @@ export function neutralInput(): InputState {
     lookDir: new Vector3(0, 0, -1),
     gas: false,
     jump: false,
-    reel: false,
     slash: false,
     hookL: false,
     hookR: false,
@@ -206,8 +204,14 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
     p.vel.multiplyScalar(Math.max(0, 1 - cfg.drag * dt))
   }
 
-  if (input.reel) {
-    for (const hook of anchors) reelHook(hook, cfg.reelSpeed * dt, cfg.minRopeLength)
+  // the winch is automatic: slack ratchets up instantly, and the rope winds in at a
+  // rate that grows with speed — holding a hook IS reeling; releasing it lets go
+  const speedNow = p.vel.length()
+  for (const hook of anchors) {
+    const dist = p.pos.distanceTo(hook.anchor)
+    if (dist < hook.length) hook.length = Math.max(cfg.minRopeLength, dist)
+    const rate = cfg.reelSpeed * Math.min(1, (1.5 + speedNow * 0.18) / 14)
+    reelHook(hook, rate * dt, cfg.minRopeLength)
   }
 
   if (p.vel.length() > cfg.speedCap) p.vel.setLength(cfg.speedCap)

@@ -98,7 +98,6 @@ function buildInput(): InputState {
   const input = neutralInput()
   input.jump = keys.has('Space')
   input.gas = keys.has('ShiftLeft') || keys.has('ShiftRight')
-  input.reel = keys.has('KeyE')
   input.slash = keys.has('KeyF')
   input.hookL = mouseL || keys.has('KeyQ')
   input.hookR = mouseR
@@ -311,7 +310,6 @@ renderer.setAnimationLoop(() => {
 interface DebugStepInput {
   gas?: boolean
   jump?: boolean
-  reel?: boolean
   slash?: boolean
   hookL?: boolean
   hookR?: boolean
@@ -377,7 +375,6 @@ function snapshot() {
     const input = neutralInput()
     input.gas = partial.gas ?? false
     input.jump = partial.jump ?? false
-    input.reel = partial.reel ?? false
     input.slash = partial.slash ?? false
     input.hookL = partial.hookL ?? false
     input.hookR = partial.hookR ?? false

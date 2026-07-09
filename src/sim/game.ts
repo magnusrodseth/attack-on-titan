@@ -249,7 +249,6 @@ function copyInput(dst: InputState, src: InputState): void {
   dst.lookDir.copy(src.lookDir)
   dst.gas = src.gas
   dst.jump = src.jump
-  dst.reel = src.reel
   dst.slash = src.slash
   dst.hookL = src.hookL
   dst.hookR = src.hookR

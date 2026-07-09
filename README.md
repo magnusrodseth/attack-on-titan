@@ -16,10 +16,9 @@ Click **DEPLOY** (grabs pointer lock), then:
 | Input | Action |
 | --- | --- |
 | Mouse | Look / aim hooks |
-| LMB / RMB | Fire and hold left / right hook at the crosshair |
+| LMB / RMB | Hold to fire a hook and winch in automatically (faster the faster you move); release to detach |
 | Space | Jump |
 | Shift | Gas boost in your horizontal move/look direction |
-| E | Reel in (tighter, faster orbits; climbs the rope) |
 | F | Blade slash |
 | W A S D | Run / steer momentum |
 | R | Resupply gas, canisters and blades at the green plaza ring |

@@ -125,15 +125,32 @@ describe('stepPlayer', () => {
     expect(p.vel.x).toBeGreaterThan(24) // no meaningful tangential loss in one tick
   })
 
-  it('reels in the rope while holding reel', () => {
+  it('auto-reels an attached rope, winching harder the faster you move', () => {
+    const slow = createPlayer()
+    const fast = createPlayer()
+    for (const p of [slow, fast]) {
+      p.pos.set(0, 20, 0)
+      p.onGround = false
+      attachHook(p.hooks[0], new Vector3(0, 50, 0), p.pos) // rope 30, taut
+    }
+    slow.vel.set(2, 0, 0)
+    fast.vel.set(30, 0, 0)
+    for (let i = 0; i < 60; i++) {
+      stepPlayer(slow, idle(), DT, emptyArena())
+      stepPlayer(fast, idle(), DT, emptyArena())
+    }
+    expect(slow.hooks[0].length).toBeLessThan(30)
+    expect(fast.hooks[0].length).toBeLessThan(slow.hooks[0].length)
+  })
+
+  it('ratchets the rope: slack is taken up and never paid back out', () => {
     const p = createPlayer()
-    p.pos.set(0, 30, 0)
-    attachHook(p.hooks[0], new Vector3(0, 60, 0), p.pos)
-    const before = p.hooks[0].length
-    const input = idle()
-    input.reel = true
-    stepPlayer(p, input, DT, emptyArena())
-    expect(p.hooks[0].length).toBeLessThan(before)
+    p.pos.set(0, 20, 0)
+    p.onGround = false
+    attachHook(p.hooks[0], new Vector3(0, 50, 0), p.pos) // length 30
+    p.pos.set(0, 35, 0) // now only 15 from the anchor: 15 of slack
+    stepPlayer(p, idle(), DT, emptyArena())
+    expect(p.hooks[0].length).toBeLessThanOrEqual(15)
   })
 
   it('skids instead of stopping when landing at speed (momentum survives ground touches)', () => {
