@@ -1,5 +1,7 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { CYCLE_SECONDS, startFraction } from './daynight'
+import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS } from './flashlight'
 import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
 import { isWalkable } from './nav'
 import { neutralInput } from './player'
@@ -234,6 +236,50 @@ describe('resupply', () => {
     input.resupply = true
     stepGame(game, input, DT)
     expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+
+  it('recharges the flashlight battery at the station', () => {
+    const game = playingGame()
+    game.player.lamp = 3
+    game.player.pos.set(2, 1.7, 2)
+    const input = neutralInput()
+    input.resupply = true
+    stepGame(game, input, DT)
+    expect(game.player.lamp).toBe(LAMP_BATTERY_SECONDS)
+  })
+})
+
+describe('flashlight through the game loop', () => {
+  /** Advances the run's clock to local midnight without stepping the sim. */
+  function atMidnight(game: ReturnType<typeof playingGame>): void {
+    game.time = (1 - startFraction(game.seed)) * CYCLE_SECONDS
+  }
+
+  it('drains the battery only while it is night', () => {
+    const game = playingGame()
+    const input = neutralInput()
+    stepGame(game, input, DT) // seeded start is always daylight
+    expect(game.player.lamp).toBe(LAMP_BATTERY_SECONDS)
+    atMidnight(game)
+    stepGame(game, input, DT)
+    expect(game.player.lamp).toBeLessThan(LAMP_BATTERY_SECONDS)
+  })
+
+  it('warns once when the battery runs low, and again when it dies', () => {
+    const game = playingGame()
+    atMidnight(game)
+    const input = neutralInput()
+    game.player.lamp = LAMP_LOW_SECONDS + DT / 2
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'lampLow')).toBe(true)
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'lampLow')).toBe(false) // edge, not level
+
+    game.player.lamp = DT / 2
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'lampDead')).toBe(true)
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'lampDead')).toBe(false)
   })
 })
 

@@ -17,3 +17,6 @@ server/.wrangler/
 
 # playwright-cli session snapshots (agent browser verification runs)
 .playwright-cli/
+
+# Claude Code session worktrees (parallel-session runtime state)
+.claude/worktrees/

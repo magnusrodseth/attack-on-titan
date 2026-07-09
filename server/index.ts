@@ -1,16 +1,25 @@
+import { Hono } from 'hono'
 import { routePartykitRequest } from 'partyserver'
-import { handleApi } from './api'
+import { api } from './api'
 import type { Env } from './env'
 
 export { MatchRoom } from './room'
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url)
-    if (url.pathname.startsWith('/api/')) return handleApi(request, env)
-    return (
-      (await routePartykitRequest(request, env as unknown as Record<string, unknown>)) ??
-      new Response('Not found', { status: 404 })
-    )
-  },
-}
+const app = new Hono<{ Bindings: Env }>()
+
+app.route('/api', api)
+
+// partyserver owns /parties/:party/:room (websocket upgrade and Durable Object routing)
+app.all('/parties/*', async (c) => {
+  const response = await routePartykitRequest(c.req.raw, c.env as unknown as Record<string, unknown>)
+  return response ?? c.json({ error: 'Not found' }, 404)
+})
+
+app.notFound((c) => c.json({ error: 'Not found' }, 404))
+
+app.onError((err, c) => {
+  console.error('unhandled error', err instanceof Error ? err.message : err)
+  return c.json({ error: 'Internal error' }, 500)
+})
+
+export default { fetch: app.fetch }

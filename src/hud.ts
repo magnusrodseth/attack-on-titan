@@ -14,6 +14,8 @@ export interface HudFrame {
   speed: number
   nearStation: boolean
   hookInRange: boolean
+  /** Flashlight battery 0..1 while the night lamp window is open; null hides the gauge by day. */
+  lamp: number | null
 }
 
 export interface SettingsValues {
@@ -41,6 +43,8 @@ export class Hud {
   private spearBar = el('spear-bar')
   private spearFill = el('spear-fill')
   private spearCount = el('spear-count')
+  private lampRow = el('lamp-row')
+  private lampFill = el('lamp-fill')
   private meters = el('meters')
   private speedo = el('speedo')
   private banner = el('banner')
@@ -227,7 +231,14 @@ export class Hud {
     this.spearFill.style.width = `${((p.spears / Math.max(1, p.config.spearCapacity)) * 100).toFixed(1)}%`
     this.spearCount.textContent = `×${p.spears}`
     this.spearBar.style.setProperty('--segs', String(Math.max(1, p.config.spearCapacity)))
-    this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
+    // the lamp gauge only exists at night; an empty or dying battery joins the red pulse
+    this.lampRow.classList.toggle('hidden', frame.lamp === null)
+    if (frame.lamp !== null) this.lampFill.style.width = `${(frame.lamp * 100).toFixed(1)}%`
+
+    this.meters.classList.toggle(
+      'low',
+      (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1 || (frame.lamp !== null && frame.lamp < 0.2),
+    )
 
     this.focusFill.style.width = `${game.focus.toFixed(1)}%`
 

@@ -8,12 +8,15 @@ import type { Leaderboard } from './net/protocol'
 import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
+import { FlashlightBeam } from './render/flashlight'
 import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
 import { SpearsView } from './render/spears'
 import { TitanPool } from './render/titans'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
+import { clockFraction } from './sim/daynight'
+import { LAMP_BATTERY_SECONDS, lampGlow, lampOn } from './sim/flashlight'
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
@@ -63,10 +66,13 @@ const urlParams = new URLSearchParams(location.search)
 // server) builds the identical district before the match even starts
 const lobbyCode = normalizeRoomCode(urlParams.get('lobby') ?? '')
 const coopMode = lobbyCode !== null
+// dev playground: a statue gallery with free flight and nothing that bites; the
+// import.meta.env.DEV guard makes this a compile-time false in production builds
+const playgroundMode = import.meta.env.DEV && !coopMode && urlParams.get('playground') === '1'
 const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 const game = createGame(seed, undefined, modeId)
-const { scene, updateScenery } = buildScene(game.arena)
+const { scene, updateScenery, dayNight } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
 camera.rotation.order = 'YXZ'
 
@@ -80,6 +86,7 @@ scene.add(camera) // camera children (blade viewmodel) need the camera in the sc
 const titanPool = new TitanPool(scene)
 const soldierPool = new SoldierPool(scene)
 const effects = new Effects(scene)
+const flashlight = new FlashlightBeam(scene)
 const hud = new Hud(seed)
 const blade = new BladeView(camera)
 const audio = new AudioSystem()
@@ -95,7 +102,7 @@ let mouseM = false
 let mouseR = false
 let yaw = 0
 let pitch = 0
-const debug = { autopilot: false, silent: false }
+const debug = { autopilot: false, silent: false, clockOverride: null as number | null }
 
 window.addEventListener('keydown', (e) => {
   keys.add(e.code)
@@ -149,6 +156,7 @@ window.addEventListener('keydown', (e) => {
     return
   }
   if (game.phase !== 'playing' || document.pointerLockElement === renderer.domElement) return
+  if (playgroundMode) return // the playground drawer owns unlock; clicking the city resumes
   const wait = Math.max(0, 1350 - (performance.now() - lastUnlockAt))
   window.clearTimeout(resumeTimer)
   resumeTimer = window.setTimeout(() => {
@@ -300,7 +308,7 @@ hud.onPickUpgrade = (id) => {
 // --- run persistence: refreshing the page loses nothing --------------------
 
 function persistRun(): void {
-  if (coopMode) return // co-op state lives on the server, not in the solo save slot
+  if (coopMode || playgroundMode) return // neither belongs in the solo save slot
   if (game.phase !== 'playing' && game.phase !== 'upgrading') return
   try {
     localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun(game, { yaw, pitch })))
@@ -322,7 +330,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') persistRun()
 })
 
-const restored = !coopMode && runSave !== null && restoreRun(runSave, game)
+const restored = !coopMode && !playgroundMode && runSave !== null && restoreRun(runSave, game)
 if (restored) {
   if (runSave?.view) {
     yaw = runSave.view.yaw
@@ -334,7 +342,7 @@ if (restored) {
   } else {
     hud.showStart(true) // straight back to the paused run: one click resumes
   }
-} else if (!coopMode) {
+} else if (!coopMode && !playgroundMode) {
   hud.showStart()
 }
 
@@ -546,6 +554,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
         if (event.playerId === me) {
           game.player.gas = game.player.config.maxGas
           game.player.canisters = game.player.config.gasCanisters
+          game.player.lamp = LAMP_BATTERY_SECONDS
           hud.showBanner('Resupplied', 900)
           audio.refill()
         }
@@ -679,6 +688,57 @@ hud.onCloseLeaderboard = () => {
   if (!coopMode) hud.showStart(game.phase === 'playing')
 }
 
+// --- dev playground (compile-time false in production) -----------------------
+
+let devFrame: ((dt: number) => void) | null = null
+if (import.meta.env.DEV) {
+  void import('./dev/playground').then(({ initDev }) => {
+    devFrame = initDev({
+      playground: playgroundMode,
+      game,
+      scene,
+      camera,
+      hud,
+      soldierPool,
+      canvas: renderer.domElement,
+      enterWorld: () => {
+        audio.init()
+        lockPointer()
+      },
+      setView: (y, p) => {
+        yaw = y
+        pitch = p
+      },
+      setClock: (f) => {
+        debug.clockOverride = f
+      },
+    })
+  })
+}
+
+/** Playground: slashes are pure spectacle and resupply refills locally; nothing judges. */
+function handlePlaygroundIntents(events: GameEvent[]): void {
+  const passthrough: GameEvent[] = []
+  for (const event of events) {
+    if (event.type === 'coopSlash') {
+      blade.slash()
+      audio.play(SLASHES, { volume: 0.55 })
+    } else if (event.type === 'coopResupply') {
+      const p = game.player
+      p.gas = p.config.maxGas
+      p.canisters = p.config.gasCanisters
+      p.blades = p.config.bladePairs
+      p.bladeHp = p.config.bladeDurability
+      p.lamp = LAMP_BATTERY_SECONDS
+      hud.showBanner('Resupplied', 900)
+      audio.refill()
+    } else {
+      passthrough.push(event)
+    }
+  }
+  handleEvents(passthrough)
+}
+
 // --- events from the sim ----------------------------------------------------
 
 function handleEvents(events: GameEvent[]): void {
@@ -766,6 +826,14 @@ function handleEvents(events: GameEvent[]): void {
       case 'resupply':
         hud.showBanner('Resupplied', 900)
         audio.refill()
+        break
+      case 'lampLow':
+        hud.showBanner('Lamp Fading · Recharge at the Station', 2200)
+        audio.click()
+        break
+      case 'lampDead':
+        hud.showBanner('Lamp Dead · Recharge at the Station', 2600)
+        audio.click()
         break
       case 'canisterSwap':
         hud.showBanner(event.remaining > 0 ? `Canister Swapped · ${event.remaining} Left` : 'Last Canister', 1200)
@@ -897,6 +965,18 @@ renderer.setAnimationLoop(() => {
         meSnap?.picked ? 'Waiting for the squad…' : `${Math.ceil(coop.myPickTimer())} s to choose`,
       )
     }
+  } else if (playgroundMode && game.phase === 'playing') {
+    // statue gallery: the local soldier flies via the co-op pilot (no titan AI, no waves)
+    if (locked || debug.autopilot) {
+      const input = buildInput()
+      acc += dt
+      while (acc >= SIM_DT) {
+        stepCoopClient(game, input, SIM_DT)
+        handlePlaygroundIntents(game.events)
+        acc -= SIM_DT
+      }
+    }
+    devFrame?.(dt)
   } else if (simActive) {
     if (pauseShown) {
       hud.hideStart()
@@ -956,6 +1036,9 @@ renderer.setAnimationLoop(() => {
   spearsView.sync(game.spears, game.pickups, dt)
   updateSpearBeeps(dt)
   updateScenery(dt, camera)
+  const clock = debug.clockOverride ?? clockFraction(seed, game.time)
+  dayNight.update(clock, camera)
+  flashlight.update(camera, game.phase === 'menu' ? 0 : lampGlow(clock, game.player.lamp), now)
   blade.update(dt)
   effects.syncRopes(game.player, camera, dt)
   effects.update(dt, camera, game.player.vel)
@@ -1001,7 +1084,9 @@ renderer.setAnimationLoop(() => {
     raycastHookTarget(game.arena, game.player.pos, lookDir, game.player.config.hookRange) !== null
   const nearStation =
     Math.hypot(game.player.pos.x - game.arena.station.x, game.player.pos.z - game.arena.station.z) <= 10
-  hud.update(game, { speed, nearStation, hookInRange })
+  const lamp =
+    lampOn(clock) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
+  hud.update(game, { speed, nearStation, hookInRange, lamp })
 
   saveTimer += dt
   if (saveTimer >= 1) {
@@ -1044,6 +1129,8 @@ function snapshot() {
     titansAlive: game.titans.filter((t) => t.hp > 0).length,
     hooks: game.player.hooks.map((h) => h.state),
     buildings: game.arena.buildings.length,
+    clock: Math.round((debug.clockOverride ?? clockFraction(seed, game.time)) * 1000) / 1000,
+    lamp: Math.round(game.player.lamp),
   }
 }
 
@@ -1070,6 +1157,15 @@ function snapshot() {
       hud.hideStart()
       pauseShown = false
     }
+  },
+  // render-only clock override (0 = midnight, 0.5 = noon, null = follow the sim)
+  setClock(fraction: number | null) {
+    debug.clockOverride = fraction
+  },
+  // aim the camera without pointer lock (headless verification)
+  setView(newYaw: number, newPitch: number) {
+    yaw = newYaw
+    pitch = Math.min(1.45, Math.max(-1.45, newPitch))
   },
   start() {
     hud.hideStart()

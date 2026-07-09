@@ -3,6 +3,8 @@ import type { Arena } from './city'
 import { generateCity, raycastHookTarget } from './city'
 import { EYE_HEIGHT } from './constants'
 import { trySlash } from './combat'
+import { clockFraction } from './daynight'
+import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
 import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { NavGrid } from './nav'
@@ -47,6 +49,8 @@ export type GameEvent =
   | { type: 'playerHit'; hp: number }
   | { type: 'waveClear'; wave: number; bonus: number }
   | { type: 'resupply' }
+  | { type: 'lampLow' }
+  | { type: 'lampDead' }
   | { type: 'canisterSwap'; remaining: number }
   | { type: 'boost' }
   | { type: 'death' }
@@ -181,6 +185,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   }
   g.time += dt
   const p = g.player
+  stepLamp(g, dt)
 
   // focus meter: hold to slow time (main loop applies FOCUS_TIME_SCALE while focusActive)
   if (g.focusActive) {
@@ -268,6 +273,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       p.blades = p.config.bladePairs
       p.bladeHp = p.config.bladeDurability
       p.hp = p.config.maxHp
+      p.lamp = LAMP_BATTERY_SECONDS
       g.events.push({ type: 'resupply' })
     }
   }
@@ -357,6 +363,21 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   if (g.phase !== 'playing') saveBest(g) // the run just ended or hit an intermission
 
   copyInput(g.prevInput, input)
+}
+
+/**
+ * Burns flashlight battery while the beam is lit (night), with edge-triggered warnings.
+ * Shared by the solo loop and the co-op client — the battery is a personal resource the
+ * server never needs to see.
+ */
+export function stepLamp(g: GameState, dt: number): void {
+  const p = g.player
+  const before = p.lamp
+  p.lamp = drainLamp(p.lamp, clockFraction(g.seed, g.time), dt)
+  if (before > LAMP_LOW_SECONDS && p.lamp <= LAMP_LOW_SECONDS && p.lamp > 0) {
+    g.events.push({ type: 'lampLow' })
+  }
+  if (before > 0 && p.lamp <= 0) g.events.push({ type: 'lampDead' })
 }
 
 // Only a few titans hunt at once, or the maze becomes a blender. Tokens go to the

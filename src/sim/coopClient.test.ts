@@ -11,6 +11,7 @@ import {
   type RemoteSoldier,
 } from './coopClient'
 import { SIM_DT } from './constants'
+import { CYCLE_SECONDS, startFraction } from './daynight'
 import { createGame } from './game'
 import { neutralInput } from './player'
 
@@ -101,6 +102,15 @@ describe('stepCoopClient', () => {
     input2.resupply = true
     stepCoopClient(g2, input2, SIM_DT)
     expect(g2.events.some((e) => e.type === 'coopResupply')).toBe(true)
+  })
+
+  it('drains the flashlight battery at night, same as solo', () => {
+    const g = createGame('coop-test', null)
+    g.phase = 'playing'
+    g.time = (1 - startFraction(g.seed)) * CYCLE_SECONDS // local midnight
+    const before = g.player.lamp
+    stepCoopClient(g, neutralInput(), SIM_DT)
+    expect(g.player.lamp).toBeLessThan(before)
   })
 })
 

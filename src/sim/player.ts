@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import type { Arena } from './city'
 import { clampToWall, groundHeightAt, resolveBuildingCollision } from './city'
 import { EYE_HEIGHT, GRAVITY } from './constants'
+import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { Hook } from './rope'
 import { applyRopeConstraint, createHook, reelHook } from './rope'
 
@@ -96,6 +97,8 @@ export interface PlayerState {
   bladeHp: number
   hp: number
   spears: number
+  /** Flashlight battery, in seconds of night light; recharges only at resupply. */
+  lamp: number
   onGround: boolean
   slashTimer: number
   fireTimer: number
@@ -118,6 +121,7 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     bladeHp: config.bladeDurability,
     hp: config.maxHp,
     spears: config.spearCapacity,
+    lamp: LAMP_BATTERY_SECONDS,
     onGround: true,
     slashTimer: 0,
     fireTimer: 0,

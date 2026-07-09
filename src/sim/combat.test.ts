@@ -23,10 +23,10 @@ describe('trySlash', () => {
     expect(t.hp).toBe(0)
   })
 
-  it('has a generous nape hitbox: a kill lands from 5m off the nape center', () => {
+  it('has a generous nape hitbox: a kill lands from 6m off the nape center', () => {
     const { p, t } = setup(25)
     p.pos.copy(napeCenter(t))
-    p.pos.y += 5
+    p.pos.y += 6
     const result = trySlash(p, [t])
     expect(result.napeHit).toBe(true)
     expect(result.killed).toBe(true)
@@ -50,7 +50,7 @@ describe('trySlash', () => {
 
   it('body hits do little damage and dull the blade faster', () => {
     const { p, t } = setup(30)
-    p.pos.set(0, 7.5, 2.5) // torso height, in front of the body, away from nape
+    p.pos.set(0, 5, 3.2) // belly height, in front of the body, beyond the grown nape radius
     const napeResult = setup(30)
     const bodyWear = (() => {
       const before = p.bladeHp
@@ -100,6 +100,15 @@ describe('trySlash', () => {
     expect(t.ankles[1]).toBe(false)
     expect(result.killed).toBe(false)
     expect(t.state).not.toBe('crippled')
+  })
+
+  it('has a forgiving ankle hitbox: the cut lands from 3m off the ankle', () => {
+    const { p, t } = setup(12)
+    p.pos.copy(anklePos(t, 0))
+    p.pos.y += 3
+    const result = trySlash(p, [t])
+    expect(result.ankleHit).toBe(true)
+    expect(t.ankles[0]).toBe(true)
   })
 
   it('cripples the titan when both ankles are cut', () => {

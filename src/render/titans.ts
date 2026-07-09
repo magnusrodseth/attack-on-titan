@@ -46,13 +46,13 @@ import { SWAT_WINDUP } from '../sim/titan'
  * Procedural "pure titan": nude-look tan humanoid with a creepy grin and slightly wrong
  * proportions, per the user's reference images. Built at unit height and scaled by t.height.
  */
-interface Limb {
+export interface Limb {
   pivot: Group // hip or shoulder
   lower: Group // knee or elbow
 }
 
 /** Two-segment limb with a joint sphere: capsules instead of boxes. */
-function makeLimb(
+export function makeLimb(
   material: MeshStandardMaterial,
   upperR: number,
   upperL: number,
@@ -60,6 +60,7 @@ function makeLimb(
   lowerL: number,
   x: number,
   pivotY: number,
+  lowerMaterial: MeshStandardMaterial = material,
 ): Limb {
   const pivot = new Group()
   pivot.position.set(x, pivotY, 0)
@@ -73,11 +74,11 @@ function makeLimb(
   pivot.add(joint)
   const lower = new Group()
   lower.position.y = jointY
-  const lowerMesh = new Mesh(new CapsuleGeometry(lowerR, lowerL, 3, 8), material)
+  const lowerMesh = new Mesh(new CapsuleGeometry(lowerR, lowerL, 3, 8), lowerMaterial)
   lowerMesh.position.y = -(lowerL / 2 + lowerR)
   lowerMesh.castShadow = true
   lower.add(lowerMesh)
-  const tip = new Mesh(new SphereGeometry(lowerR * 1.1, 8, 6), material)
+  const tip = new Mesh(new SphereGeometry(lowerR * 1.1, 8, 6), lowerMaterial)
   tip.position.y = -(lowerL + lowerR * 1.6)
   lower.add(tip)
   pivot.add(lower)
@@ -93,6 +94,8 @@ class TitanVisual {
   private readonly armL: Limb
   private readonly armR: Limb
   private readonly torso: Group
+  /** Heel glows matching sim ankle targets; index 0 = left, 1 = right (like t.ankles). */
+  private readonly ankleGlows: [Mesh, Mesh]
   private walkPhase = 0
   private lastPos = { x: 0, z: 0 }
 
@@ -127,6 +130,16 @@ class TitanVisual {
     // two-segment capsule legs with hip pivots and knees
     this.legL = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, -0.085, 0.44)
     this.legR = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, 0.085, 0.44)
+
+    // glowing heel tendons, the same red as the nape so both weak points read alike;
+    // each hides once its ankle is cut (see syncPose)
+    const heel = (limb: Limb): Mesh => {
+      const glow = new Mesh(new BoxGeometry(0.06, 0.055, 0.03), this.napeMat)
+      glow.position.set(0, -0.175, -0.05) // back of the lower leg, at the sim's anklePos height
+      limb.lower.add(glow)
+      return glow
+    }
+    this.ankleGlows = [heel(this.legL), heel(this.legR)]
 
     this.torso = new Group()
     this.torso.position.y = 0.44
@@ -208,6 +221,11 @@ class TitanVisual {
   syncPose(t: TitanState, dt: number): void {
     this.group.position.copy(t.pos)
     this.group.rotation.y = t.facing
+
+    // a cut tendon stops advertising itself; a crippled or dead titan has none to sell
+    const showAnkles = t.state !== 'dead' && t.state !== 'crippled'
+    this.ankleGlows[0].visible = showAnkles && !t.ankles[0]
+    this.ankleGlows[1].visible = showAnkles && !t.ankles[1]
 
     if (t.state === 'dead') {
       // fall forward around the feet, then dissolve

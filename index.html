@@ -77,6 +77,8 @@
       #blade-fill { background: linear-gradient(180deg, #f4f8fb, #93a1ad); }
       #spear-fill { background: linear-gradient(180deg, #ffb36b, #c25e1e); }
       #focus-fill { background: linear-gradient(180deg, #c3adff, #6d4fd0); }
+      /* lamp gauge only appears at night, while the flashlight is running its battery */
+      #lamp-fill { background: linear-gradient(180deg, #ffe9b0, #cf9435); }
       /* segmented gauges read as countable uses; separators overlay the fill */
       .bar.segmented::after {
         content: ''; position: absolute; inset: 0; pointer-events: none;
@@ -404,6 +406,10 @@
         <div id="blade-bar" class="bar segmented"><div id="blade-fill" class="fill"></div></div>
         <div class="meter-label">SPEAR <span id="spear-count"></span></div>
         <div id="spear-bar" class="bar segmented"><div id="spear-fill" class="fill"></div></div>
+        <div id="lamp-row" class="hidden">
+          <div class="meter-label">LAMP</div>
+          <div id="lamp-bar" class="bar"><div id="lamp-fill" class="fill"></div></div>
+        </div>
         <div class="meter-label">FOCUS</div>
         <div id="focus-bar" class="bar"><div id="focus-fill" class="fill"></div></div>
       </div>

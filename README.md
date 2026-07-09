@@ -86,7 +86,8 @@ pnpm typecheck   # tsc --noEmit (client) + tsc -p server
 pnpm build       # production bundle in dist/
 ```
 
-The multiplayer backend lives in `server/` (Cloudflare Worker, partyserver + Drizzle):
+The multiplayer backend lives in `server/` (Cloudflare Worker: Hono routing, partyserver
+rooms, Drizzle over D1):
 
 ```bash
 pnpm server:dev     # wrangler dev on localhost:8787 (local D1 included, no env needed)
@@ -100,6 +101,12 @@ Vercel for production).
 
 `window.__aot` exposes a debug hook (`start()`, `step(ticks, input)`, `snapshot()`,
 `setAutopilot()`, `setSilent()`) used for browser automation.
+
+Dev builds also ship a playground (`http://localhost:5173/?playground=1`, or the
+`Playground · Dev` menu button): a statue gallery in the real city with free ODM flight and no
+titan AI, for inspecting the soldier and titan models and styling the Striker/Captain figures
+live (backquote toggles the drawer). It is dynamic-imported behind `import.meta.env.DEV`, so
+production bundles contain none of it.
 
 Design decisions and their history live in `wayfinder/map.md`; mechanics research with sources in
 `docs/research/odm-mechanics.md`.
@@ -128,7 +135,11 @@ Music (two tracks alternating in-game):
 
 - Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)
 - Brushed-steel blade texture from [ambientCG](https://ambientcg.com/view?id=Metal012) (Metal012, CC0)
+- Galvanized steel wire rope (ODM cables) and brushed grapple-hook steel from [ambientCG](https://ambientcg.com): [Rope002](https://ambientcg.com/view?id=Rope002), [Metal011](https://ambientcg.com/view?id=Metal011) (both CC0)
 - Soldier textures (Survey-Corps cloak linen, ODM-harness/boot leather, uniform cloth) from [ambientCG](https://ambientcg.com): [Fabric045](https://ambientcg.com/view?id=Fabric045), [Leather028](https://ambientcg.com/view?id=Leather028), [Fabric062](https://ambientcg.com/view?id=Fabric062) (all CC0)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
 - Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)
 - Mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg
+- Teammate recruit model (rigged + animated Rogue_Hooded) from [KayKit Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) by Kay Lousberg (CC0)
+- Night-sky star map from [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) — NASA/Goddard Space Flight Center Scientific Visualization Studio (public domain; Gaia DR2 data)
+- Moon texture from the [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720) — NASA's Scientific Visualization Studio (public domain; LRO/LROC data)

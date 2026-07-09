@@ -35,6 +35,13 @@ browser profiles, ready to share on LinkedIn.
   (lobby state machine, 30 Hz tick loop, creator reassignment on leave, match write via atomic
   D1 batch). Room code doubles as the city seed via the `?lobby=` reload pattern; the match
   seed appends a rematch counter so waves and offers stay fresh in the same city.
+- Server framework: Worker entry and REST API migrated to Hono (2026-07-09, graduated from
+  the IDEAS.md note once the raw deploy was proven). Pure port: identical routes, messages
+  and status codes; CORS pinning kept the same `isAllowedOrigin` predicate via `hono/cors`'s
+  origin function; `/parties/*` forwards to partyserver's `routePartykitRequest`; `MatchRoom`
+  and the db layer untouched; unused Neon dependency dropped. Verified locally (full API
+  matrix plus a browser lobby over the websocket route) and in production (version df720b06:
+  API matrix, existing leaderboard intact, lobby MARIA-RE over the deployed worker).
 - Verified end-to-end locally with two automated browsers (2026-07-09): register/login,
   code+link join, ready/start, identical mirrored titans, seven server-validated kills with
   attribution and heart-back, wave clear → personal offers → pick timer auto-pick → scaled
