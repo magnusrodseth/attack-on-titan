@@ -127,6 +127,124 @@ this pins the user's spec for it.
 - **Spectacle**: phase-change roar + camera shake + hitstop, unique music layer while the bar
   is up, and a big multi-burst kill with its own banner ("The Wall Stands") and score bonus.
 
+## Fix the placebo upgrades (defect found in sparring, 2026-07-09)
+
+Not a feature: a correctness fix, agreed to document here until scoped. Three config fields in
+`DEFAULT_PLAYER_CONFIG` (`src/sim/player.ts`) are declared and mutated by upgrades but never
+read by `stepPlayer` (verified by grep, 2026-07-09): `gasThrust`, `gasBurn`, `airBoostThrust`.
+Gas is only ever spent by the Shift dash (`BOOST_COST`), so:
+
+- **"Tuned Thrusters"** (gasThrust ×1.2) is a complete no-op.
+- **"Wind Dancer"** is half-live: airControl ×1.6 works, airBoostThrust ×1.3 does nothing.
+- A dead upgrade in a pick-1-of-3 offer means a wasted pick whenever it appears.
+
+Fix directions: either wire the fields into live systems (e.g. boost impulse scales with
+airBoostThrust) or drop the dead fields and replace both upgrades with ones touching live
+constants (boost impulse, `BOOST_COOLDOWN`, `BOOST_COST`, body-hit blade wear). Replacement is
+probably cleaner than inventing a new thrust mechanic just to justify a stat. Add a regression
+guard: a test per upgrade asserting an observable sim-behavior delta, so a dead upgrade can
+never ship silently again.
+
+## Close-quarters kill bonus (sparring idea, agreed 2026-07-09)
+
+A score multiplier tier for killing a titan while hooked to it. Hooks already anchor in
+titan-local space and track the titan (`attachHookToTitan`/`updateTitanAnchor`), so the check
+is one line at kill time in `trySlash`: some `hook.titanId === victim.id`.
+
+- **Scoring**: a new multiplier in `registerKill` (`src/sim/score.ts`), composing with the
+  existing speed/air/oneCut/rare/chain factors; carry an `anchoredToVictim` flag on the kill
+  event so HUD banners ("Point-Blank!") and the co-op server (`coopSlash` validates the same
+  way) stay in sync.
+- **Why**: makes the iconic orbit-the-titan-you-are-killing move mechanically legible, and
+  rewards hooking titans themselves instead of always hooking buildings.
+
+## Dull blades: wear raises the kill threshold (sparring idea, agreed 2026-07-09)
+
+Blades are currently binary until they snap (bladeHp 6 per pair, 4 pairs; nape/ankle wear 1,
+body wears 2, `wearBlade` in `src/sim/combat.ts`). Idea: the one-cut threshold scales with the
+current pair's remaining bladeHp — fresh pair kills at killSpeed 17 m/s, last-hit pair needs
+roughly 22.
+
+- **Why**: this is the fix for the weakest system in the game. Gas is only spent on dashes and
+  every kill refunds a heart, so the resupply station is nearly decorative; dull blades make
+  the mid-wave resupply run a real decision (dip in kill threshold vs travel time) without
+  touching the gas economy (free swinging stays sacred to the feel).
+- **Scope notes**: only the one-cut threshold moves; keep the sub-threshold damage curve keyed
+  on base killSpeed so chip damage is not double-punished. Deepens "Sharp Blades" and
+  "Extra Blades" upgrades. HUD: tint the segmented blade-gauge cells toward dull as bladeHp
+  drops, and surface the raised threshold near the kill-speed feedback.
+
+## Rare titan kind: the Crawler (sparring idea, agreed 2026-07-09)
+
+Third `TitanKind`: permanently prone, fast on all fours, nape low. The pose already exists:
+crippled titans kneel with the nape at height×0.6 (`src/sim/titan.ts`). The wayfinder map
+lists "crawlers" under Not yet specified; this pins the direction.
+
+- **Immune to ankle cuts**: no stance to break — ankle slashes count as body hits.
+- **Approach geometry flips**: the nape must be attacked from above, and the pendulum bottom
+  is horizontal, so the player has to dive at it. The current moveset is bad at that, which is
+  the point.
+- **Behavior sketch**: faster than a normal's walk, serpentine chase, no leap (or a low
+  lunge). Seeded spawn weighting in `waveComposition` from some wave onward.
+- **Render**: reuse the capsule-limb rig in a crawl pose; existing CC0 skin assets satisfy the
+  texture rule.
+
+## Titan HP as a size/variant lever (future idea, logged 2026-07-09)
+
+Fact: every titan has flat 100 HP regardless of height 8–27 m (`createTitan`,
+`src/sim/titan.ts`). This works today because speed ≥ killSpeed bypasses HP entirely; HP only
+matters in the chip-damage regime. Logged as an unused lever:
+
+- Scale HP with height (bigger = tankier to chip) and/or set per-variant HP (crawler lower,
+  armored/boss higher) as the tuning knob for future variants instead of inventing new damage
+  types.
+- **Explicit non-goal**: never scale the one-cut threshold with size. Speed-kills stay the
+  universal clean answer, so the speed-is-damage identity survives any HP rebalance.
+
+## Daily seed mode (sparring idea, agreed 2026-07-09)
+
+A `GameMode` registry entry: everyone plays the same seed per UTC day (e.g.
+`hashSeed('daily:' + YYYY-MM-DD)`), one scored attempt, dedicated leaderboard scope. The
+determinism contract makes it nearly free, and GAME_MODES plus the D1 leaderboard/protocol
+shapes already exist. Likely the strongest retention feature per line of code available.
+
+- **To scope**: one-attempt enforcement (localStorage mark keyed by date locally; server
+  rejects a second submission per account/day), what spends the attempt (death, or first
+  submission?), whether mid-run resume is allowed within the day (probably yes, but restart =
+  attempt spent).
+- **Later**: ghost replays fall out of the same determinism (record the input stream, replay
+  as a translucent ghost) — daily is the proving ground, a time-trial mode is the payoff.
+
+## Adrenaline: co-op-compatible Focus replacement (sparring idea, agreed 2026-07-09)
+
+Focus (Q, 0.3× world time) is solo-only and force-disabled in co-op (`src/sim/coopClient.ts`)
+because a shared world cannot slow for one soldier. Adrenaline inverts the effect: same
+meter/drain/regen economy (the `FOCUS_*` constants in `src/sim/game.ts` are the starting
+tuning), but instead of dilating time it briefly raises the player's own speedCap and
+airControl (maybe reel rate too).
+
+- **Why it works in co-op**: clients own their movement, so no netcode changes; check the
+  server's `MAX_REPORTED_SPEED` clamp (60) against the boosted cap.
+- **Why it fits the game**: it feeds speed-is-damage — a burst carries you past killSpeed
+  instead of pausing the world. Same "world feels slow" fantasy.
+- **Open question**: replace Focus in solo too (one consistent system) or keep Focus solo and
+  Adrenaline co-op as distinct feels.
+
+## Active revive in co-op: downed state (sparring idea, agreed 2026-07-09)
+
+Today dead soldiers respawn at full HP at the muster on the next wave clear (`src/sim/coop.ts`),
+which is functional but passive. Idea: a downed state with a ~30 s bleedout; a teammate holding
+within ~3 m for ~3 s revives at partial HP. Server-side it is a timer plus a proximity check on
+state the snapshots already carry.
+
+- Keep wave-clear auto-revive as the backstop; teamWipe becomes "all connected soldiers
+  simultaneously downed or dead".
+- **To scope**: can downed soldiers crawl/look or only spectate; chaser tokens should drop a
+  downed target (dead weight must not hold aggro); bleedout ring on teammate nameplates and
+  the spectator overlay; brief i-frames after revive.
+- Creates the rescue moments co-op currently lacks; pairs well with a possible grab-type titan
+  (discussed, not yet adopted) where cutting the wrist frees a grabbed teammate.
+
 ## Migrate the co-op server to Hono (note to self, 2026-07-09)
 
 Once the Cloudflare deploy of the multiplayer server (ADR 0001) works end to end, migrate the
