@@ -77,8 +77,7 @@ export const KIT_DEFAULTS: Record<FigureKind, Record<string, string>> = {
     shorts: '#1f2a5a',
     socks: '#f2f1ea',
     skin: '#e0b48c',
-    hair: '#9a7648', // swept-back dark blond
-    beard: '#755631',
+    hair: '#9a7648', // swept-back dark blond; the beard lives in the face photo
     armband: '#3050d8', // captain's armband, left arm
     number: '#ce1126',
   },
@@ -103,6 +102,23 @@ const JERSEY_W = 1024
 const JERSEY_H = 512
 const HEAD_W = 512
 const HEAD_H = 256
+
+/** Skull scale per kind: the Striker's long pill head vs the Captain's rounder one. */
+const HEAD_SHAPE: Record<FigureKind, { x: number; y: number; z: number }> = {
+  striker: { x: 0.94, y: 1.3, z: 0.96 },
+  captain: { x: 1.02, y: 1.16, z: 1 },
+}
+
+const FACE_PHOTO: Record<FigureKind, string> = {
+  striker: '/textures/haaland-face.jpg',
+  captain: '/textures/kane-face.jpg',
+}
+
+/** Face patch width on the head canvas: both wrap far past the front of the head. */
+const FACE_W: Record<FigureKind, number> = {
+  striker: 265,
+  captain: 275,
+}
 
 export function buildFootballer(
   kind: FigureKind,
@@ -129,8 +145,6 @@ export function buildFootballer(
   const socks = slot('socks', '/textures/soldier-cloth.jpg', 1)
   // linen, not bark: hair tints multiply over the map, and bark is too dark to ever read blond
   const hair = slot('hair', '/textures/linen.jpg', 2, 0.95)
-  // near-black facial features, same bark-over-dark trick as the titan mouths
-  const face = new MeshStandardMaterial({ map: cloth('/textures/bark.jpg', 2), color: 0x241b12, roughness: 0.95 })
 
   // --- baked jersey: flag cross + back number wrap the chest instead of floating decals
   const jerseyCanvas = document.createElement('canvas')
@@ -176,75 +190,83 @@ export function buildFootballer(
   const clothImg = loadImage('/textures/soldier-cloth.jpg', paintJersey)
   const chestMat = new MeshStandardMaterial({ map: jerseyTexture, roughness: 0.9 })
 
-  // --- baked head (striker only): the face photo feathered into the skin at the sphere front
-  let paintHead: (() => void) | null = null
-  let headMat: MeshStandardMaterial | null = null
-  if (kind === 'striker') {
-    const headCanvas = document.createElement('canvas')
-    headCanvas.width = HEAD_W
-    headCanvas.height = HEAD_H
-    const headTexture = new CanvasTexture(headCanvas)
-    headTexture.colorSpace = SRGBColorSpace
+  // --- baked head: the face photo feathered into the skin at the sphere front
+  const headCanvas = document.createElement('canvas')
+  headCanvas.width = HEAD_W
+  headCanvas.height = HEAD_H
+  const headTexture = new CanvasTexture(headCanvas)
+  headTexture.colorSpace = SRGBColorSpace
 
-    paintHead = () => {
-      const ctx = headCanvas.getContext('2d')!
+  function paintHead(): void {
+    const ctx = headCanvas.getContext('2d')!
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.fillStyle = kitColor('skin')
+    ctx.fillRect(0, 0, HEAD_W, HEAD_H)
+    if (ready(skinImg)) {
+      ctx.globalCompositeOperation = 'multiply'
+      const tile = HEAD_W / 1.5 // match the body skin's 1.5 texture repeat
+      for (let y = 0; y < HEAD_H; y += tile)
+        for (let x = 0; x < HEAD_W; x += tile) ctx.drawImage(skinImg, x, y, tile, tile)
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = kitColor('skin')
-      ctx.fillRect(0, 0, HEAD_W, HEAD_H)
-      if (ready(skinImg)) {
-        ctx.globalCompositeOperation = 'multiply'
-        const tile = HEAD_W / 1.5 // match the body skin's 1.5 texture repeat
-        for (let y = 0; y < HEAD_H; y += tile)
-          for (let x = 0; x < HEAD_W; x += tile) ctx.drawImage(skinImg, x, y, tile, tile)
-        ctx.globalCompositeOperation = 'source-over'
-      }
-      if (ready(faceImg)) {
-        // feathered oval so the photo blends into the skin instead of ending at a hard seam
-        const fw = 124
-        const fh = 136
-        const off = document.createElement('canvas')
-        off.width = fw
-        off.height = fh
-        const octx = off.getContext('2d')!
-        octx.drawImage(faceImg, 0, 0, fw, fh)
-        octx.globalCompositeOperation = 'destination-in'
-        octx.translate(fw / 2, fh / 2)
-        octx.scale(1, fh / fw)
-        const mask = octx.createRadialGradient(0, 0, 0, 0, 0, fw / 2)
-        mask.addColorStop(0.55, 'rgba(0,0,0,1)')
-        mask.addColorStop(0.85, 'rgba(0,0,0,0)') // stop short of the crop edge: photo background stays out
-        octx.fillStyle = mask
-        octx.fillRect(-fw / 2, -fw / 2, fw, fw)
-        ctx.drawImage(off, FRONT_U * HEAD_W - fw / 2, (1 - 0.52) * HEAD_H - fh / 2)
-      }
-      headTexture.needsUpdate = true
     }
-
-    headMat = new MeshStandardMaterial({ map: headTexture, roughness: 0.85 })
+    if (ready(faceImg)) {
+      // feathered oval so the photo blends into the skin instead of ending at a hard seam;
+      // sized per kind to wrap most of the head, not just a front patch
+      const fw = FACE_W[kind]
+      const fh = 175
+      const off = document.createElement('canvas')
+      off.width = fw
+      off.height = fh
+      const octx = off.getContext('2d')!
+      octx.drawImage(faceImg, 0, 0, fw, fh)
+      octx.globalCompositeOperation = 'destination-in'
+      octx.translate(fw / 2, fh / 2)
+      octx.scale(1, fh / fw)
+      const mask = octx.createRadialGradient(0, 0, 0, 0, 0, fw / 2)
+      mask.addColorStop(0.55, 'rgba(0,0,0,1)')
+      mask.addColorStop(0.85, 'rgba(0,0,0,0)') // stop short of the crop edge: photo background stays out
+      octx.fillStyle = mask
+      octx.fillRect(-fw / 2, -fw / 2, fw, fw)
+      ctx.drawImage(off, FRONT_U * HEAD_W - fw / 2, (1 - 0.52) * HEAD_H - fh / 2)
+    }
+    headTexture.needsUpdate = true
   }
-  const skinImg = loadImage('/textures/skin.jpg', () => paintHead?.())
-  const faceImg = loadImage('/textures/haaland-face.jpg', () => paintHead?.())
 
-  // legs: bare thighs under the shorts, socks from the knee down
-  const legL = makeLimb(skin, 0.058, 0.11, 0.047, 0.1, -0.085, 0.44, socks)
-  const legR = makeLimb(skin, 0.058, 0.11, 0.047, 0.1, 0.085, 0.44, socks)
+  const headMat = new MeshStandardMaterial({ map: headTexture, roughness: 0.85 })
+  const skinImg = loadImage('/textures/skin.jpg', paintHead)
+  const faceImg = loadImage(FACE_PHOTO[kind], paintHead)
+
+  // legs: bare thighs under the shorts, socks from the knee down; stance kept narrow
+  // enough that the slimmed shorts still contain the thigh tops
+  const legL = makeLimb(skin, 0.058, 0.11, 0.047, 0.1, -0.075, 0.44, socks)
+  const legR = makeLimb(skin, 0.058, 0.11, 0.047, 0.1, 0.075, 0.44, socks)
   group.add(legL.pivot, legR.pivot)
 
   const torso = new Group()
   torso.position.y = 0.44
   group.add(torso)
 
-  const chest = new Mesh(new CapsuleGeometry(0.12, 0.2, 4, 24), chestMat)
+  // long jersey: the chest capsule runs low so the shirt hangs over the shorts
+  const chest = new Mesh(new CapsuleGeometry(0.12, 0.26, 4, 24), chestMat)
   chest.scale.set(1.15, 1, 0.8) // battering-ram build, not the titan belly
-  chest.position.y = 0.18
+  chest.position.y = 0.15
   chest.castShadow = true
   torso.add(chest)
 
-  const hips = new Mesh(new CapsuleGeometry(0.13, 0.08, 4, 10), shorts)
-  hips.scale.set(1.05, 1, 0.78)
-  hips.position.y = 0.02
+  // shorts: slimmer than the jersey and set low, strictly inside the chest until its
+  // base curve narrows past them
+  const hips = new Mesh(new CapsuleGeometry(0.115, 0.05, 4, 24), shorts)
+  hips.scale.set(1.17, 1, 0.8)
+  hips.position.y = -0.03
   hips.castShadow = true
   torso.add(hips)
+
+  // slim jersey-red hem band over the seam where the shorts emerge from under the chest,
+  // so the shirt ends on a clean horizontal line with no white at the waist
+  const hem = new Mesh(new CylinderGeometry(0.12, 0.12, 0.024, 24), jersey)
+  hem.scale.set(1.17, 1, 0.82)
+  hem.position.y = -0.01
+  torso.add(hem)
 
   for (const side of [-1, 1]) {
     const shoulder = new Mesh(new SphereGeometry(0.06, 8, 6), jersey)
@@ -264,8 +286,9 @@ export function buildFootballer(
   const head = new Group()
   head.position.y = 0.4
   torso.add(head)
-  const skull = new Mesh(new SphereGeometry(0.085, 24, 18), headMat ?? skin)
-  skull.scale.set(1, 1.12, 1)
+  const shape = HEAD_SHAPE[kind]
+  const skull = new Mesh(new SphereGeometry(0.085, 24, 18), headMat)
+  skull.scale.set(shape.x, shape.y, shape.z)
   skull.castShadow = true
   head.add(skull)
 
@@ -273,24 +296,25 @@ export function buildFootballer(
     // slicked-back crown: a snug shell over the skull, tilted back just enough that the
     // hairline overlaps the photo's forehead (no skin gap) while eyes and brow stay clear
     const crown = new Mesh(new SphereGeometry(0.089, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), hair)
-    crown.scale.set(1.02, 1.1, 1.02)
+    crown.scale.set(shape.x * 1.02, shape.y * 0.98, shape.z * 1.02)
     crown.position.set(0, 0.005, -0.01)
     crown.rotation.x = -0.38
     head.add(crown)
 
-    const bun = new Mesh(new SphereGeometry(0.034, 10, 8), hair)
-    bun.position.set(0, 0.05, -0.095)
+    const bun = new Mesh(new SphereGeometry(0.036, 10, 8), hair)
+    bun.position.set(0, 0.075, -0.085)
     head.add(bun)
 
-    // loose locks hugging the skull, streaming back off the bun into a short wind-blown
-    // tail; kept thin and high so the nape glow underneath stays readable from behind
+    // one tight tail off the bun (three overlapping strands reading as a single mass, with
+    // a slight wind sway) plus skull-hugging temple wisps; short enough that the nape glow
+    // underneath stays readable from behind
     const v3 = (x: number, y: number, z: number) => new Vector3(x, y, z)
     const locks: [Vector3[], number][] = [
-      [[v3(0, 0.055, -0.095), v3(0, 0.03, -0.14), v3(0.01, -0.005, -0.16), v3(-0.005, -0.04, -0.155)], 0.013],
-      [[v3(0.028, 0.05, -0.08), v3(0.04, 0.02, -0.12), v3(0.03, -0.015, -0.145), v3(0.02, -0.045, -0.14)], 0.009],
-      [[v3(-0.028, 0.05, -0.08), v3(-0.04, 0.02, -0.12), v3(-0.03, -0.015, -0.145), v3(-0.02, -0.045, -0.14)], 0.009],
-      [[v3(0.05, 0.025, -0.055), v3(0.055, -0.005, -0.095), v3(0.045, -0.035, -0.12)], 0.007],
-      [[v3(-0.05, 0.025, -0.055), v3(-0.055, -0.005, -0.095), v3(-0.045, -0.035, -0.12)], 0.007],
+      [[v3(0, 0.045, -0.1), v3(0.006, 0.01, -0.13), v3(-0.004, -0.025, -0.145), v3(0.002, -0.055, -0.14)], 0.016],
+      [[v3(0.012, 0.04, -0.095), v3(0.018, 0.005, -0.125), v3(0.012, -0.03, -0.14)], 0.011],
+      [[v3(-0.012, 0.04, -0.095), v3(-0.018, 0.005, -0.125), v3(-0.012, -0.03, -0.14)], 0.011],
+      [[v3(0.055, 0.02, -0.04), v3(0.06, -0.005, -0.08), v3(0.05, -0.025, -0.105)], 0.006],
+      [[v3(-0.055, 0.02, -0.04), v3(-0.06, -0.005, -0.08), v3(-0.05, -0.025, -0.105)], 0.006],
     ]
     for (const [points, radius] of locks) {
       const lock = new Mesh(new TubeGeometry(new CatmullRomCurve3(points), 12, radius, 6), hair)
@@ -300,19 +324,12 @@ export function buildFootballer(
       head.add(tip)
     }
   } else {
-    for (const side of [-1, 1]) {
-      const eye = new Mesh(new SphereGeometry(0.011, 6, 5), face)
-      eye.position.set(side * 0.032, 0.015, 0.078)
-      head.add(eye)
-    }
-    // swept-back hair and the short full beard
-    const sweep = new Mesh(new BoxGeometry(0.155, 0.06, 0.17), hair)
-    sweep.position.set(0, 0.065, -0.015)
-    head.add(sweep)
-    const beard = slot('beard', '/textures/bark.jpg', 2, 0.95)
-    const jaw = new Mesh(new BoxGeometry(0.11, 0.05, 0.05), beard)
-    jaw.position.set(0, -0.055, 0.05)
-    head.add(jaw)
+    // swept-back short hair: same snug shell as the striker, sitting a touch flatter
+    const crown = new Mesh(new SphereGeometry(0.089, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.4), hair)
+    crown.scale.set(shape.x * 1.02, shape.y * 0.98, shape.z * 1.02)
+    crown.position.set(0, 0.008, -0.012)
+    crown.rotation.x = -0.3
+    head.add(crown)
 
     const collar = slot('collar', '/textures/soldier-cloth.jpg', 1)
     const ring = new Mesh(new CylinderGeometry(0.05, 0.055, 0.035, 10), collar)
@@ -335,7 +352,7 @@ export function buildFootballer(
 
   group.scale.setScalar(height)
   paintJersey()
-  paintHead?.()
+  paintHead()
 
   const bakedSlots = new Set(['jersey', 'cross', 'crossInlay', 'number'])
   return {
@@ -345,7 +362,7 @@ export function buildFootballer(
       kit[slotName] = hex
       for (const material of materialSlots[slotName] ?? []) material.color.set(hex)
       if (bakedSlots.has(slotName)) paintJersey()
-      if (slotName === 'skin') paintHead?.()
+      if (slotName === 'skin') paintHead()
     },
     setHeight(h: number) {
       group.scale.setScalar(h)

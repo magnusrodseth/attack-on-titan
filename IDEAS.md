@@ -66,10 +66,12 @@ viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
   offset navy/white flag cross and a number 9, white shorts — plus the blond ponytail-bun.
   Build the kit from sourced CC0 fabric/knit textures with per-instance tints (the layering
   the texture rule encourages, like the banner linen); hair as a tinted geometry block.
-- Likeness boundary: game-ready Haaland face models/textures DO exist (FIFA/PES face-mod
-  communities — the first reference below is one), but they are neither freely licensed nor
-  clear of likeness rights, so none can be shipped. The homage stays photo-free: kit + hair +
-  the run should read as him instantly.
+- Likeness boundary (revised by user decision, 2026-07-09): the face is now a real photo,
+  overriding the earlier photo-free rule — a cropped Wikimedia Commons photo ("Erling Haaland
+  Morocco v Norway 7 June 2026-51" by Bryan Berlin, CC BY-SA 4.0, credited in the README) baked
+  into the head texture in `src/render/strikers.ts`. Kit and hair remain CC0-textured tinted
+  geometry. Game-ready FIFA/PES face mods stay off-limits (unlicensed, no clear likeness
+  rights); only properly licensed Commons photos qualify.
 - User-provided visual references (look/proportion only):
   - https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU7JeIBXpzTCIUWoEq7Tpu4ikMD-V2OXmmH02ty2XCne61tFdjJ7BTXJfX&s=10 (game face-mod render, slicked-back blond hair)
   - https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQmDn_-U2M7aAUvitfyQsjvsTyJeL3EJLZ9dbySEyY8mSUR-LbtDsI5nXc&s=10 (red Norway home jersey, flag cross, ponytail-bun)
@@ -95,7 +97,9 @@ when the Striker graduates to the wayfinder map, this section graduates with it.
   navy shorts, plus the blue captain's armband as a tinted band on the left arm. Swept-back
   dark-blond hair and a short full beard as tinted geometry blocks. Same construction as the
   Striker's kit: sourced CC0 fabric/knit textures with per-instance tints.
-- **Likeness boundary**: same rule as the Striker, photo-free homage only. No Three Lions
+- **Likeness boundary** (revised with the Striker, 2026-07-09): a real face photo is allowed —
+  the build uses "Harry Kane on October 10, 2023" (UK Prime Minister's Office, CC BY 2.0,
+  credited in the README) baked into the head texture. Otherwise unchanged. No Three Lions
   crest, no brand marks (both are trademarked even in freely licensed photos); the read
   comes from white-kit-with-red-9 + armband + beard standing next to the Norway red.
 - User-provided visual references (look/proportion only):
