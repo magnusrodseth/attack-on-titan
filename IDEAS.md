@@ -75,6 +75,29 @@ viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
   - https://pbs.twimg.com/media/FZGhAdJX0AAo1Yq.jpg
   - https://media-cldnry.s-nbcnews.com/image/upload/rockcms/2026-07/260705-haaland-norway-world-cup-ww-1524-b41355.jpg (2026 World Cup, Norway kit with shorts — the spawn look)
 
+## Boss fight with boss health bar and weak-point phases (user idea, 2026-07-09)
+
+A boss titan encounter (natural finale for a wave milestone, e.g. every 10th wave, or its own
+entry on the GameMode registry). The map's fog already lists "boss/armored titan finale" —
+this pins the user's spec for it.
+
+- **Boss health bar**: a wide branded gauge across the top of the screen (same plate/brass
+  construction as the menu gauges, Cinzel name plate, segmented into phase chunks), shown only
+  while the boss is engaged.
+- **Parts of the body lighting up**: the fight is phase-driven — a body part (ankle tendon,
+  wrist, shoulder, eye, then finally the nape) glows as the current weak point, in the same
+  overbright emissive style as the existing nape indicator. Only the lit part takes damage;
+  cutting it staggers the boss, drains a phase chunk of the bar, and moves the glow to the
+  next part. The nape only becomes cuttable in the last phase.
+- **Sim shape**: a `boss` titan kind with a part-hitbox list (reuse the ankle/nape local-anchor
+  math), `phase` index and per-part hp in TitanState or a parallel BossState; events for
+  part-broken/phase-change drive HUD, sounds and bursts. Deterministic like everything else.
+- **Armor synergy**: an armored boss whose skin resists blades everywhere except the lit part
+  is the intended target for the Thunder Spear class (see above) — spears crack plates open,
+  blades finish the glowing flesh.
+- **Spectacle**: phase-change roar + camera shake + hitstop, unique music layer while the bar
+  is up, and a big multi-burst kill with its own banner ("The Wall Stands") and score bonus.
+
 ## Day/night cycle with a realistic sky (user idea, 2026-07-09)
 
 Replace the flat sky color with a realistic skybox that follows a time-of-day simulation, giving
