@@ -6,11 +6,11 @@ import { trySlash } from './combat'
 import type { InputState, PlayerState } from './player'
 import { createPlayer, neutralInput, stepPlayer } from './player'
 import { createRng, hashSeed } from './rng'
-import { attachHook, releaseHook } from './rope'
+import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from './rope'
 import type { ScoreState } from './score'
 import { createScore, registerKill, stepScore } from './score'
 import type { TitanState } from './titan'
-import { createTitan, stepTitan } from './titan'
+import { createTitan, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 import { applyUpgrade, offerUpgrades } from './upgrades'
 import { waveComposition } from './waves'
@@ -21,6 +21,8 @@ export type GameEvent =
   | { type: 'hook'; index: 0 | 1; point: Vector3 }
   | { type: 'unhook'; index: 0 | 1 }
   | { type: 'slash'; hit: boolean; napeHit: boolean }
+  | { type: 'ankleSliced'; titanId: number; remaining: number }
+  | { type: 'crippled'; titanId: number }
   | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number }
   | { type: 'bladeBroke' }
   | { type: 'playerHit'; hp: number }
@@ -151,6 +153,12 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
     const result = trySlash(p, g.titans)
     g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
     if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
+    if (result.ankleHit && result.titanId !== undefined) {
+      const titan = g.titans.find((t) => t.id === result.titanId)
+      const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
+      g.events.push({ type: 'ankleSliced', titanId: result.titanId, remaining })
+      if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
+    }
     if (result.killed && result.titanId !== undefined) {
       const points = registerKill(
         g.score,
@@ -178,6 +186,8 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       g.events.push({ type: 'resupply' })
     }
   }
+
+  syncTitanHooks(g)
 
   const canistersBefore = p.canisters
   stepPlayer(p, input, dt, g.arena)
@@ -228,19 +238,46 @@ function handleHookEdge(
 ): void {
   const hook = g.player.hooks[index]
   if (held && !wasHeld) {
-    const target = raycastHookTarget(
-      g.arena,
-      g.player.pos,
-      input.lookDir.clone().normalize(),
-      g.player.config.hookRange,
-    )
-    if (target) {
-      attachHook(hook, target, g.player.pos)
-      g.events.push({ type: 'hook', index, point: target.clone() })
+    const dir = input.lookDir.clone().normalize()
+    const range = g.player.config.hookRange
+    const cityPoint = raycastHookTarget(g.arena, g.player.pos, dir, range)
+    const cityDist = cityPoint ? g.player.pos.distanceTo(cityPoint) : Infinity
+
+    let bestTitan: TitanState | null = null
+    let bestTitanDist = Infinity
+    for (const titan of g.titans) {
+      const dist = raycastTitan(titan, g.player.pos, dir, range)
+      if (dist !== null && dist < bestTitanDist) {
+        bestTitan = titan
+        bestTitanDist = dist
+      }
+    }
+
+    if (bestTitan && bestTitanDist < cityDist) {
+      const point = g.player.pos.clone().addScaledVector(dir, bestTitanDist)
+      attachHookToTitan(hook, bestTitan, point, g.player.pos)
+      g.events.push({ type: 'hook', index, point: point.clone() })
+    } else if (cityPoint) {
+      attachHook(hook, cityPoint, g.player.pos)
+      g.events.push({ type: 'hook', index, point: cityPoint.clone() })
     }
   } else if (!held && wasHeld && hook.state === 'attached') {
     releaseHook(hook)
     g.events.push({ type: 'unhook', index })
+  }
+}
+
+/** Titan-attached anchors follow their titan; hooks in dead titans tear free. */
+function syncTitanHooks(g: GameState): void {
+  for (const [index, hook] of g.player.hooks.entries()) {
+    if (hook.state !== 'attached' || hook.titanId === null) continue
+    const titan = g.titans.find((t) => t.id === hook.titanId)
+    if (!titan || titan.hp <= 0) {
+      releaseHook(hook)
+      g.events.push({ type: 'unhook', index: index as 0 | 1 })
+    } else {
+      updateTitanAnchor(hook, titan)
+    }
   }
 }
 

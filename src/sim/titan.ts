@@ -1,8 +1,12 @@
 import { Vector3 } from 'three'
+import type { Arena } from './city'
+import { resolveBuildingCollision } from './city'
 import { GRAVITY } from './constants'
 
 export type TitanKind = 'normal' | 'abnormal'
-export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'dead'
+export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'crippled' | 'dead'
+
+export const CRIPPLE_DURATION = 60 // seconds on its knees before it regenerates and rises
 
 export interface TitanState {
   id: number
@@ -18,6 +22,9 @@ export interface TitanState {
   attackCooldown: number
   leapCooldown: number
   wanderTimer: number
+  ankles: [boolean, boolean]
+  crippleTimer: number
+  avoidTimer: number
 }
 
 export interface TitanEvent {
@@ -28,6 +35,15 @@ export interface TitanEvent {
 }
 
 export const SWAT_WINDUP = 0.45
+export const TURN_RATE = { normal: 1.4, abnormal: 2.2 } // rad/s: titans commit to turns
+
+function turnToward(t: TitanState, targetYaw: number, dt: number): void {
+  const rate = t.kind === 'abnormal' ? TURN_RATE.abnormal : TURN_RATE.normal
+  let delta = targetYaw - t.facing
+  while (delta > Math.PI) delta -= Math.PI * 2
+  while (delta < -Math.PI) delta += Math.PI * 2
+  t.facing += Math.max(-rate * dt, Math.min(rate * dt, delta))
+}
 
 export function createTitan(opts: {
   id: number
@@ -50,6 +66,9 @@ export function createTitan(opts: {
     attackCooldown: 0,
     leapCooldown: opts.kind === 'abnormal' ? 2 : 0,
     wanderTimer: 0,
+    ankles: [false, false],
+    crippleTimer: 0,
+    avoidTimer: 0,
   }
 }
 
@@ -58,14 +77,51 @@ export function forwardOf(t: TitanState): Vector3 {
 }
 
 export function napeCenter(t: TitanState): Vector3 {
+  const napeHeight = t.state === 'crippled' ? 0.6 : 0.82 // kneeling drops the nape into reach
   return t.pos
     .clone()
-    .add(new Vector3(0, t.height * 0.82, 0))
+    .add(new Vector3(0, t.height * napeHeight, 0))
     .addScaledVector(forwardOf(t), -t.height * 0.09)
+}
+
+/** World position of an ankle (side 0 = left, 1 = right). */
+export function anklePos(t: TitanState, side: 0 | 1): Vector3 {
+  const lateral = (side === 0 ? -1 : 1) * t.height * 0.12
+  const fwd = forwardOf(t)
+  return new Vector3(
+    t.pos.x + fwd.z * lateral,
+    t.pos.y + t.height * 0.06,
+    t.pos.z - fwd.x * lateral,
+  )
+}
+
+/** Both ankles cut: down it goes. Returns true if this call crippled it. */
+export function crippleTitan(t: TitanState): boolean {
+  if (t.state === 'crippled' || t.hp <= 0) return false
+  if (!(t.ankles[0] && t.ankles[1])) return false
+  t.state = 'crippled'
+  t.stateTime = 0
+  t.crippleTimer = CRIPPLE_DURATION
+  t.vel.set(0, 0, 0)
+  return true
 }
 
 export function bodyCenter(t: TitanState): Vector3 {
   return t.pos.clone().add(new Vector3(0, t.height * 0.55, 0))
+}
+
+/** Walks the titan forward and slides it out of any building it hits; corridors only. */
+function walkTitan(t: TitanState, distance: number, arena: Arena | undefined, rng: () => number): void {
+  const before = t.pos.clone()
+  t.pos.addScaledVector(forwardOf(t), distance)
+  if (!arena || t.pos.y > 0.1) return
+  const radius = Math.min(2.6, Math.max(1, t.height * 0.12))
+  resolveBuildingCollision(arena, t.pos, t.vel, radius)
+  if (t.pos.distanceTo(before) < distance * 0.4 && t.avoidTimer <= 0) {
+    // pinned against a wall: commit to a sidestep for a moment instead of grinding
+    t.avoidTimer = 0.5 + rng() * 0.5
+    t.facing += (rng() < 0.5 ? 1 : -1) * (0.7 + rng() * 0.7)
+  }
 }
 
 export function stepTitan(
@@ -73,6 +129,7 @@ export function stepTitan(
   playerPos: Vector3,
   dt: number,
   rng: () => number,
+  arena?: Arena,
 ): TitanEvent[] {
   if (t.hp <= 0) {
     if (t.state !== 'dead') {
@@ -87,13 +144,14 @@ export function stepTitan(
   t.stateTime += dt
   t.attackCooldown = Math.max(0, t.attackCooldown - dt)
   t.leapCooldown = Math.max(0, t.leapCooldown - dt)
+  t.avoidTimer = Math.max(0, t.avoidTimer - dt)
 
   const dx = playerPos.x - t.pos.x
   const dz = playerPos.z - t.pos.z
   const horizDist = Math.hypot(dx, dz)
   const aggro = t.kind === 'abnormal' ? 130 : 55
   const reach = t.height * 0.5
-  const walkSpeed = t.height * (t.kind === 'abnormal' ? 0.5 : 0.28)
+  const walkSpeed = t.height * (t.kind === 'abnormal' ? 0.38 : 0.2)
 
   switch (t.state) {
     case 'wander': {
@@ -102,7 +160,7 @@ export function stepTitan(
         t.facing = rng() * Math.PI * 2
         t.wanderTimer = 2 + rng() * 4
       }
-      t.pos.addScaledVector(forwardOf(t), walkSpeed * 0.5 * dt)
+      walkTitan(t, walkSpeed * 0.5 * dt, arena, rng)
       if (horizDist < aggro) {
         t.state = 'chase'
         t.stateTime = 0
@@ -110,7 +168,7 @@ export function stepTitan(
       break
     }
     case 'chase': {
-      t.facing = Math.atan2(dx, dz)
+      if (t.avoidTimer <= 0) turnToward(t, Math.atan2(dx, dz), dt)
       if (t.kind === 'abnormal' && t.leapCooldown <= 0 && horizDist > 12 && horizDist < 80) {
         t.state = 'leap'
         t.stateTime = 0
@@ -126,13 +184,13 @@ export function stepTitan(
         break
       }
       if (horizDist > reach * 0.6) {
-        t.pos.addScaledVector(forwardOf(t), walkSpeed * 1.6 * dt)
+        walkTitan(t, walkSpeed * 1.35 * dt, arena, rng)
       }
       if (horizDist > aggro * 1.5) t.state = 'wander'
       break
     }
     case 'attack': {
-      t.facing = Math.atan2(dx, dz)
+      turnToward(t, Math.atan2(dx, dz), dt)
       if (t.stateTime >= SWAT_WINDUP) {
         const swatPos = t.pos
           .clone()
@@ -156,8 +214,46 @@ export function stepTitan(
       }
       break
     }
+    case 'crippled': {
+      // helpless on its knees; heals and rises if the nape isn't taken in time
+      t.crippleTimer -= dt
+      if (t.crippleTimer <= 0) {
+        t.hp = t.maxHp
+        t.ankles = [false, false]
+        t.state = 'chase'
+        t.stateTime = 0
+        t.attackCooldown = 1
+      }
+      break
+    }
     case 'dead':
       break
   }
   return events
+}
+
+/** Ray vs the titan's body cylinder; returns hit distance or null. Lets hooks anchor to titans. */
+export function raycastTitan(
+  t: TitanState,
+  origin: Vector3,
+  dir: Vector3,
+  maxRange: number,
+): number | null {
+  if (t.hp <= 0) return null
+  const radius = Math.max(0.8, t.height * 0.14)
+  const ox = origin.x - t.pos.x
+  const oz = origin.z - t.pos.z
+  const a = dir.x * dir.x + dir.z * dir.z
+  if (a < 1e-9) return null
+  const b = 2 * (ox * dir.x + oz * dir.z)
+  const c = ox * ox + oz * oz - radius * radius
+  const disc = b * b - 4 * a * c
+  if (disc < 0) return null
+  const sqrtDisc = Math.sqrt(disc)
+  for (const hit of [(-b - sqrtDisc) / (2 * a), (-b + sqrtDisc) / (2 * a)]) {
+    if (hit <= 0.01 || hit > maxRange) continue
+    const y = origin.y + dir.y * hit
+    if (y >= t.pos.y && y <= t.pos.y + t.height * 0.92) return hit
+  }
+  return null
 }

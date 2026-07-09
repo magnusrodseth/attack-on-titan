@@ -123,6 +123,20 @@ class TitanVisual {
       return
     }
 
+    if (t.state === 'crippled') {
+      // fall to the knees: sink the body and fold the legs back
+      const kneel = Math.min(1, t.stateTime / 0.6)
+      const eased = 1 - (1 - kneel) * (1 - kneel)
+      this.group.position.y = t.pos.y - 0.22 * t.height * eased
+      this.group.rotation.x = 0.12 * eased // slight forward slump
+      this.legL.rotation.x = this.legR.rotation.x = -1.4 * eased
+      this.armL.rotation.x = this.armR.rotation.x = -0.35 * eased
+      this.torso.rotation.x = 0.28 * eased
+      this.napeMat.emissiveIntensity = 1 + Math.sin(performance.now() * 0.009) * 0.6 // scream "cut here"
+      return
+    }
+    this.group.rotation.x = 0
+
     const moved = Math.hypot(t.pos.x - this.lastPos.x, t.pos.z - this.lastPos.z)
     this.lastPos = { x: t.pos.x, z: t.pos.z }
     const speed = dt > 0 ? moved / dt : 0

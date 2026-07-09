@@ -180,6 +180,21 @@ function handleEvents(events: GameEvent[]): void {
         hud.popPoints(event.points, event.oneCut)
         break
       }
+      case 'ankleSliced':
+        hud.popText(event.remaining > 0 ? 'Ankle!' : 'Both Ankles!')
+        audio.play('slice', { volume: 0.7, rate: 1.25 })
+        audio.play(FLINCHES, { volume: 0.7 })
+        effects.addShake(0.15)
+        break
+      case 'crippled': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        if (titan) {
+          audio.playAt(ROARS, titan.pos.distanceTo(game.player.pos), { volume: 1.4, rate: 0.75 })
+        }
+        hud.showBanner('Crippled — Take the Nape!', 1800)
+        effects.addShake(0.35)
+        break
+      }
       case 'bladeBroke':
         hud.showBanner('Blade Shattered', 900)
         audio.snap()
@@ -222,6 +237,7 @@ let last = performance.now()
 let acc = 0
 let prevPhase = game.phase
 let pauseShown = false
+let prevCrippled = new Set<number>()
 
 renderer.setAnimationLoop(() => {
   const now = performance.now()
@@ -280,6 +296,21 @@ renderer.setAnimationLoop(() => {
   audio.setWind(simActive ? speed : 0)
   audio.setGas(gasAudible)
   audio.setDucked((game.phase === 'playing' && !simActive && !debug.silent) || game.phase === 'menu')
+  // a crippled titan leaving that state alive has regenerated and risen
+  const crippledNow = new Set(
+    game.titans.filter((t) => t.state === 'crippled').map((t) => t.id),
+  )
+  for (const id of prevCrippled) {
+    if (!crippledNow.has(id)) {
+      const titan = game.titans.find((t) => t.id === id)
+      if (titan && titan.hp > 0 && game.phase === 'playing') {
+        hud.showBanner('It Has Risen…', 1800)
+        audio.playAt(ROARS, titan.pos.distanceTo(game.player.pos), { volume: 1.4, rate: 0.7 })
+      }
+    }
+  }
+  prevCrippled = crippledNow
+
   roarTimer -= dt
   if (roarTimer <= 0) {
     roarTimer = 4 + Math.random() * 6

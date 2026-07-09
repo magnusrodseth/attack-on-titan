@@ -80,7 +80,11 @@ export class Hud {
   }
 
   popPoints(points: number, oneCut: boolean): void {
-    this.popup.textContent = oneCut ? `+${points} ONE CUT` : `+${points}`
+    this.popText(oneCut ? `+${points} ONE CUT` : `+${points}`)
+  }
+
+  popText(text: string): void {
+    this.popup.textContent = text
     this.popup.classList.remove('pop')
     void this.popup.offsetWidth // restart the CSS animation
     this.popup.classList.add('pop')

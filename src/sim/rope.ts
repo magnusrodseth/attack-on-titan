@@ -4,20 +4,57 @@ export interface Hook {
   state: 'none' | 'attached'
   anchor: Vector3
   length: number
+  /** When set, the anchor tracks this titan (see updateTitanAnchor). */
+  titanId: number | null
+  local: Vector3
+}
+
+/** The shape rope needs from a titan; avoids importing the full titan module. */
+export interface TitanAnchorTarget {
+  id: number
+  pos: Vector3
+  facing: number
 }
 
 export function createHook(): Hook {
-  return { state: 'none', anchor: new Vector3(), length: 0 }
+  return { state: 'none', anchor: new Vector3(), length: 0, titanId: null, local: new Vector3() }
 }
 
 export function attachHook(hook: Hook, anchor: Vector3, playerPos: Vector3): void {
   hook.state = 'attached'
   hook.anchor.copy(anchor)
   hook.length = anchor.distanceTo(playerPos)
+  hook.titanId = null
+}
+
+export function attachHookToTitan(
+  hook: Hook,
+  titan: TitanAnchorTarget,
+  point: Vector3,
+  playerPos: Vector3,
+): void {
+  attachHook(hook, point, playerPos)
+  hook.titanId = titan.id
+  const rel = point.clone().sub(titan.pos)
+  const cos = Math.cos(-titan.facing)
+  const sin = Math.sin(-titan.facing)
+  hook.local.set(cos * rel.x + sin * rel.z, rel.y, -sin * rel.x + cos * rel.z)
+}
+
+/** Re-derives the world anchor from the titan's current position and facing. */
+export function updateTitanAnchor(hook: Hook, titan: TitanAnchorTarget): void {
+  const cos = Math.cos(titan.facing)
+  const sin = Math.sin(titan.facing)
+  hook.anchor.set(
+    titan.pos.x + cos * hook.local.x + sin * hook.local.z,
+    titan.pos.y + hook.local.y,
+    titan.pos.z - sin * hook.local.x + cos * hook.local.z,
+  )
 }
 
 export function releaseHook(hook: Hook): void {
   hook.state = 'none'
+  hook.titanId = null
 }
 
 /**

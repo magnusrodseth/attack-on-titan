@@ -264,7 +264,11 @@ function addTowers(scene: Scene, arena: Arena): void {
     map: tex('/textures/wall.jpg', 2, 4),
     roughness: 0.9,
   })
-  const slate = new MeshStandardMaterial({ color: 0x4c5560, roughness: 0.7 })
+  const slate = new MeshStandardMaterial({
+    map: tex('/textures/roof_slate.jpg', 2, 2),
+    color: 0x9aa2ac,
+    roughness: 0.7,
+  })
   for (const tower of arena.buildings) {
     if (tower.kind !== 'tower') continue
     const bodyH = tower.h * 0.78
@@ -296,7 +300,7 @@ function addWall(scene: Scene, arena: Arena): void {
 
   const rim = new Mesh(
     new TorusGeometry(arena.wallRadius + 7, 2.4, 6, 64),
-    new MeshStandardMaterial({ color: 0x767b7f, roughness: 1 }),
+    new MeshStandardMaterial({ map: tex('/textures/wall.jpg', 60, 1), roughness: 1 }),
   )
   rim.rotation.x = Math.PI / 2
   rim.position.y = arena.wallHeight
@@ -306,7 +310,7 @@ function addWall(scene: Scene, arena: Arena): void {
 function addStation(scene: Scene, arena: Arena): void {
   const pole = new Mesh(
     new CylinderGeometry(0.35, 0.35, 16, 8),
-    new MeshStandardMaterial({ color: 0x5a4632, roughness: 0.8 }),
+    new MeshStandardMaterial({ map: tex('/textures/bark.jpg', 1, 4), roughness: 0.9 }),
   )
   pole.position.set(arena.station.x, 8, arena.station.z)
   pole.castShadow = true

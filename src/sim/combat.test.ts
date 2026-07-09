@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { trySlash } from './combat'
 import { createPlayer } from './player'
-import { createTitan, napeCenter } from './titan'
+import { anklePos, createTitan, napeCenter } from './titan'
 
 function setup(speed: number) {
   const p = createPlayer()
@@ -78,6 +78,40 @@ describe('trySlash', () => {
     const result = trySlash(p2, [t2])
     expect(result.hit).toBe(false)
     expect(t2.hp).toBe(t2.maxHp)
+  })
+
+  it('slices an ankle when slashing at foot level', () => {
+    const { p, t } = setup(12)
+    p.pos.copy(anklePos(t, 0))
+    const result = trySlash(p, [t])
+    expect(result.hit).toBe(true)
+    expect(result.ankleHit).toBe(true)
+    expect(t.ankles[0]).toBe(true)
+    expect(t.ankles[1]).toBe(false)
+    expect(result.killed).toBe(false)
+    expect(t.state).not.toBe('crippled')
+  })
+
+  it('cripples the titan when both ankles are cut', () => {
+    const { p, t } = setup(12)
+    p.pos.copy(anklePos(t, 0))
+    trySlash(p, [t])
+    p.slashTimer = 0
+    p.pos.copy(anklePos(t, 1))
+    const result = trySlash(p, [t])
+    expect(result.ankleHit).toBe(true)
+    expect(result.crippled).toBe(true)
+    expect(t.state).toBe('crippled')
+    expect(t.crippleTimer).toBeGreaterThan(50)
+  })
+
+  it('does not re-slice an already cut ankle', () => {
+    const { p, t } = setup(12)
+    p.pos.copy(anklePos(t, 0))
+    trySlash(p, [t])
+    p.slashTimer = 0
+    const result = trySlash(p, [t])
+    expect(result.ankleHit).toBe(false) // same spot again: only body remains
   })
 
   it('respects the slash cooldown', () => {

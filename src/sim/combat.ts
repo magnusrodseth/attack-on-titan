@@ -1,10 +1,12 @@
 import type { PlayerState } from './player'
 import type { TitanState } from './titan'
-import { bodyCenter, napeCenter } from './titan'
+import { anklePos, bodyCenter, crippleTitan, napeCenter } from './titan'
 
 export interface SlashResult {
   hit: boolean
   napeHit: boolean
+  ankleHit: boolean
+  crippled: boolean
   killed: boolean
   oneCut: boolean
   damage: number
@@ -22,6 +24,8 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
   const none: SlashResult = {
     hit: false,
     napeHit: false,
+    ankleHit: false,
+    crippled: false,
     killed: false,
     oneCut: false,
     damage: 0,
@@ -45,6 +49,33 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
     }
   }
   if (!best) {
+    // ankles: any speed cuts the tendon
+    for (const t of titans) {
+      if (t.hp <= 0 || t.state === 'crippled') continue
+      for (const side of [0, 1] as const) {
+        if (t.ankles[side]) continue
+        const ankleDist = p.pos.distanceTo(anklePos(t, side))
+        if (ankleDist <= p.config.slashRange * 0.4 + t.height * 0.02 && ankleDist < bestDist) {
+          const bladeBroke = wearBlade(p, 1)
+          t.ankles[side] = true
+          const crippled = crippleTitan(t)
+          return {
+            hit: true,
+            napeHit: false,
+            ankleHit: true,
+            crippled,
+            killed: false,
+            oneCut: false,
+            damage: 0,
+            speed,
+            bladeBroke,
+            titanId: t.id,
+          }
+        }
+      }
+    }
+  }
+  if (!best) {
     for (const t of titans) {
       if (t.hp <= 0) continue
       const bodyDist = p.pos.distanceTo(bodyCenter(t))
@@ -63,13 +94,26 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
       const oneCut = best.hp === best.maxHp
       const damage = best.hp
       best.hp = 0
-      return { hit: true, napeHit: true, killed: true, oneCut, damage, speed, bladeBroke, titanId: best.id }
+      return {
+        hit: true,
+        napeHit: true,
+        ankleHit: false,
+        crippled: false,
+        killed: true,
+        oneCut,
+        damage,
+        speed,
+        bladeBroke,
+        titanId: best.id,
+      }
     }
     const damage = Math.max(6, 45 * Math.pow(speed / p.config.killSpeed, 1.5))
     best.hp = Math.max(0, best.hp - damage)
     return {
       hit: true,
       napeHit: true,
+      ankleHit: false,
+      crippled: false,
       killed: best.hp <= 0,
       oneCut: false,
       damage,
@@ -84,6 +128,8 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
   return {
     hit: true,
     napeHit: false,
+    ankleHit: false,
+    crippled: false,
     killed: best.hp <= 0,
     oneCut: false,
     damage,

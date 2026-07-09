@@ -56,6 +56,7 @@ describe('titan swats', () => {
     game.titans.splice(1) // keep one titan
     const titan = game.titans[0]!
     titan.pos.set(0, 0, 0)
+    titan.facing = 0 // already facing the player; titans now turn gradually
     titan.state = 'attack'
     titan.stateTime = 10 // way past windup: swat lands next step
     titan.attackCooldown = 0
@@ -117,6 +118,47 @@ describe('hooks through the game loop', () => {
     expect(game.player.hooks[0].state).toBe('attached')
 
     input.hookL = false
+    stepGame(game, input, DT)
+    expect(game.player.hooks[0].state).toBe('none')
+  })
+})
+
+describe('hooking titans', () => {
+  function gameWithLoneTitan() {
+    const game = playingGame()
+    game.arena.buildings.length = 0
+    game.titans.splice(1)
+    const titan = game.titans[0]!
+    titan.pos.set(40, 0, 0)
+    titan.facing = 0
+    game.player.pos.set(0, 5, 0)
+    return { game, titan }
+  }
+
+  it('attaches to a titan in the crosshair and the anchor tracks its movement', () => {
+    const { game, titan } = gameWithLoneTitan()
+    const input = neutralInput()
+    input.lookDir = new Vector3(40, titan.height * 0.5 - 5, 0).normalize()
+    input.hookL = true
+    stepGame(game, input, DT)
+    const hook = game.player.hooks[0]
+    expect(hook.state).toBe('attached')
+    expect(hook.titanId).toBe(titan.id)
+
+    const anchorBefore = hook.anchor.clone()
+    titan.pos.x += 10
+    stepGame(game, input, DT)
+    expect(hook.anchor.x).toBeGreaterThan(anchorBefore.x + 8)
+  })
+
+  it('releases the hook when the hooked titan dies', () => {
+    const { game, titan } = gameWithLoneTitan()
+    const input = neutralInput()
+    input.lookDir = new Vector3(40, titan.height * 0.5 - 5, 0).normalize()
+    input.hookL = true
+    stepGame(game, input, DT)
+    expect(game.player.hooks[0].state).toBe('attached')
+    titan.hp = 0
     stepGame(game, input, DT)
     expect(game.player.hooks[0].state).toBe('none')
   })
