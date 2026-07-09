@@ -9,6 +9,7 @@ import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, startGame, stepGame } from './sim/game'
+import { DEFAULT_MODE_ID, GAME_MODES } from './sim/modes'
 import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
 import { neutralInput } from './sim/player'
@@ -19,8 +20,18 @@ function dailySeed(): string {
   return `wall-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 }
 
+const MODE_KEY = 'aot-odm-mode'
+function storedModeId(): string | null {
+  try {
+    return localStorage.getItem(MODE_KEY)
+  } catch {
+    return null
+  }
+}
+
 const seed = new URLSearchParams(location.search).get('seed') ?? dailySeed()
-const game = createGame(seed)
+const modeId = new URLSearchParams(location.search).get('mode') ?? storedModeId() ?? DEFAULT_MODE_ID
+const game = createGame(seed, undefined, modeId)
 const { scene, updateScenery } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
 camera.rotation.order = 'YXZ'
@@ -84,9 +95,10 @@ document.addEventListener('pointerlockchange', () => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Escape') return
-  if (hud.settingsOpen) {
-    // Escape backs out of settings to the menu underneath instead of resuming
+  if (hud.settingsOpen || hud.modesOpen) {
+    // Escape backs out of a panel to the menu underneath instead of resuming
     hud.hideSettings()
+    hud.hideModes()
     hud.showStart(game.phase === 'playing')
     return
   }
@@ -141,7 +153,7 @@ function beginRun(): void {
   if (game.phase === 'menu' || game.phase === 'dead') {
     startGame(game)
     prevPhase = game.phase
-    hud.showBanner('Wave 1')
+    hud.showBanner(game.mode.id === 'waves' ? `Wave ${game.wave}` : game.mode.name)
   }
   lockPointer()
 }
@@ -178,6 +190,27 @@ hud.onSettingsChange = (values) => {
   }
   audio.setMusicVolume(values.music)
   audio.setSfxVolume(values.sfx)
+}
+
+// game modes: pick in the menu; switching reloads into the new mode (URL carries it)
+hud.onOpenModes = () => hud.showModes(GAME_MODES, game.mode.id)
+hud.onCloseModes = () => {
+  hud.hideModes()
+  hud.showStart(game.phase === 'playing')
+}
+hud.onPickMode = (id) => {
+  if (id === game.mode.id) {
+    hud.onCloseModes()
+    return
+  }
+  try {
+    localStorage.setItem(MODE_KEY, id)
+  } catch {
+    // private mode: the URL param below still carries the choice
+  }
+  const params = new URLSearchParams(location.search)
+  params.set('mode', id)
+  location.search = params.toString()
 }
 
 hud.onStart = beginRun
@@ -316,6 +349,7 @@ renderer.setAnimationLoop(() => {
       document.exitPointerLock()
       hud.hideStart() // a lingering pause overlay must not sit under the new menu
       hud.hideSettings()
+      hud.hideModes()
       pauseShown = false
       if (game.phase === 'upgrading') hud.showUpgrades(game.offers)
       else hud.showDeath(game)

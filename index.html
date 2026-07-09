@@ -191,7 +191,15 @@
       }
 
       /* upgrade cards: field-modification plaques, same plate construction */
-      #upgrade-cards { display: flex; gap: 20px; }
+      #upgrade-cards, #mode-cards { display: flex; gap: 20px; }
+      .mode-card { width: 300px; }
+      .card.selected {
+        filter:
+          drop-shadow(1.5px 0 0 var(--brass-bright)) drop-shadow(-1.5px 0 0 var(--brass-bright))
+          drop-shadow(0 1.5px 0 var(--brass-bright)) drop-shadow(0 -1.5px 0 var(--brass-bright))
+          drop-shadow(0 0 12px #c1121f88) drop-shadow(0 8px 12px #000b);
+      }
+      .card .card-tag { font-family: var(--header-font); font-size: 13px; font-weight: 700; letter-spacing: 4px; color: var(--brass-bright); margin-top: 12px; }
       .card {
         pointer-events: auto; cursor: pointer; position: relative; width: 230px; padding: 24px 18px;
         filter:
@@ -281,10 +289,18 @@
           <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost burst &nbsp;·&nbsp; <b>Q</b> focus (slow time) &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply
         </div>
         <div class="menu-col">
-          <button id="start-btn" class="primary">Deploy</button>
+          <button id="start-btn" class="primary">Deploy Your Soldier</button>
+          <button id="modes-btn">Game Mode</button>
           <button id="settings-btn">Settings</button>
         </div>
         <div class="seedline" id="seed-line"></div>
+      </div>
+
+      <div id="modes" class="overlay hidden">
+        <h2 class="aot-title">Game Mode</h2>
+        <div class="sub">Choose how you take the field. Switching modes restarts the run.</div>
+        <div id="mode-cards"></div>
+        <button id="modes-back">Back</button>
       </div>
 
       <div id="settings" class="overlay hidden">

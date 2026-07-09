@@ -46,6 +46,8 @@ export class Hud {
   private death = el('death')
   private deathStats = el('death-stats')
   private settingsPanel = el('settings')
+  private modesPanel = el('modes')
+  private modeCards = el('mode-cards')
   private bannerTimer: number | undefined
 
   onStart: () => void = () => {}
@@ -54,6 +56,9 @@ export class Hud {
   onOpenSettings: () => void = () => {}
   onCloseSettings: () => void = () => {}
   onSettingsChange: (values: SettingsValues) => void = () => {}
+  onOpenModes: () => void = () => {}
+  onCloseModes: () => void = () => {}
+  onPickMode: (id: string) => void = () => {}
 
   constructor(seed: string) {
     el('seed-line').textContent = `seed: ${seed} — share the URL with ?seed=${encodeURIComponent(seed)} to race the same city`
@@ -62,6 +67,8 @@ export class Hud {
     el<HTMLButtonElement>('retry-btn').addEventListener('click', () => this.onRetry())
     el<HTMLButtonElement>('settings-btn').addEventListener('click', () => this.onOpenSettings())
     el<HTMLButtonElement>('settings-back').addEventListener('click', () => this.onCloseSettings())
+    el<HTMLButtonElement>('modes-btn').addEventListener('click', () => this.onOpenModes())
+    el<HTMLButtonElement>('modes-back').addEventListener('click', () => this.onCloseModes())
     for (const id of SLIDER_IDS) {
       el<HTMLInputElement>(id).addEventListener('input', () => {
         this.refreshSettingsDisplay()
@@ -106,6 +113,30 @@ export class Hud {
 
   get settingsOpen(): boolean {
     return !this.settingsPanel.classList.contains('hidden')
+  }
+
+  showModes(modes: { id: string; name: string; desc: string }[], currentId: string): void {
+    this.modeCards.innerHTML = ''
+    for (const mode of modes) {
+      const selected = mode.id === currentId
+      const card = document.createElement('div')
+      card.className = selected ? 'card mode-card selected' : 'card mode-card'
+      card.innerHTML =
+        `<div class="card-name">${mode.name}</div><div class="card-desc">${mode.desc}</div>` +
+        (selected ? '<div class="card-tag">Active</div>' : '')
+      card.addEventListener('click', () => this.onPickMode(mode.id))
+      this.modeCards.appendChild(card)
+    }
+    this.start.classList.add('hidden')
+    this.modesPanel.classList.remove('hidden')
+  }
+
+  hideModes(): void {
+    this.modesPanel.classList.add('hidden')
+  }
+
+  get modesOpen(): boolean {
+    return !this.modesPanel.classList.contains('hidden')
   }
 
   update(game: GameState, frame: HudFrame): void {
@@ -170,7 +201,7 @@ export class Hud {
   showStart(resume = false): void {
     this.start.classList.remove('hidden')
     this.start.querySelector('h1')!.textContent = resume ? 'Paused' : 'Wings of Freedom'
-    el<HTMLButtonElement>('start-btn').textContent = resume ? 'RESUME' : 'DEPLOY'
+    el<HTMLButtonElement>('start-btn').textContent = resume ? 'Resume' : 'Deploy Your Soldier'
   }
 
   hideStart(): void {

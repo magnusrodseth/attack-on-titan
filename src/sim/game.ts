@@ -3,6 +3,8 @@ import type { Arena } from './city'
 import { generateCity, raycastHookTarget } from './city'
 import { EYE_HEIGHT } from './constants'
 import { trySlash } from './combat'
+import type { GameMode } from './modes'
+import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { InputState, PlayerState } from './player'
 import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import { createRng, hashSeed } from './rng'
@@ -10,10 +12,8 @@ import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from '.
 import type { ScoreState } from './score'
 import { createScore, registerKill, stepScore } from './score'
 import type { TitanState } from './titan'
-import { createTitan, raycastTitan, stepTitan } from './titan'
+import { raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
-import { applyUpgrade, offerUpgrades } from './upgrades'
-import { waveComposition } from './waves'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead'
 
@@ -67,6 +67,7 @@ export interface GameState {
   nextTitanId: number
   focus: number
   focusActive: boolean
+  mode: GameMode
 }
 
 const BEST_KEY = 'aot-odm-best'
@@ -89,7 +90,7 @@ export function loadBest(storage: StorageLike | null): BestStats {
   return { bestScore: 0, bestWave: 0 }
 }
 
-function saveBest(g: GameState): void {
+export function saveBest(g: GameState): void {
   g.best.bestScore = Math.max(g.best.bestScore, g.score.score)
   g.best.bestWave = Math.max(g.best.bestWave, g.wave)
   try {
@@ -99,7 +100,11 @@ function saveBest(g: GameState): void {
   }
 }
 
-export function createGame(seed: string, storage: StorageLike | null = defaultStorage()): GameState {
+export function createGame(
+  seed: string,
+  storage: StorageLike | null = defaultStorage(),
+  modeId: string = DEFAULT_MODE_ID,
+): GameState {
   return {
     seed,
     phase: 'menu',
@@ -118,6 +123,7 @@ export function createGame(seed: string, storage: StorageLike | null = defaultSt
     nextTitanId: 1,
     focus: FOCUS_MAX,
     focusActive: false,
+    mode: getMode(modeId),
   }
 }
 
@@ -125,28 +131,17 @@ export function startGame(g: GameState): void {
   g.player = createPlayer()
   g.player.pos.set(0, EYE_HEIGHT, 8)
   g.score = createScore()
-  g.wave = 1
+  g.wave = 0
   g.time = 0
   g.offers = []
-  spawnWave(g)
-  g.phase = 'playing'
-}
-
-function spawnWave(g: GameState): void {
-  const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
-  g.titans = waveComposition(g.wave, rng).map((s) =>
-    createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x: s.x, z: s.z }),
-  )
+  g.titans = []
+  g.phase = 'playing' // set first so the mode may override it from start()
+  g.mode.start(g)
 }
 
 export function chooseUpgrade(g: GameState, id: string): void {
   if (g.phase !== 'upgrading') return
-  applyUpgrade(g.player, id)
-  g.player.hp = g.player.config.maxHp // a fresh wave starts at full health
-  g.offers = []
-  g.wave += 1
-  spawnWave(g)
-  g.phase = 'playing'
+  g.mode.chooseUpgrade?.(g, id)
 }
 
 export function stepGame(g: GameState, input: InputState, dt: number): void {
@@ -247,14 +242,9 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
 
   stepScore(g.score, dt)
 
-  if (g.phase === 'playing' && g.titans.length > 0 && g.titans.every((t) => t.hp <= 0)) {
-    const bonus = 250 * g.wave
-    g.score.score += bonus
-    g.offers = offerUpgrades(createRng(hashSeed(`${g.seed}:offers:${g.wave}`)))
-    g.phase = 'upgrading'
-    saveBest(g)
-    g.events.push({ type: 'waveClear', wave: g.wave, bonus })
-  }
+  // the mode drives progression (wave clears, objectives, win/lose)
+  if (g.phase === 'playing') g.mode.step(g, dt)
+  if (g.phase !== 'playing') saveBest(g) // the run just ended or hit an intermission
 
   copyInput(g.prevInput, input)
 }
