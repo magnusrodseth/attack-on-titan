@@ -133,6 +133,13 @@
       .overlay.hidden { display: none; }
       .overlay h1 { font-size: 84px; }
       .overlay h2 { font-size: 58px; }
+      #mobile-gate { z-index: 10; background: radial-gradient(ellipse at 50% 30%, #16111afb, #07060aff 78%); }
+      #mobile-gate .sub b { color: var(--brass-bright); font-weight: 600; }
+      @media (max-width: 640px) {
+        .overlay h1 { font-size: 52px; }
+        .overlay h2 { font-size: 40px; }
+        .overlay .sub { font-size: 18px; padding: 0 22px; }
+      }
       .overlay .sub { color: var(--parchment); opacity: 0.85; font-size: 21px; max-width: 720px; line-height: 1.6; }
       .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.1; letter-spacing: 0.5px; }
       .overlay .keys b { font-family: var(--header-font); font-size: 15px; color: var(--brass-bright); letter-spacing: 1px; }
@@ -336,6 +343,15 @@
         <h2 class="aot-title">Wave Cleared</h2>
         <div class="sub">Choose one field modification</div>
         <div id="upgrade-cards"></div>
+      </div>
+
+      <div id="mobile-gate" class="overlay hidden">
+        <h2 class="aot-title">Halt, Soldier</h2>
+        <div class="sub">
+          This rig cannot mount omni-directional mobility gear. <b>Wings of Freedom</b> is best
+          played on a desktop, with a keyboard in one hand and a mouse in the other. Return from
+          a proper station to take the field.
+        </div>
       </div>
 
       <div id="death" class="overlay hidden">

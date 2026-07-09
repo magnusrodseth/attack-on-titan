@@ -161,7 +161,13 @@ function lockPointer(): void {
   }
 }
 
+// phones and tablets cannot drive this control scheme: gate them out, on brand
+const touchOnly =
+  matchMedia('(pointer: coarse)').matches && matchMedia('(hover: none)').matches
+if (touchOnly) document.getElementById('mobile-gate')?.classList.remove('hidden')
+
 function beginRun(): void {
+  if (touchOnly) return
   audio.init()
   hud.hideStart()
   hud.hideDeath()
