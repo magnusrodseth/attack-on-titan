@@ -20,6 +20,7 @@ export class Hud {
   private combo = el('combo')
   private best = el('best')
   private gasFill = el('gas-fill')
+  private gasCanisters = el('gas-canisters')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
   private meters = el('meters')
@@ -58,9 +59,10 @@ export class Hud {
 
     const gasRatio = p.gas / p.config.maxGas
     this.gasFill.style.width = `${(gasRatio * 100).toFixed(1)}%`
+    this.gasCanisters.textContent = `×${p.canisters}`
     this.bladeFill.style.width = `${((p.bladeHp / p.config.bladeDurability) * 100).toFixed(1)}%`
     this.bladePairs.textContent = `×${p.blades}`
-    this.meters.classList.toggle('low', gasRatio < 0.2 || p.blades <= 1)
+    this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
 
     const kmh = Math.round(frame.speed * 3.6)
     this.speedo.innerHTML = frame.speed > 20 ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
@@ -96,7 +98,7 @@ export class Hud {
 
   showStart(resume = false): void {
     this.start.classList.remove('hidden')
-    this.start.querySelector('h1')!.textContent = resume ? 'PAUSED' : 'WINGS OF FREEDOM'
+    this.start.querySelector('h1')!.textContent = resume ? 'Paused' : 'Wings of Freedom'
     el<HTMLButtonElement>('start-btn').textContent = resume ? 'RESUME' : 'DEPLOY'
   }
 

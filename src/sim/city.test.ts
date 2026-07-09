@@ -44,21 +44,21 @@ describe('generateCity', () => {
 })
 
 describe('generateCity — AoT district look (user reference images)', () => {
-  it('is mostly dense low row-houses at 2-4 story scale', () => {
+  it('is dense row-houses tall enough to build swing velocity from', () => {
     const arena = generateCity(createRng(5))
     const houses = arena.buildings.filter((b) => b.kind === 'house')
     expect(houses.length).toBeGreaterThan(150) // dense district
     const heights = houses.map((b) => b.h).sort((a, b) => a - b)
     const median = heights[Math.floor(heights.length / 2)]!
-    expect(median).toBeGreaterThanOrEqual(9)
-    expect(median).toBeLessThanOrEqual(16)
+    expect(median).toBeGreaterThanOrEqual(14)
+    expect(median).toBeLessThanOrEqual(23)
   })
 
   it('scatters tall church towers as high anchor points', () => {
     const arena = generateCity(createRng(5))
     const towers = arena.buildings.filter((b) => b.kind === 'tower')
-    expect(towers.length).toBeGreaterThanOrEqual(3)
-    for (const t of towers) expect(t.h).toBeGreaterThanOrEqual(25)
+    expect(towers.length).toBeGreaterThanOrEqual(5)
+    for (const t of towers) expect(t.h).toBeGreaterThanOrEqual(32)
   })
 
   it('has an AoT-scale 50m wall', () => {

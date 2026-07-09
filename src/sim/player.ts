@@ -7,6 +7,7 @@ import { applyRopeConstraint, createHook, reelHook } from './rope'
 
 export interface PlayerConfig {
   maxGas: number
+  gasCanisters: number
   gasThrust: number
   gasBurn: number
   airBoostThrust: number
@@ -30,12 +31,13 @@ export interface PlayerConfig {
 
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   maxGas: 100,
+  gasCanisters: 3,
   gasThrust: 40,
   gasBurn: 22,
   airBoostThrust: 24,
   runSpeed: 8,
   runAccel: 40,
-  airControl: 10,
+  airControl: 14,
   jumpSpeed: 9,
   drag: 0.04,
   reelSpeed: 14,
@@ -55,6 +57,7 @@ export interface InputState {
   move: Vector3
   lookDir: Vector3
   gas: boolean
+  jump: boolean
   reel: boolean
   slash: boolean
   hookL: boolean
@@ -67,6 +70,7 @@ export function neutralInput(): InputState {
     move: new Vector3(),
     lookDir: new Vector3(0, 0, -1),
     gas: false,
+    jump: false,
     reel: false,
     slash: false,
     hookL: false,
@@ -80,6 +84,7 @@ export interface PlayerState {
   vel: Vector3
   hooks: [Hook, Hook]
   gas: number
+  canisters: number
   blades: number
   bladeHp: number
   hp: number
@@ -96,6 +101,7 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     vel: new Vector3(),
     hooks: [createHook(), createHook()],
     gas: config.maxGas,
+    canisters: config.gasCanisters,
     blades: config.bladePairs,
     bladeHp: config.bladeDurability,
     hp: config.maxHp,
@@ -111,6 +117,24 @@ export function attachedHooks(p: PlayerState): Hook[] {
   return p.hooks.filter((h) => h.state === 'attached')
 }
 
+/**
+ * Rotates horizontal velocity toward a desired direction without changing its magnitude —
+ * directional authority is what makes momentum movement feel controllable instead of slippery.
+ */
+function steerHorizontal(vel: Vector3, dir: Vector3, maxAngle: number): void {
+  const speed = Math.hypot(vel.x, vel.z)
+  if (speed < 0.5 || dir.lengthSq() === 0) return
+  const current = Math.atan2(vel.z, vel.x)
+  const target = Math.atan2(dir.z, dir.x)
+  let delta = target - current
+  while (delta > Math.PI) delta -= Math.PI * 2
+  while (delta < -Math.PI) delta += Math.PI * 2
+  const turn = Math.max(-maxAngle, Math.min(maxAngle, delta))
+  const angle = current + turn
+  vel.x = Math.cos(angle) * speed
+  vel.z = Math.sin(angle) * speed
+}
+
 export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena: Arena): void {
   const cfg = p.config
   p.slashTimer = Math.max(0, p.slashTimer - dt)
@@ -120,37 +144,36 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
 
   p.vel.y += GRAVITY * dt
 
-  const hookedGas = input.gas && anchors.length > 0 && p.gas > 0
-  if (input.gas) {
-    if (wasOnGround && anchors.length === 0) {
-      p.vel.y = cfg.jumpSpeed
-      p.onGround = false
-    } else if (p.gas > 0) {
-      if (anchors.length > 0) {
-        if (wasOnGround) {
-          // ODM launch: pop off the ground so the rope takes over from run friction
-          p.vel.y = Math.max(p.vel.y, cfg.jumpSpeed * 0.7)
-          p.onGround = false
-        }
-        const pull = new Vector3()
-        for (const hook of anchors) {
-          pull.add(hook.anchor.clone().sub(p.pos).normalize())
-        }
-        if (pull.lengthSq() > 0) {
-          pull.normalize()
-          p.vel.addScaledVector(pull, cfg.gasThrust * dt)
-        }
-        p.gas = Math.max(0, p.gas - cfg.gasBurn * dt)
-      } else if (!wasOnGround) {
-        p.vel.addScaledVector(input.lookDir, cfg.airBoostThrust * dt)
-        p.gas = Math.max(0, p.gas - cfg.gasBurn * 0.7 * dt)
+  // a dry tank swaps in a spare canister automatically; refills only at resupply
+  if (p.gas <= 0 && p.canisters > 0) {
+    p.canisters -= 1
+    p.gas = cfg.maxGas
+  }
+
+  if (input.jump && wasOnGround) {
+    p.vel.y = cfg.jumpSpeed
+    p.onGround = false
+  }
+
+  const boosting = input.gas && p.gas > 0
+  if (boosting) {
+    const dir = new Vector3(input.move.x, 0, input.move.z)
+    if (dir.lengthSq() === 0) dir.set(input.lookDir.x, 0, input.lookDir.z)
+    if (dir.lengthSq() > 0) {
+      dir.normalize()
+      if (wasOnGround && anchors.length > 0) {
+        // ODM launch: pop off the ground so the rope takes over from run friction
+        p.vel.y = Math.max(p.vel.y, cfg.jumpSpeed * 0.7)
+        p.onGround = false
       }
+      p.vel.addScaledVector(dir, cfg.gasThrust * dt)
+      p.gas = Math.max(0, p.gas - cfg.gasBurn * dt)
     }
   }
 
   const move = new Vector3(input.move.x, 0, input.move.z)
   if (move.lengthSq() > 0) move.normalize()
-  if (wasOnGround && !hookedGas) {
+  if (wasOnGround && !boosting) {
     const horizSpeed = Math.hypot(p.vel.x, p.vel.z)
     if (move.lengthSq() > 0 && horizSpeed <= cfg.runSpeed + 1) {
       const target = move.clone().multiplyScalar(cfg.runSpeed)
@@ -169,11 +192,13 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
         p.vel.z *= scale
       }
       if (move.lengthSq() > 0) {
-        p.vel.x += move.x * 15 * dt
-        p.vel.z += move.z * 15 * dt
+        steerHorizontal(p.vel, move, 2.4 * dt)
+        p.vel.x += move.x * 24 * dt
+        p.vel.z += move.z * 24 * dt
       }
     }
   } else if (move.lengthSq() > 0) {
+    steerHorizontal(p.vel, move, 1.5 * dt)
     p.vel.addScaledVector(move, cfg.airControl * dt)
   }
 

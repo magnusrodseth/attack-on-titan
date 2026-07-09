@@ -38,9 +38,12 @@ interface PlayOpts {
   jitter?: number
 }
 
+const MASTER_VOLUME = 0.8
+
 export class AudioSystem {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
+  private duckedState = false
   private windGain: GainNode | null = null
   private windFilter: BiquadFilterNode | null = null
   private gasGain: GainNode | null = null
@@ -55,7 +58,7 @@ export class AudioSystem {
     const ctx = new AudioContext()
     this.ctx = ctx
     this.master = ctx.createGain()
-    this.master.gain.value = 0.8
+    this.master.gain.value = this.duckedState ? 0 : MASTER_VOLUME
     this.master.connect(ctx.destination)
 
     const noise = this.noiseBuffer(ctx)
@@ -102,6 +105,18 @@ export class AudioSystem {
 
   get state(): string {
     return this.ctx?.state ?? 'uninitialized'
+  }
+
+  get ducked(): boolean {
+    return this.duckedState
+  }
+
+  /** Silences the whole soundscape (including tails) while a menu covers the game. */
+  setDucked(ducked: boolean): void {
+    if (ducked === this.duckedState) return
+    this.duckedState = ducked
+    if (!this.ctx || !this.master) return
+    this.master.gain.setTargetAtTime(ducked ? 0 : MASTER_VOLUME, this.ctx.currentTime, 0.05)
   }
 
   play(names: SampleName | SampleName[], opts: PlayOpts = {}): void {

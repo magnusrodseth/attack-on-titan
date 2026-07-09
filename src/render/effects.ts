@@ -3,9 +3,11 @@ import {
   BufferAttribute,
   BufferGeometry,
   Camera,
-  Line,
+  CylinderGeometry,
   LineBasicMaterial,
   LineSegments,
+  Mesh,
+  MeshStandardMaterial,
   Points,
   PointsMaterial,
   Scene,
@@ -14,9 +16,10 @@ import {
 import type { PlayerState } from '../sim/player'
 
 const STREAK_COUNT = 46
+const ROPE_UP = new Vector3(0, 1, 0)
 
 export class Effects {
-  private ropes: [Line, Line]
+  private ropes: [Mesh, Mesh]
   private streaks: LineSegments
   private streakOffsets: Vector3[] = []
   private streakMat: LineBasicMaterial
@@ -48,10 +51,12 @@ export class Effects {
     }
   }
 
-  private makeRope(): Line {
-    const geometry = new BufferGeometry()
-    geometry.setAttribute('position', new BufferAttribute(new Float32Array(6), 3))
-    const rope = new Line(geometry, new LineBasicMaterial({ color: 0x2c2721 }))
+  private makeRope(): Mesh {
+    // a unit cylinder stretched between hand and anchor each frame: cable with volume
+    const rope = new Mesh(
+      new CylinderGeometry(0.016, 0.016, 1, 6, 1, true),
+      new MeshStandardMaterial({ color: 0x241f1a, roughness: 0.6, metalness: 0.4 }),
+    )
     rope.frustumCulled = false
     rope.visible = false
     this.scene.add(rope)
@@ -66,12 +71,13 @@ export class Effects {
         return
       }
       rope.visible = true
-      const hand = new Vector3(i === 0 ? -0.4 : 0.4, -0.3, -0.25)
+      const hand = new Vector3(i === 0 ? -0.35 : 0.35, -0.32, -0.5)
       camera.localToWorld(hand)
-      const attr = rope.geometry.getAttribute('position') as BufferAttribute
-      attr.setXYZ(0, hand.x, hand.y, hand.z)
-      attr.setXYZ(1, hook.anchor.x, hook.anchor.y, hook.anchor.z)
-      attr.needsUpdate = true
+      const span = new Vector3().subVectors(hook.anchor, hand)
+      const length = Math.max(span.length(), 0.01)
+      rope.position.copy(hand).addScaledVector(span, 0.5)
+      rope.scale.set(1, length, 1)
+      rope.quaternion.setFromUnitVectors(ROPE_UP, span.divideScalar(length))
     })
   }
 

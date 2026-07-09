@@ -57,7 +57,7 @@ export function generateCity(rng: () => number): Arena {
   }
 
   const order = shuffle(rng, cells)
-  const towerCells = new Set(order.slice(0, 4 + Math.floor(rng() * 3)))
+  const towerCells = new Set(order.slice(0, 6 + Math.floor(rng() * 3)))
   for (const cell of cells) {
     if (towerCells.has(cell)) {
       arena.buildings.push({
@@ -65,7 +65,7 @@ export function generateCity(rng: () => number): Arena {
         z: cell.cz,
         w: 12,
         d: 12,
-        h: 28 + rng() * 10,
+        h: 36 + rng() * 12,
         kind: 'tower',
         ridgeAxis: rng() < 0.5 ? 'x' : 'z',
         tint: rng(),
@@ -88,7 +88,7 @@ function fillRowHouses(arena: Arena, cx: number, cz: number, rng: () => number):
       let width = 8 + rng() * 4
       if (cursor + width > CELL_HALF - 5) width = CELL_HALF - cursor // absorb the tail
       const center = cursor + width / 2
-      const height = 10 + rng() * 4.5
+      const height = 14 + rng() * 8
       arena.buildings.push({
         x: alongX ? cx + center : cx + rowOffset,
         z: alongX ? cz + rowOffset : cz + center,

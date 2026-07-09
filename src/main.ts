@@ -1,6 +1,7 @@
 import { PerspectiveCamera, Vector3, WebGLRenderer } from 'three'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { Hud } from './hud'
+import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { buildScene } from './render/scene'
 import { TitanPool } from './render/titans'
@@ -29,9 +30,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
 renderer.shadowMap.enabled = true
 document.body.appendChild(renderer.domElement)
 
+scene.add(camera) // camera children (blade viewmodel) need the camera in the scene graph
 const titanPool = new TitanPool(scene)
 const effects = new Effects(scene)
 const hud = new Hud(seed)
+const blade = new BladeView(camera)
 const audio = new AudioSystem()
 let gasAudible = false
 let roarTimer = 3
@@ -70,15 +73,35 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight)
 })
 
+// Escape resumes from the pause menu. Chrome refuses to re-lock the pointer for
+// ~1.25s after an ESC-initiated exit, so wait out the remainder before requesting.
+let lastUnlockAt = -Infinity
+let resumeTimer: number | undefined
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement !== renderer.domElement) lastUnlockAt = performance.now()
+})
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape') return
+  if (game.phase !== 'playing' || document.pointerLockElement === renderer.domElement) return
+  const wait = Math.max(0, 1350 - (performance.now() - lastUnlockAt))
+  window.clearTimeout(resumeTimer)
+  resumeTimer = window.setTimeout(() => {
+    if (game.phase === 'playing' && document.pointerLockElement !== renderer.domElement) {
+      lockPointer()
+    }
+  }, wait)
+})
+
 const UP = new Vector3(0, 1, 0)
 
 function buildInput(): InputState {
   const input = neutralInput()
-  input.gas = keys.has('Space')
-  input.reel = keys.has('ShiftLeft') || keys.has('ShiftRight')
+  input.jump = keys.has('Space')
+  input.gas = keys.has('ShiftLeft') || keys.has('ShiftRight')
+  input.reel = keys.has('KeyE')
   input.slash = keys.has('KeyF')
   input.hookL = mouseL || keys.has('KeyQ')
-  input.hookR = mouseR || keys.has('KeyE')
+  input.hookR = mouseR
   input.resupply = keys.has('KeyR')
   camera.getWorldDirection(input.lookDir)
 
@@ -110,7 +133,7 @@ function beginRun(): void {
   if (game.phase === 'menu' || game.phase === 'dead') {
     startGame(game)
     prevPhase = game.phase
-    hud.showBanner('WAVE 1')
+    hud.showBanner('Wave 1')
   }
   lockPointer()
 }
@@ -123,7 +146,7 @@ hud.onPickUpgrade = (id) => {
   chooseUpgrade(game, id)
   prevPhase = game.phase
   hud.hideUpgrades()
-  hud.showBanner(`WAVE ${game.wave}`)
+  hud.showBanner(`Wave ${game.wave}`)
   lockPointer()
 }
 hud.showStart()
@@ -134,9 +157,10 @@ function handleEvents(events: GameEvent[]): void {
   for (const event of events) {
     switch (event.type) {
       case 'slash':
-        hud.slashFlash()
+        blade.slash()
         audio.play(SLASHES, { volume: 0.55 })
         if (event.hit && event.napeHit) {
+          hud.slashFlash()
           effects.addShake(0.12)
           audio.play('slice', { volume: 0.9 })
         } else if (event.hit) {
@@ -158,7 +182,7 @@ function handleEvents(events: GameEvent[]): void {
         break
       }
       case 'bladeBroke':
-        hud.showBanner('BLADE SHATTERED', 900)
+        hud.showBanner('Blade Shattered', 900)
         audio.snap()
         break
       case 'playerHit':
@@ -168,11 +192,15 @@ function handleEvents(events: GameEvent[]): void {
         audio.play(GRUNTS, { volume: 0.8, rate: 0.7 })
         break
       case 'waveClear':
-        hud.showBanner(`WAVE ${event.wave} CLEARED  +${event.bonus}`, 2400)
+        hud.showBanner(`Wave ${event.wave} Cleared  +${event.bonus}`, 2400)
         audio.chime()
         break
       case 'resupply':
-        hud.showBanner('RESUPPLIED', 900)
+        hud.showBanner('Resupplied', 900)
+        audio.refill()
+        break
+      case 'canisterSwap':
+        hud.showBanner(event.remaining > 0 ? `Canister Swapped · ${event.remaining} Left` : 'Last Canister', 1200)
         audio.refill()
         break
       case 'death':
@@ -201,8 +229,9 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(now - last, 100) / 1000
   last = now
   const locked = document.pointerLockElement === renderer.domElement
+  const simActive = game.phase === 'playing' && (locked || debug.autopilot)
 
-  if (game.phase === 'playing' && (locked || debug.autopilot)) {
+  if (simActive) {
     if (pauseShown) {
       hud.hideStart()
       pauseShown = false
@@ -244,15 +273,17 @@ renderer.setAnimationLoop(() => {
   effects.applyShake(camera)
 
   titanPool.sync(game.titans, dt)
+  blade.update(dt)
   effects.syncRopes(game.player, camera)
   effects.update(dt, camera, game.player.vel)
 
-  audio.setWind(game.phase === 'playing' ? speed : 0)
+  audio.setWind(simActive ? speed : 0)
   audio.setGas(gasAudible)
+  audio.setDucked((game.phase === 'playing' && !simActive && !debug.silent) || game.phase === 'menu')
   roarTimer -= dt
   if (roarTimer <= 0) {
     roarTimer = 4 + Math.random() * 6
-    if (game.phase === 'playing') {
+    if (simActive) {
       const alive = game.titans.filter((t) => t.hp > 0)
       const titan = alive[Math.floor(Math.random() * alive.length)]
       if (titan) {
@@ -279,6 +310,7 @@ renderer.setAnimationLoop(() => {
 
 interface DebugStepInput {
   gas?: boolean
+  jump?: boolean
   reel?: boolean
   slash?: boolean
   hookL?: boolean
@@ -295,6 +327,7 @@ function snapshot() {
     score: game.score.score,
     hp: game.player.hp,
     gas: Math.round(game.player.gas),
+    canisters: game.player.canisters,
     blades: game.player.blades,
     pos: game.player.pos.toArray().map((v) => Math.round(v * 10) / 10),
     speed: Math.round(game.player.vel.length() * 10) / 10,
@@ -312,7 +345,10 @@ function snapshot() {
     debug.autopilot = value
   },
   audioDebug() {
-    return { state: audio.state, loaded: audio.loadedCount }
+    return { state: audio.state, loaded: audio.loadedCount, ducked: audio.ducked }
+  },
+  fxSlash() {
+    blade.slash()
   },
   setSilent(value: boolean) {
     debug.silent = value
@@ -340,6 +376,7 @@ function snapshot() {
   step(ticks = 1, partial: DebugStepInput = {}) {
     const input = neutralInput()
     input.gas = partial.gas ?? false
+    input.jump = partial.jump ?? false
     input.reel = partial.reel ?? false
     input.slash = partial.slash ?? false
     input.hookL = partial.hookL ?? false

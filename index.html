@@ -6,8 +6,27 @@
     <title>Wings of Freedom — ODM Wave Survival</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>" />
     <style>
+      @font-face {
+        font-family: 'Cloister Black';
+        src: url('/fonts/cloister-black.ttf') format('truetype');
+        font-display: swap;
+      }
       :root {
         --hud-font: 'Avenir Next', 'Trebuchet MS', system-ui, sans-serif;
+        --title-font: 'Cloister Black', 'Times New Roman', serif;
+      }
+      .aot-title {
+        font-family: var(--title-font);
+        font-weight: 400;
+        letter-spacing: 3px;
+        color: #f4efe4;
+        text-shadow:
+          1px 1px 0 #5a1015,
+          2px 2px 0 #521014,
+          3px 3px 0 #470d11,
+          4px 4px 0 #38090d,
+          5px 5px 0 #2a0709,
+          7px 7px 14px #000d;
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0e12; }
@@ -53,7 +72,7 @@
       /* wave banner + point popups */
       #banner {
         position: absolute; left: 50%; top: 18%; transform: translateX(-50%);
-        font-size: 34px; font-weight: 800; letter-spacing: 6px; text-shadow: 0 3px 14px #000c;
+        font-size: 52px; white-space: nowrap;
         opacity: 0; transition: opacity 0.3s;
       }
       #banner.show { opacity: 1; }
@@ -78,8 +97,8 @@
         background: #0b0e12d8; pointer-events: auto; text-align: center; gap: 14px;
       }
       .overlay.hidden { display: none; }
-      .overlay h1 { font-size: 44px; letter-spacing: 8px; font-weight: 800; }
-      .overlay h2 { font-size: 26px; letter-spacing: 4px; }
+      .overlay h1 { font-size: 76px; }
+      .overlay h2 { font-size: 54px; }
       .overlay .sub { opacity: 0.75; font-size: 14px; letter-spacing: 2px; max-width: 560px; line-height: 1.7; }
       .overlay .keys { font-size: 13px; opacity: 0.85; line-height: 2; letter-spacing: 1px; }
       .overlay .keys b { color: #a8e6ff; }
@@ -112,37 +131,37 @@
         <div id="best"></div>
       </div>
       <div id="meters">
-        <div class="meter-label">GAS</div>
+        <div class="meter-label">GAS <span id="gas-canisters"></span></div>
         <div id="gas-bar"><div id="gas-fill"></div></div>
         <div class="meter-label">BLADE <span id="blade-pairs"></span></div>
         <div id="blade-bar"><div id="blade-fill"></div></div>
       </div>
       <div id="speedo"></div>
-      <div id="banner"></div>
+      <div id="banner" class="aot-title"></div>
       <div id="popup"></div>
       <div id="prompt"></div>
       <div id="vignette"></div>
       <div id="flash"></div>
 
       <div id="start" class="overlay">
-        <h1>WINGS OF FREEDOM</h1>
+        <h1 class="aot-title">Wings of Freedom</h1>
         <div class="sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
         <div class="keys">
-          <b>Mouse</b> look &nbsp;·&nbsp; <b>LMB / RMB</b> left &amp; right hook &nbsp;·&nbsp; <b>Space</b> gas (pulls you to your hooks)<br />
-          <b>Shift</b> reel in &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply at the green plaza ring
+          <b>Mouse</b> look &nbsp;·&nbsp; <b>LMB / RMB</b> left &amp; right hook &nbsp;·&nbsp; <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost<br />
+          <b>E</b> reel in &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply at the green plaza ring
         </div>
         <button id="start-btn">DEPLOY</button>
         <div class="seedline" id="seed-line"></div>
       </div>
 
       <div id="upgrade" class="overlay hidden">
-        <h2>WAVE CLEARED</h2>
+        <h2 class="aot-title">Wave Cleared</h2>
         <div class="sub">Choose one field modification</div>
         <div id="upgrade-cards"></div>
       </div>
 
       <div id="death" class="overlay hidden">
-        <h2>DEVOURED</h2>
+        <h2 class="aot-title">Devoured</h2>
         <div class="stats" id="death-stats"></div>
         <button id="retry-btn">ONCE MORE</button>
         <div class="seedline" id="death-seed"></div>

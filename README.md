@@ -16,13 +16,17 @@ Click **DEPLOY** (grabs pointer lock), then:
 | Input | Action |
 | --- | --- |
 | Mouse | Look / aim hooks |
-| LMB / RMB (or Q / E) | Fire and hold left / right hook at the crosshair |
-| Space | Gas: pulls you toward your hooks; jump/boost when unhooked |
-| Shift | Reel in (tighter, faster orbits) |
+| LMB / RMB | Fire and hold left / right hook at the crosshair |
+| Space | Jump |
+| Shift | Gas boost in your horizontal move/look direction |
+| E | Reel in (tighter, faster orbits; climbs the rope) |
 | F | Blade slash |
-| W A S D | Run / air drift |
-| R | Resupply gas and blades at the green plaza ring |
-| Esc | Pause |
+| W A S D | Run / steer momentum |
+| R | Resupply gas, canisters and blades at the green plaza ring |
+| Esc | Pause / resume |
+
+You carry a gas tank plus 3 spare canisters; an empty tank auto-swaps a canister in.
+When the last one runs dry, only a resupply refills you.
 
 **The one rule:** nape damage scales with your speed. At or above the kill threshold
 (crosshair-side speedo turns blue) a nape hit is a one-cut kill. Swing mastery *is* combat mastery.
@@ -61,3 +65,5 @@ is synthesized at runtime with WebAudio.
 
 - Titan roars, grunts, flinches, slice, groans, scream: [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx) by rubberduck (OpenGameArt)
 - Blade whooshes: [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes) by StarNinjas (OpenGameArt)
+
+Title font: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free).

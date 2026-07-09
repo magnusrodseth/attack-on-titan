@@ -62,6 +62,15 @@ export const UPGRADE_POOL: Upgrade[] = [
     },
   },
   {
+    id: 'spare-canister',
+    name: 'Spare Canister',
+    desc: '+1 gas canister, now and at resupply',
+    apply(p) {
+      p.config.gasCanisters += 1
+      p.canisters += 1
+    },
+  },
+  {
     id: 'gas-refund',
     name: 'Combat Scavenging',
     desc: 'Each kill refunds 12 gas',

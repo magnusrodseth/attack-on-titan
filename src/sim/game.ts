@@ -26,6 +26,7 @@ export type GameEvent =
   | { type: 'playerHit'; hp: number }
   | { type: 'waveClear'; wave: number; bonus: number }
   | { type: 'resupply' }
+  | { type: 'canisterSwap'; remaining: number }
   | { type: 'death' }
 
 export interface BestStats {
@@ -171,13 +172,18 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
     const dist = Math.hypot(p.pos.x - g.arena.station.x, p.pos.z - g.arena.station.z)
     if (dist <= RESUPPLY_RADIUS) {
       p.gas = p.config.maxGas
+      p.canisters = p.config.gasCanisters
       p.blades = p.config.bladePairs
       p.bladeHp = p.config.bladeDurability
       g.events.push({ type: 'resupply' })
     }
   }
 
+  const canistersBefore = p.canisters
   stepPlayer(p, input, dt, g.arena)
+  if (p.canisters < canistersBefore) {
+    g.events.push({ type: 'canisterSwap', remaining: p.canisters })
+  }
 
   for (const titan of g.titans) {
     for (const event of stepTitan(titan, p.pos, dt, g.rngLive)) {
@@ -242,6 +248,7 @@ function copyInput(dst: InputState, src: InputState): void {
   dst.move.copy(src.move)
   dst.lookDir.copy(src.lookDir)
   dst.gas = src.gas
+  dst.jump = src.jump
   dst.reel = src.reel
   dst.slash = src.slash
   dst.hookL = src.hookL
