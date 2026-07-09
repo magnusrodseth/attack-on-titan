@@ -1,0 +1,26 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - generic: "0"
+      - generic: BEST 0 · WAVE 0
+    - generic:
+      - generic: HEALTH
+      - generic: ♥ ♥ ♥ ♥ ♥
+      - generic: GAS ×3
+      - generic: BLADE ×4
+      - generic: FOCUS
+    - generic: 0 km/h
+    - generic: R — RESUPPLY
+    - generic [ref=e2]:
+      - heading "Paused" [level=1] [ref=e3]
+      - generic [ref=e4]: First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.
+      - generic [ref=e5]:
+        - text: Mouse look · LMB / RMB (or J / K) hold to hook & winch in, release to let go
+        - text: Space jump · Shift boost burst · Q focus (slow time) · F slash · W A S D run · R resupply
+      - generic [ref=e6]:
+        - button "Resume" [ref=e7] [cursor=pointer]
+        - button "Restart Run" [ref=e8] [cursor=pointer]
+        - button "Multiplayer" [ref=e9] [cursor=pointer]
+        - button "Game Mode" [ref=e10] [cursor=pointer]
+        - button "Leaderboard" [ref=e11] [cursor=pointer]
+        - button "Settings" [ref=e12] [cursor=pointer]

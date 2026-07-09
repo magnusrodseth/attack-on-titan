@@ -195,6 +195,10 @@ function spawnWave(w: CoopWorld): void {
 export function applyPlayerUpdate(w: CoopWorld, playerId: string, update: PlayerUpdate): void {
   const p = w.players.get(playerId)
   if (!p || !p.connected) return
+  // NaN/Infinity pass range clamps (NaN > x is false) and would poison every snapshot
+  // and titan target in the shared world: reject the report outright
+  const parts = [update.pos.x, update.pos.y, update.pos.z, update.vel.x, update.vel.y, update.vel.z]
+  if (!parts.every(Number.isFinite)) return
   const pos = update.pos.clone()
   const radial = Math.hypot(pos.x, pos.z)
   const maxRadial = w.arena.wallRadius + 60
@@ -502,10 +506,10 @@ export function removePlayer(w: CoopWorld, playerId: string): CoopEvent[] {
   if (w.phase === 'playing') {
     let anyAlive = false
     for (const other of w.players.values()) if (other.connected && other.alive) anyAlive = true
-    if (!anyAlive && connectedCount(w) > 0) events.push(endMatch(w))
-    if (connectedCount(w) === 0) w.phase = 'ended' // empty room: nothing to rank or persist
+    // even a fully abandoned match ends through endMatch so cleared waves still persist
+    if (!anyAlive) events.push(endMatch(w))
   } else if (w.phase === 'upgrading') {
-    if (connectedCount(w) === 0) w.phase = 'ended'
+    if (connectedCount(w) === 0) events.push(endMatch(w))
     else if (allPicked(w)) events.push(...startNextWave(w))
   }
   return events

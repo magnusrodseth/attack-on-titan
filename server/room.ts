@@ -65,16 +65,25 @@ export class MatchRoom extends Server<Env> {
     const token = new URL(ctx.request.url).searchParams.get('token') ?? ''
     const session = token ? await validateSessionToken(createDb(this.env.DB), token) : null
     if (!session) return this.refuse(conn, 'unauthorized', 4001, 'Sign in to muster')
-    for (const member of this.members.values()) {
+    // same soldier again (wifi blip, tab reload): the new connection replaces the old one,
+    // so a reconnecting combatant drops straight back into their live match
+    for (const [connId, member] of this.members) {
       if (member.handle === session.username) {
-        return this.refuse(conn, 'unauthorized', 4002, 'Already connected in this room')
+        this.members.delete(connId) // before close: onClose must not treat this as leaving
+        this.getConnection(connId)?.close(4000, 'Replaced by a newer connection')
+        break
       }
     }
     const midMatch = this.phase !== 'lobby'
     if (!midMatch && this.members.size >= MAX_ROOM_PLAYERS) {
       return this.refuse(conn, 'room-full', 4003, 'This squad is full')
     }
-    this.members.set(conn.id, { handle: session.username, userId: session.userId, spectator: midMatch })
+    const combatant = this.world?.players.get(session.username)?.connected ?? false
+    this.members.set(conn.id, {
+      handle: session.username,
+      userId: session.userId,
+      spectator: midMatch && !combatant,
+    })
     if (!this.creator) this.creator = session.username
     this.broadcastLobby()
     if (midMatch && this.world) {
@@ -199,6 +208,7 @@ export class MatchRoom extends Server<Env> {
   }
 
   private finishMatch(): void {
+    if (this.phase === 'results') return // wipe can reach here twice in one tick
     if (this.interval !== null) {
       clearInterval(this.interval)
       this.interval = null

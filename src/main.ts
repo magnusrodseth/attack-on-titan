@@ -353,16 +353,17 @@ function connectCoop(account: Account): void {
   hud.setCoopUi(true)
   coop = new CoopSession(lobbyCode, account, {
     onLobby(lobby) {
-      // never pop the lobby overlay over a running fight I am part of
-      if (lobby.phase === 'lobby' || !(coop?.playing && lobby.phase === 'match')) {
-        if (lobby.phase !== 'results') hud.showLobby(lobby, coopJoinUrl(lobby.code))
-      }
+      // the lobby overlay belongs to the lobby phase only; spectators watch the fight
       if (lobby.phase === 'lobby') {
+        hud.showLobby(lobby, coopJoinUrl(lobby.code))
         hud.hideResults()
         spectating = false
         soldierPool.clear()
         game.titans = []
         hud.updateSquad([])
+      } else if (lobby.phase === 'match' && !coop?.playing && hud.lobbyOpen) {
+        hud.hideLobby()
+        hud.showBanner('Battle Under Way · You Muster Next Match', 3200)
       }
     },
     onMatchStart(roster) {
@@ -813,6 +814,7 @@ renderer.setAnimationLoop(() => {
       }
     } else if (piloting && !intermission && !debug.autopilot && !debug.silent && !pauseShown) {
       hud.showStart(true)
+      hud.showBanner('The Battle Rages On…', 2600) // a shared world does not pause
       pauseShown = true
     }
     coop.syncFrame(game, now, dt)

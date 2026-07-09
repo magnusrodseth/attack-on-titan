@@ -324,3 +324,29 @@ describe('leaving and housekeeping', () => {
     expect(drive(createCoopWorld('sina', ['a', 'b']))).toEqual(drive(createCoopWorld('sina', ['a', 'b'])))
   })
 })
+
+describe('review hardening', () => {
+  it('rejects non-finite player reports outright (NaN and Infinity poison snapshots)', () => {
+    const w = createCoopWorld('trost', ['erwin'])
+    const before = w.players.get('erwin')!.body.pos.clone()
+    applyPlayerUpdate(w, 'erwin', { pos: new Vector3(NaN, 2, 0), vel: new Vector3(), onGround: true })
+    applyPlayerUpdate(w, 'erwin', { pos: new Vector3(0, 2, 0), vel: new Vector3(Infinity, 0, 0), onGround: true })
+    const body = w.players.get('erwin')!.body
+    expect(body.pos.x).toBe(before.x)
+    expect([body.pos.x, body.pos.y, body.pos.z, body.vel.x].every(Number.isFinite)).toBe(true)
+    // a sane report still applies afterwards
+    applyPlayerUpdate(w, 'erwin', { pos: new Vector3(5, 2, 5), vel: new Vector3(1, 0, 0), onGround: true })
+    expect(body.pos.x).toBe(5)
+  })
+
+  it('a fully abandoned match still ends with rankable results', () => {
+    const w = createCoopWorld('trost', ['erwin', 'hange'])
+    w.players.get('erwin')!.score.score = 300
+    removePlayer(w, 'erwin')
+    const events = removePlayer(w, 'hange')
+    expect(events.some((e) => e.type === 'teamWipe')).toBe(true)
+    expect(w.phase).toBe('ended')
+    expect(w.results!.players.map((p) => p.id).sort()).toEqual(['erwin', 'hange'])
+    expect(w.results!.players[0]!.id).toBe('erwin')
+  })
+})

@@ -1,6 +1,6 @@
 import { desc, inArray } from 'drizzle-orm'
 import { asc, eq } from 'drizzle-orm'
-import type { Leaderboard, LeaderboardTeam } from '../../src/net/protocol'
+import type { Leaderboard, LeaderboardSoldier, LeaderboardTeam } from '../../src/net/protocol'
 import type { MatchResults } from '../../src/sim/coop'
 import type { Db } from './client'
 import { matchPlayers, matches, users } from './schema'
@@ -94,11 +94,18 @@ export async function readLeaderboard(db: Db): Promise<Leaderboard> {
     .from(matchPlayers)
     .innerJoin(users, eq(matchPlayers.userId, users.id))
     .innerJoin(matches, eq(matchPlayers.matchId, matches.id))
-    .orderBy(desc(matchPlayers.score))
-    .limit(10)
+    .orderBy(desc(matchPlayers.score), asc(users.username))
+    .limit(50)
 
-  return {
-    teams,
-    soldiers: soldierRows.map((r) => ({ ...r, endedAt: r.endedAt.toISOString() })),
+  // one row per soldier: their single best match, not ten copies of one strong player
+  const seen = new Set<string>()
+  const soldiers: LeaderboardSoldier[] = []
+  for (const row of soldierRows) {
+    if (seen.has(row.username)) continue
+    seen.add(row.username)
+    soldiers.push({ ...row, endedAt: row.endedAt.toISOString() })
+    if (soldiers.length === 10) break
   }
+
+  return { teams, soldiers }
 }

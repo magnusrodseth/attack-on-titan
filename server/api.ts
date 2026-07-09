@@ -9,7 +9,8 @@ import type { Env } from './env'
 /** Origins allowed to call the API and open rooms: prod, previews, local dev. */
 export function isAllowedOrigin(origin: string): boolean {
   if (origin === 'https://attack-on-titan.magnusrodseth.com') return true
-  if (/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.vercel\.app$/.test(origin)) return true
+  // this project's Vercel previews only, not any *.vercel.app deployment
+  if (/^https:\/\/attack-on-titan-[a-z0-9-]+\.vercel\.app$/.test(origin)) return true
   if (/^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true
   return false
 }
