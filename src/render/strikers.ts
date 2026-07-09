@@ -1,5 +1,4 @@
 import {
-  BoxGeometry,
   CanvasTexture,
   CapsuleGeometry,
   CatmullRomCurve3,
@@ -17,7 +16,7 @@ import {
   TubeGeometry,
   Vector3,
 } from 'three'
-import { makeLimb } from './titans'
+import { makeLimb, makeWeakPoint, makeWeakPointMats } from './titans'
 
 /**
  * The two rare footballer titans from IDEAS.md: the Striker (Haaland homage, Norway home
@@ -342,13 +341,17 @@ export function buildFootballer(
     armL.pivot.add(band)
   }
 
-  // the nape marks them as titans; same overbright indicator as every other nape
-  const nape = new Mesh(
-    new BoxGeometry(0.085, 0.075, 0.035),
-    new MeshStandardMaterial({ color: 0xb3202a, emissive: 0xd42b35, emissiveIntensity: 0.8 }),
-  )
-  nape.position.set(0, 0.38, -0.09)
+  // the nape marks them as titans: the same bloom-from-within as every other nape, plus
+  // heel tendons since they cripple like any aberrant
+  const weakMats = makeWeakPointMats()
+  const nape = makeWeakPoint(weakMats, 0.34, 0.12)
+  nape.position.set(0, 0.36, -0.1)
   torso.add(nape)
+  for (const limb of [legL, legR]) {
+    const heel = makeWeakPoint(weakMats, 0.19, 0.07)
+    heel.position.set(0, -0.175, -0.055)
+    limb.lower.add(heel)
+  }
 
   group.scale.setScalar(height)
   paintJersey()

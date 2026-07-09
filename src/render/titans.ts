@@ -65,6 +65,50 @@ function weakPointGlowTexture(): CanvasTexture {
   glowTexture = new CanvasTexture(canvas)
   return glowTexture
 }
+
+/** One owner's weak-point indicator materials; per-figure so opacity pulses stay independent. */
+export interface WeakPointMats {
+  glow: SpriteMaterial
+  stain: SpriteMaterial
+}
+
+export function makeWeakPointMats(): WeakPointMats {
+  return {
+    glow: new SpriteMaterial({
+      map: weakPointGlowTexture(),
+      color: 0xff2f38,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.7,
+    }),
+    stain: new SpriteMaterial({
+      map: weakPointGlowTexture(),
+      color: 0xc41420,
+      depthWrite: false,
+      opacity: 0.5,
+    }),
+  }
+}
+
+/**
+ * A weak point as a red bloom bleeding out of the flesh, not a painted shape. Two sprites:
+ * an additive halo whose center sits slightly inside the body (+z is into the flesh from
+ * every anchor, so the body swallows the core and only the soft glow escapes) plus a small
+ * normal-blended stain riding the surface, because additive light disappears against a
+ * brightly lit surface (the flashlight taught us that).
+ */
+export function makeWeakPoint(mats: WeakPointMats, haloScale: number, stainScale: number): Group {
+  const point = new Group()
+  const halo = new Sprite(mats.glow)
+  halo.position.z = 0.035
+  halo.scale.setScalar(haloScale)
+  const stain = new Sprite(mats.stain)
+  stain.position.z = -0.02
+  stain.scale.setScalar(stainScale)
+  point.add(halo, stain)
+  return point
+}
+
 import { createRng } from '../sim/rng'
 import type { TitanState } from '../sim/titan'
 import { SWAT_WINDUP } from '../sim/titan'
@@ -115,8 +159,7 @@ export function makeLimb(
 class TitanVisual {
   readonly group = new Group()
   private readonly skin: MeshStandardMaterial
-  private readonly glowMat: SpriteMaterial
-  private readonly stainMat: SpriteMaterial
+  private readonly weakMats: WeakPointMats
   private readonly napeGlow: Group
   private readonly legL: Limb
   private readonly legR: Limb
@@ -146,24 +189,7 @@ class TitanVisual {
       roughness: 0.9,
       transparent: true,
     })
-    // weak points advertise as a red bloom bleeding out of the flesh, not as painted
-    // shapes. Two sprites each: an additive halo whose center sits slightly inside the
-    // body (the flesh swallows the core, only the soft glow escapes) plus a small
-    // normal-blended stain riding the surface, because additive light disappears
-    // against a brightly lit surface (the flashlight taught us that)
-    this.glowMat = new SpriteMaterial({
-      map: weakPointGlowTexture(),
-      color: 0xff2f38,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      opacity: 0.7,
-    })
-    this.stainMat = new SpriteMaterial({
-      map: weakPointGlowTexture(),
-      color: 0xc41420,
-      depthWrite: false,
-      opacity: 0.5,
-    })
+    this.weakMats = makeWeakPointMats()
 
     const headScale = 1 + quirk() * 0.45 // big heads read "pure titan"
     const bellyScale = 0.85 + quirk() * 0.6
@@ -172,24 +198,10 @@ class TitanVisual {
     this.legL = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, -0.085, 0.44)
     this.legR = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, 0.085, 0.44)
 
-    // halo center tucked into the flesh (+z is into the body from both anchors),
-    // stain floated just off the skin
-    const weakPoint = (haloScale: number, stainScale: number): Group => {
-      const point = new Group()
-      const halo = new Sprite(this.glowMat)
-      halo.position.z = 0.035
-      halo.scale.setScalar(haloScale)
-      const stain = new Sprite(this.stainMat)
-      stain.position.z = -0.02
-      stain.scale.setScalar(stainScale)
-      point.add(halo, stain)
-      return point
-    }
-
     // glowing heel tendons, the same red as the nape so both weak points read alike;
     // each hides once its ankle is cut (see syncPose)
     const heel = (limb: Limb): Group => {
-      const glow = weakPoint(0.19, 0.07)
+      const glow = makeWeakPoint(this.weakMats, 0.19, 0.07)
       glow.position.set(0, -0.175, -0.055) // back of the heel, at the sim's anklePos height
       limb.lower.add(glow)
       return glow
@@ -257,7 +269,7 @@ class TitanVisual {
 
     // glowing nape weak point, matching sim napeCenter (~0.82h, behind the neck);
     // seated inside the neck so the bloom seeps around the flesh
-    this.napeGlow = weakPoint(0.34, 0.12)
+    this.napeGlow = makeWeakPoint(this.weakMats, 0.34, 0.12)
     this.napeGlow.position.set(0, 0.36, -0.1)
     this.torso.add(this.napeGlow)
 
@@ -314,8 +326,8 @@ class TitanVisual {
       this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.4 * eased
       this.torso.rotation.x = 0.28 * eased
       // scream "cut here"
-      this.glowMat.opacity = 0.75 + Math.sin(performance.now() * 0.009) * 0.25
-      this.stainMat.opacity = 0.65 + Math.sin(performance.now() * 0.009) * 0.2
+      this.weakMats.glow.opacity = 0.75 + Math.sin(performance.now() * 0.009) * 0.25
+      this.weakMats.stain.opacity = 0.65 + Math.sin(performance.now() * 0.009) * 0.2
       return
     }
     this.group.rotation.x = 0
@@ -348,8 +360,8 @@ class TitanVisual {
     }
 
     const pulse = Math.sin(performance.now() * 0.004 + t.id)
-    this.glowMat.opacity = 0.75 + pulse * 0.25
-    this.stainMat.opacity = 0.5 + pulse * 0.15
+    this.weakMats.glow.opacity = 0.75 + pulse * 0.25
+    this.weakMats.stain.opacity = 0.5 + pulse * 0.15
   }
 }
 
