@@ -37,7 +37,12 @@ const leatherMat = new MeshStandardMaterial({ map: cloth('/textures/soldier-leat
 const cloakMat = new MeshStandardMaterial({ map: cloth('/textures/cloak-fabric.jpg', 1.5), color: 0x35543c, roughness: 1 })
 const skinMat = new MeshStandardMaterial({ map: cloth('/textures/skin.jpg', 1), color: 0xe8c9a8, roughness: 0.85 })
 const hairMat = new MeshStandardMaterial({ map: cloth('/textures/bark.jpg', 1), color: 0x3a2c1c, roughness: 0.95 })
-const ropeMat = new MeshStandardMaterial({ color: 0x9aa3ad, roughness: 0.4, metalness: 0.6 })
+// galvanized wire rope (ambientCG Rope002, CC0); one cylinder spans the full wire, so v repeats high
+const ropeTexture = loader.load('/textures/wire-rope.jpg')
+ropeTexture.colorSpace = SRGBColorSpace
+ropeTexture.wrapS = ropeTexture.wrapT = RepeatWrapping
+ropeTexture.repeat.set(0.5, 24)
+const ropeMat = new MeshStandardMaterial({ map: ropeTexture, color: 0xd8dde2, roughness: 0.38, metalness: 0.55 })
 
 function nameSprite(name: string): Sprite {
   const canvas = document.createElement('canvas')

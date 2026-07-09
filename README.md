@@ -128,6 +128,7 @@ Music (two tracks alternating in-game):
 
 - Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)
 - Brushed-steel blade texture from [ambientCG](https://ambientcg.com/view?id=Metal012) (Metal012, CC0)
+- Galvanized steel wire rope (ODM cables) and brushed grapple-hook steel from [ambientCG](https://ambientcg.com): [Rope002](https://ambientcg.com/view?id=Rope002), [Metal011](https://ambientcg.com/view?id=Metal011) (both CC0)
 - Soldier textures (Survey-Corps cloak linen, ODM-harness/boot leather, uniform cloth) from [ambientCG](https://ambientcg.com): [Fabric045](https://ambientcg.com/view?id=Fabric045), [Leather028](https://ambientcg.com/view?id=Leather028), [Fabric062](https://ambientcg.com/view?id=Fabric062) (all CC0)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
 - Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)

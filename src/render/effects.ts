@@ -66,16 +66,17 @@ export class Effects {
   }
 
   private makeRope(): RopeVisual {
-    // segmented steel cable so it can bow and "boing" during hook flight
-    const cableTexture = new TextureLoader().load('/textures/metal.jpg')
+    // segmented steel cable so it can bow and "boing" during hook flight;
+    // galvanized wire-rope weave (ambientCG Rope002, CC0) tinted silvery
+    const cableTexture = new TextureLoader().load('/textures/wire-rope.jpg')
     cableTexture.colorSpace = SRGBColorSpace
     cableTexture.wrapS = cableTexture.wrapT = RepeatWrapping
-    cableTexture.repeat.set(0.25, 4)
+    cableTexture.repeat.set(0.5, 4)
     const cableMat = new MeshStandardMaterial({
       map: cableTexture,
-      color: 0x8a8072,
-      roughness: 0.55,
-      metalness: 0.5,
+      color: 0xd8dde2,
+      roughness: 0.38,
+      metalness: 0.55,
     })
     const geometry = new CylinderGeometry(0.016, 0.016, 1, 6, 1, true)
     const segments: Mesh[] = []
@@ -87,13 +88,17 @@ export class Effects {
       segments.push(segment)
     }
 
-    // AoT grapple head: central spike with three back-swept barbs
+    // AoT grapple head: central spike with three back-swept barbs,
+    // brushed galvanized steel (ambientCG Metal011, CC0)
     const head = new Group()
+    const headTexture = new TextureLoader().load('/textures/hook-steel.jpg')
+    headTexture.colorSpace = SRGBColorSpace
+    headTexture.wrapS = headTexture.wrapT = RepeatWrapping
     const headMat = new MeshStandardMaterial({
-      map: cableTexture,
-      color: 0x71767c,
-      metalness: 0.65,
-      roughness: 0.4,
+      map: headTexture,
+      color: 0xdfe4e9,
+      metalness: 0.6,
+      roughness: 0.32,
     })
     const spike = new Mesh(new ConeGeometry(0.09, 0.5, 6), headMat)
     spike.position.y = 0.22
