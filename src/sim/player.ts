@@ -96,6 +96,8 @@ export interface PlayerState {
   invulnTimer: number
   boostCooldown: number
   airTime: number
+  /** Horizontal speed remembered at a tethered touchdown, returned on liftoff. */
+  bankedSpeed: number
   config: PlayerConfig
 }
 
@@ -114,6 +116,7 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     invulnTimer: 0,
     boostCooldown: 0,
     airTime: 0,
+    bankedSpeed: 0,
     config,
   }
 }
@@ -198,10 +201,10 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
       // above run speed the ground is a skid: steer and bleed, never add — legs can't
       // outrun momentum; real speed comes from swinging, not from holding W.
       // Exception: with a hook attached the rope is doing the work and the feet just
-      // cycle under the arc, so a tethered graze keeps its momentum (rolling loss only)
-      // and running past the anchor lets the taut rope scoop the runner back into the
-      // swing. Releasing on the ground hands the speed back to the skid.
-      const friction = anchors.length > 0 ? 2 : move.lengthSq() > 0 ? 8 : 12
+      // cycle under the arc, so a tethered graze costs nothing per second (touchdown
+      // takes a one-time dent and liftoff returns the banked swing speed below).
+      // Releasing on the ground hands the speed back to the skid.
+      const friction = anchors.length > 0 ? 0 : move.lengthSq() > 0 ? 8 : 12
       const decel = friction * dt
       const newSpeed = Math.max(0, horizSpeed - decel)
       if (horizSpeed > 1e-6) {
@@ -248,9 +251,26 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   if (p.pos.y <= ground) {
     p.pos.y = ground
     if (p.vel.y < 0) p.vel.y = 0
+    if (!wasOnGround && anchors.length > 0) {
+      // tethered touchdown: bank the swing's speed; the graze dents the ground run a
+      // little and the rope hands the rest back the moment it lifts the runner again
+      p.bankedSpeed = Math.hypot(p.vel.x, p.vel.z)
+      p.vel.x *= 0.92
+      p.vel.z *= 0.92
+    }
+    if (anchors.length === 0) p.bankedSpeed = 0 // let go on the ground: the bank is gone
     p.onGround = true
     p.airTime = 0
   } else {
+    if (wasOnGround && anchors.length > 0 && p.bankedSpeed > 0) {
+      const horiz = Math.hypot(p.vel.x, p.vel.z)
+      if (horiz > 1e-6 && p.bankedSpeed > horiz) {
+        const scale = p.bankedSpeed / horiz
+        p.vel.x *= scale
+        p.vel.z *= scale
+      }
+    }
+    p.bankedSpeed = 0
     p.onGround = false
     p.airTime += dt
   }

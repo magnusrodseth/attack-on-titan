@@ -83,8 +83,8 @@ export class Hud {
     this.bannerTimer = window.setTimeout(() => this.banner.classList.remove('show'), ms)
   }
 
-  popPoints(points: number, oneCut: boolean): void {
-    this.popText(oneCut ? `+${points} ONE CUT` : `+${points}`)
+  popPoints(points: number, oneCut: boolean, heartGained = false): void {
+    this.popText(`+${points}${oneCut ? ' ONE CUT' : ''}${heartGained ? ' ♥' : ''}`)
   }
 
   popText(text: string): void {

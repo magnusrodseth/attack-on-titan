@@ -223,4 +223,61 @@ describe('resupply', () => {
     stepGame(game, input, DT)
     expect(game.player.gas).toBeLessThan(game.player.config.maxGas)
   })
+
+  it('restores full health at the station', () => {
+    const game = playingGame()
+    game.player.hp = 1
+    game.player.pos.set(2, 1.7, 2)
+    const input = neutralInput()
+    input.resupply = true
+    stepGame(game, input, DT)
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+})
+
+describe('health', () => {
+  it('restores full health when the next wave starts', () => {
+    const game = playingGame()
+    game.player.hp = 1
+    for (const t of game.titans) {
+      t.hp = 0
+      t.state = 'dead'
+    }
+    stepGame(game, neutralInput(), DT)
+    chooseUpgrade(game, game.offers[0]!.id)
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+
+  it('grants one heart per titan kill, capped at max health', () => {
+    const game = playingGame()
+    game.titans.splice(1)
+    const titan = game.titans[0]!
+    game.player.hp = 1
+    game.player.pos.copy(napeCenter(titan))
+    game.player.vel.set(30, 0, 0)
+    game.player.onGround = false
+    const input = neutralInput()
+    input.slash = true
+    stepGame(game, input, DT)
+    expect(titan.hp).toBe(0)
+    expect(game.player.hp).toBe(2)
+    const kill = game.events.find((e) => e.type === 'kill')
+    expect(kill && 'heartGained' in kill && kill.heartGained).toBe(true)
+  })
+
+  it('does not overheal past max health on a kill', () => {
+    const game = playingGame()
+    game.titans.splice(1)
+    const titan = game.titans[0]!
+    game.player.pos.copy(napeCenter(titan))
+    game.player.vel.set(30, 0, 0)
+    game.player.onGround = false
+    const input = neutralInput()
+    input.slash = true
+    stepGame(game, input, DT)
+    expect(titan.hp).toBe(0)
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+    const kill = game.events.find((e) => e.type === 'kill')
+    expect(kill && 'heartGained' in kill && kill.heartGained).toBe(false)
+  })
 })

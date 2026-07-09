@@ -30,7 +30,7 @@ export type GameEvent =
   | { type: 'slash'; hit: boolean; napeHit: boolean }
   | { type: 'ankleSliced'; titanId: number; remaining: number }
   | { type: 'crippled'; titanId: number }
-  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number }
+  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean }
   | { type: 'bladeBroke' }
   | { type: 'playerHit'; hp: number }
   | { type: 'waveClear'; wave: number; bonus: number }
@@ -142,6 +142,7 @@ function spawnWave(g: GameState): void {
 export function chooseUpgrade(g: GameState, id: string): void {
   if (g.phase !== 'upgrading') return
   applyUpgrade(g.player, id)
+  g.player.hp = g.player.config.maxHp // a fresh wave starts at full health
   g.offers = []
   g.wave += 1
   spawnWave(g)
@@ -192,12 +193,15 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
         p.config.killSpeed,
       )
       p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+      const heartGained = p.hp < p.config.maxHp
+      if (heartGained) p.hp += 1 // every kill buys a heart back
       g.events.push({
         type: 'kill',
         titanId: result.titanId,
         points,
         oneCut: result.oneCut,
         speed: result.speed,
+        heartGained,
       })
     }
   }
@@ -209,6 +213,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       p.canisters = p.config.gasCanisters
       p.blades = p.config.bladePairs
       p.bladeHp = p.config.bladeDurability
+      p.hp = p.config.maxHp
       g.events.push({ type: 'resupply' })
     }
   }

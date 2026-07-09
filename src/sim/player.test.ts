@@ -150,7 +150,31 @@ describe('stepPlayer', () => {
     attachHook(p.hooks[0], new Vector3(60, 50, 0), p.pos) // anchor high, ahead of the run
     for (let i = 0; i < 120; i++) stepPlayer(p, idle(), DT, emptyArena()) // 1s grounded run
     expect(p.onGround).toBe(true)
-    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(26) // rope does the work, not friction
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(29) // no per-second loss while tethered
+  })
+
+  it('banks swing speed on a tethered touchdown and hands it back on liftoff', () => {
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT + 0.5, 0)
+    p.vel.set(28, -6, 0)
+    p.onGround = false
+    attachHook(p.hooks[0], new Vector3(80, 60, 0), p.pos)
+    let ticks = 0
+    while (!p.onGround && ticks < 60) {
+      stepPlayer(p, idle(), DT, emptyArena())
+      ticks++
+    }
+    expect(p.onGround).toBe(true)
+    const grounded = Math.hypot(p.vel.x, p.vel.z)
+    expect(grounded).toBeLessThan(27) // the touchdown dents the run a little
+    expect(grounded).toBeGreaterThan(23)
+    for (let i = 0; i < 60; i++) stepPlayer(p, idle(), DT, emptyArena()) // half a second grounded
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeCloseTo(grounded, 1) // and then holds steady
+    const input = idle()
+    input.jump = true
+    stepPlayer(p, input, DT, emptyArena())
+    expect(p.onGround).toBe(false)
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(26.5) // the swing returns the bank
   })
 
   it('releasing the hooks on the ground brings back the skid (momentum is lost)', () => {

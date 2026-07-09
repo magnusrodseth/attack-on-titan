@@ -179,7 +179,7 @@ function handleEvents(events: GameEvent[]): void {
         }
         effects.addShake(0.4)
         audio.thud(0.6)
-        hud.popPoints(event.points, event.oneCut)
+        hud.popPoints(event.points, event.oneCut, event.heartGained)
         break
       }
       case 'ankleSliced':
