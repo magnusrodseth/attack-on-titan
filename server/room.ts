@@ -63,7 +63,7 @@ export class MatchRoom extends Server<Env> {
 
   async onConnect(conn: Connection, ctx: ConnectionContext): Promise<void> {
     const token = new URL(ctx.request.url).searchParams.get('token') ?? ''
-    const session = token ? await validateSessionToken(createDb(this.env.DATABASE_URL), token) : null
+    const session = token ? await validateSessionToken(createDb(this.env.DB), token) : null
     if (!session) return this.refuse(conn, 'unauthorized', 4001, 'Sign in to muster')
     for (const member of this.members.values()) {
       if (member.handle === session.username) {
@@ -210,7 +210,7 @@ export class MatchRoom extends Server<Env> {
       this.broadcastMsg({ v: PROTOCOL_VERSION, type: 'results', results })
       if (!this.matchWritten) {
         this.matchWritten = true
-        const write = writeMatch(createDb(this.env.DATABASE_URL), this.name, this.seed, results, this.rosterIds)
+        const write = writeMatch(createDb(this.env.DB), this.name, this.seed, results, this.rosterIds)
         this.ctx.waitUntil(
           write.catch((err) => console.error('match write failed', err instanceof Error ? err.message : err)),
         )

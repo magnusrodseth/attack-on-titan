@@ -415,9 +415,9 @@ async function routePartykitRequest(req, env$1 = env, options) {
   if (!serverMapCache.has(env$1)) {
     const namespaceMap = {};
     const bindingNames2 = {};
-    for (const [k, v2] of Object.entries(env$1)) if (v2 && typeof v2 === "object" && "idFromName" in v2 && typeof v2.idFromName === "function") {
+    for (const [k, v] of Object.entries(env$1)) if (v && typeof v === "object" && "idFromName" in v && typeof v.idFromName === "function") {
       const kebab = camelCaseToKebabCase(k);
-      namespaceMap[kebab] = v2;
+      namespaceMap[kebab] = v;
       bindingNames2[kebab] = k;
     }
     serverMapCache.set(env$1, namespaceMap);
@@ -1199,18 +1199,18 @@ var UniqueConstraint = class {
 // ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/utils/array.js
 function parsePgArrayValue(arrayString, startFrom, inQuotes) {
   for (let i = startFrom; i < arrayString.length; i++) {
-    const char2 = arrayString[i];
-    if (char2 === "\\") {
+    const char = arrayString[i];
+    if (char === "\\") {
       i++;
       continue;
     }
-    if (char2 === '"') {
+    if (char === '"') {
       return [arrayString.slice(startFrom, i).replace(/\\/g, ""), i + 1];
     }
     if (inQuotes) {
       continue;
     }
-    if (char2 === "," || char2 === "}") {
+    if (char === "," || char === "}") {
       return [arrayString.slice(startFrom, i).replace(/\\/g, ""), i];
     }
   }
@@ -1222,8 +1222,8 @@ function parsePgNestedArray(arrayString, startFrom = 0) {
   let i = startFrom;
   let lastCharIsComma = false;
   while (i < arrayString.length) {
-    const char2 = arrayString[i];
-    if (char2 === ",") {
+    const char = arrayString[i];
+    if (char === ",") {
       if (lastCharIsComma || i === startFrom) {
         result.push("");
       }
@@ -1232,20 +1232,20 @@ function parsePgNestedArray(arrayString, startFrom = 0) {
       continue;
     }
     lastCharIsComma = false;
-    if (char2 === "\\") {
+    if (char === "\\") {
       i += 2;
       continue;
     }
-    if (char2 === '"') {
+    if (char === '"') {
       const [value2, startFrom2] = parsePgArrayValue(arrayString, i + 1, true);
       result.push(value2);
       i = startFrom2;
       continue;
     }
-    if (char2 === "}") {
+    if (char === "}") {
       return [result, i + 1];
     }
-    if (char2 === "{") {
+    if (char === "{") {
       const [value2, startFrom2] = parsePgNestedArray(arrayString, i + 1);
       result.push(value2);
       i = startFrom2;
@@ -1296,9 +1296,9 @@ var PgColumnBuilder = class extends ColumnBuilder {
     this.config.uniqueType = config?.nulls;
     return this;
   }
-  generatedAlwaysAs(as2) {
+  generatedAlwaysAs(as) {
     this.config.generated = {
-      as: as2,
+      as,
       type: "always",
       mode: "stored"
     };
@@ -1467,14 +1467,14 @@ var PgArray = class _PgArray extends PgColumn {
     if (typeof value === "string") {
       value = parsePgArray(value);
     }
-    return value.map((v2) => this.baseColumn.mapFromDriverValue(v2));
+    return value.map((v) => this.baseColumn.mapFromDriverValue(v));
   }
   mapToDriverValue(value, isNestedArray = false) {
-    const a2 = value.map(
-      (v2) => v2 === null ? null : is(this.baseColumn, _PgArray) ? this.baseColumn.mapToDriverValue(v2, true) : this.baseColumn.mapToDriverValue(v2)
+    const a = value.map(
+      (v) => v === null ? null : is(this.baseColumn, _PgArray) ? this.baseColumn.mapToDriverValue(v, true) : this.baseColumn.mapToDriverValue(v)
     );
-    if (isNestedArray) return a2;
-    return makePgArray(a2);
+    if (isNestedArray) return a;
+    return makePgArray(a);
   }
 };
 
@@ -1783,8 +1783,8 @@ var SQL = class _SQL {
       }
       if (Array.isArray(chunk)) {
         const result = [new StringChunk("(")];
-        for (const [i, p2] of chunk.entries()) {
-          result.push(p2);
+        for (const [i, p] of chunk.entries()) {
+          result.push(p);
           if (i < chunk.length - 1) {
             result.push(new StringChunk(", "));
           }
@@ -2062,20 +2062,20 @@ var Placeholder = class {
   }
 };
 function fillPlaceholders(params, values) {
-  return params.map((p2) => {
-    if (is(p2, Placeholder)) {
-      if (!(p2.name in values)) {
-        throw new Error(`No value for placeholder "${p2.name}" was provided`);
+  return params.map((p) => {
+    if (is(p, Placeholder)) {
+      if (!(p.name in values)) {
+        throw new Error(`No value for placeholder "${p.name}" was provided`);
       }
-      return values[p2.name];
+      return values[p.name];
     }
-    if (is(p2, Param) && is(p2.value, Placeholder)) {
-      if (!(p2.value.name in values)) {
-        throw new Error(`No value for placeholder "${p2.value.name}" was provided`);
+    if (is(p, Param) && is(p.value, Placeholder)) {
+      if (!(p.value.name in values)) {
+        throw new Error(`No value for placeholder "${p.value.name}" was provided`);
       }
-      return p2.encoder.mapToDriverValue(values[p2.value.name]);
+      return p.encoder.mapToDriverValue(values[p.value.name]);
     }
-    return p2;
+    return p;
   });
 }
 __name(fillPlaceholders, "fillPlaceholders");
@@ -2279,11 +2279,11 @@ var DefaultLogger = class {
     this.writer = config?.writer ?? new ConsoleLogWriter();
   }
   logQuery(query, params) {
-    const stringifiedParams = params.map((p2) => {
+    const stringifiedParams = params.map((p) => {
       try {
-        return JSON.stringify(p2);
+        return JSON.stringify(p);
       } catch {
-        return String(p2);
+        return String(p);
       }
     });
     const paramsStr = stringifiedParams.length ? ` -- params: [${stringifiedParams.join(", ")}]` : "";
@@ -2441,1694 +2441,14 @@ function getTableLikeName(table) {
   return is(table, Subquery) ? table._.alias : is(table, View) ? table[ViewBaseConfig].name : is(table, SQL) ? void 0 : table[Table.Symbol.IsAlias] ? table[Table.Symbol.Name] : table[Table.Symbol.BaseName];
 }
 __name(getTableLikeName, "getTableLikeName");
-function getColumnNameAndConfig(a2, b2) {
+function getColumnNameAndConfig(a, b) {
   return {
-    name: typeof a2 === "string" && a2.length > 0 ? a2 : "",
-    config: typeof a2 === "object" ? a2 : b2
+    name: typeof a === "string" && a.length > 0 ? a : "",
+    config: typeof a === "object" ? a : b
   };
 }
 __name(getColumnNameAndConfig, "getColumnNameAndConfig");
-function isConfig(data) {
-  if (typeof data !== "object" || data === null) return false;
-  if (data.constructor.name !== "Object") return false;
-  if ("logger" in data) {
-    const type = typeof data["logger"];
-    if (type !== "boolean" && (type !== "object" || typeof data["logger"]["logQuery"] !== "function") && type !== "undefined") return false;
-    return true;
-  }
-  if ("schema" in data) {
-    const type = typeof data["schema"];
-    if (type !== "object" && type !== "undefined") return false;
-    return true;
-  }
-  if ("casing" in data) {
-    const type = typeof data["casing"];
-    if (type !== "string" && type !== "undefined") return false;
-    return true;
-  }
-  if ("mode" in data) {
-    if (data["mode"] !== "default" || data["mode"] !== "planetscale" || data["mode"] !== void 0) return false;
-    return true;
-  }
-  if ("connection" in data) {
-    const type = typeof data["connection"];
-    if (type !== "string" && type !== "object" && type !== "undefined") return false;
-    return true;
-  }
-  if ("client" in data) {
-    const type = typeof data["client"];
-    if (type !== "object" && type !== "function" && type !== "undefined") return false;
-    return true;
-  }
-  if (Object.keys(data).length === 0) return true;
-  return false;
-}
-__name(isConfig, "isConfig");
 var textDecoder = typeof TextDecoder === "undefined" ? null : new TextDecoder();
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/int.common.js
-var PgIntColumnBaseBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgIntColumnBaseBuilder");
-  }
-  static [entityKind] = "PgIntColumnBaseBuilder";
-  generatedAlwaysAsIdentity(sequence) {
-    if (sequence) {
-      const { name, ...options } = sequence;
-      this.config.generatedIdentity = {
-        type: "always",
-        sequenceName: name,
-        sequenceOptions: options
-      };
-    } else {
-      this.config.generatedIdentity = {
-        type: "always"
-      };
-    }
-    this.config.hasDefault = true;
-    this.config.notNull = true;
-    return this;
-  }
-  generatedByDefaultAsIdentity(sequence) {
-    if (sequence) {
-      const { name, ...options } = sequence;
-      this.config.generatedIdentity = {
-        type: "byDefault",
-        sequenceName: name,
-        sequenceOptions: options
-      };
-    } else {
-      this.config.generatedIdentity = {
-        type: "byDefault"
-      };
-    }
-    this.config.hasDefault = true;
-    this.config.notNull = true;
-    return this;
-  }
-};
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/bigint.js
-var PgBigInt53Builder = class extends PgIntColumnBaseBuilder {
-  static {
-    __name(this, "PgBigInt53Builder");
-  }
-  static [entityKind] = "PgBigInt53Builder";
-  constructor(name) {
-    super(name, "number", "PgBigInt53");
-  }
-  /** @internal */
-  build(table) {
-    return new PgBigInt53(table, this.config);
-  }
-};
-var PgBigInt53 = class extends PgColumn {
-  static {
-    __name(this, "PgBigInt53");
-  }
-  static [entityKind] = "PgBigInt53";
-  getSQLType() {
-    return "bigint";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "number") {
-      return value;
-    }
-    return Number(value);
-  }
-};
-var PgBigInt64Builder = class extends PgIntColumnBaseBuilder {
-  static {
-    __name(this, "PgBigInt64Builder");
-  }
-  static [entityKind] = "PgBigInt64Builder";
-  constructor(name) {
-    super(name, "bigint", "PgBigInt64");
-  }
-  /** @internal */
-  build(table) {
-    return new PgBigInt64(
-      table,
-      this.config
-    );
-  }
-};
-var PgBigInt64 = class extends PgColumn {
-  static {
-    __name(this, "PgBigInt64");
-  }
-  static [entityKind] = "PgBigInt64";
-  getSQLType() {
-    return "bigint";
-  }
-  // eslint-disable-next-line unicorn/prefer-native-coercion-functions
-  mapFromDriverValue(value) {
-    return BigInt(value);
-  }
-};
-function bigint(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (config.mode === "number") {
-    return new PgBigInt53Builder(name);
-  }
-  return new PgBigInt64Builder(name);
-}
-__name(bigint, "bigint");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/bigserial.js
-var PgBigSerial53Builder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgBigSerial53Builder");
-  }
-  static [entityKind] = "PgBigSerial53Builder";
-  constructor(name) {
-    super(name, "number", "PgBigSerial53");
-    this.config.hasDefault = true;
-    this.config.notNull = true;
-  }
-  /** @internal */
-  build(table) {
-    return new PgBigSerial53(
-      table,
-      this.config
-    );
-  }
-};
-var PgBigSerial53 = class extends PgColumn {
-  static {
-    __name(this, "PgBigSerial53");
-  }
-  static [entityKind] = "PgBigSerial53";
-  getSQLType() {
-    return "bigserial";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "number") {
-      return value;
-    }
-    return Number(value);
-  }
-};
-var PgBigSerial64Builder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgBigSerial64Builder");
-  }
-  static [entityKind] = "PgBigSerial64Builder";
-  constructor(name) {
-    super(name, "bigint", "PgBigSerial64");
-    this.config.hasDefault = true;
-  }
-  /** @internal */
-  build(table) {
-    return new PgBigSerial64(
-      table,
-      this.config
-    );
-  }
-};
-var PgBigSerial64 = class extends PgColumn {
-  static {
-    __name(this, "PgBigSerial64");
-  }
-  static [entityKind] = "PgBigSerial64";
-  getSQLType() {
-    return "bigserial";
-  }
-  // eslint-disable-next-line unicorn/prefer-native-coercion-functions
-  mapFromDriverValue(value) {
-    return BigInt(value);
-  }
-};
-function bigserial(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (config.mode === "number") {
-    return new PgBigSerial53Builder(name);
-  }
-  return new PgBigSerial64Builder(name);
-}
-__name(bigserial, "bigserial");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/boolean.js
-var PgBooleanBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgBooleanBuilder");
-  }
-  static [entityKind] = "PgBooleanBuilder";
-  constructor(name) {
-    super(name, "boolean", "PgBoolean");
-  }
-  /** @internal */
-  build(table) {
-    return new PgBoolean(table, this.config);
-  }
-};
-var PgBoolean = class extends PgColumn {
-  static {
-    __name(this, "PgBoolean");
-  }
-  static [entityKind] = "PgBoolean";
-  getSQLType() {
-    return "boolean";
-  }
-};
-function boolean(name) {
-  return new PgBooleanBuilder(name ?? "");
-}
-__name(boolean, "boolean");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/char.js
-var PgCharBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgCharBuilder");
-  }
-  static [entityKind] = "PgCharBuilder";
-  constructor(name, config) {
-    super(name, "string", "PgChar");
-    this.config.length = config.length;
-    this.config.enumValues = config.enum;
-  }
-  /** @internal */
-  build(table) {
-    return new PgChar(
-      table,
-      this.config
-    );
-  }
-};
-var PgChar = class extends PgColumn {
-  static {
-    __name(this, "PgChar");
-  }
-  static [entityKind] = "PgChar";
-  length = this.config.length;
-  enumValues = this.config.enumValues;
-  getSQLType() {
-    return this.length === void 0 ? `char` : `char(${this.length})`;
-  }
-};
-function char(a2, b2 = {}) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgCharBuilder(name, config);
-}
-__name(char, "char");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/cidr.js
-var PgCidrBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgCidrBuilder");
-  }
-  static [entityKind] = "PgCidrBuilder";
-  constructor(name) {
-    super(name, "string", "PgCidr");
-  }
-  /** @internal */
-  build(table) {
-    return new PgCidr(table, this.config);
-  }
-};
-var PgCidr = class extends PgColumn {
-  static {
-    __name(this, "PgCidr");
-  }
-  static [entityKind] = "PgCidr";
-  getSQLType() {
-    return "cidr";
-  }
-};
-function cidr(name) {
-  return new PgCidrBuilder(name ?? "");
-}
-__name(cidr, "cidr");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/custom.js
-var PgCustomColumnBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgCustomColumnBuilder");
-  }
-  static [entityKind] = "PgCustomColumnBuilder";
-  constructor(name, fieldConfig, customTypeParams) {
-    super(name, "custom", "PgCustomColumn");
-    this.config.fieldConfig = fieldConfig;
-    this.config.customTypeParams = customTypeParams;
-  }
-  /** @internal */
-  build(table) {
-    return new PgCustomColumn(
-      table,
-      this.config
-    );
-  }
-};
-var PgCustomColumn = class extends PgColumn {
-  static {
-    __name(this, "PgCustomColumn");
-  }
-  static [entityKind] = "PgCustomColumn";
-  sqlName;
-  mapTo;
-  mapFrom;
-  constructor(table, config) {
-    super(table, config);
-    this.sqlName = config.customTypeParams.dataType(config.fieldConfig);
-    this.mapTo = config.customTypeParams.toDriver;
-    this.mapFrom = config.customTypeParams.fromDriver;
-  }
-  getSQLType() {
-    return this.sqlName;
-  }
-  mapFromDriverValue(value) {
-    return typeof this.mapFrom === "function" ? this.mapFrom(value) : value;
-  }
-  mapToDriverValue(value) {
-    return typeof this.mapTo === "function" ? this.mapTo(value) : value;
-  }
-};
-function customType(customTypeParams) {
-  return (a2, b2) => {
-    const { name, config } = getColumnNameAndConfig(a2, b2);
-    return new PgCustomColumnBuilder(name, config, customTypeParams);
-  };
-}
-__name(customType, "customType");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/date.common.js
-var PgDateColumnBaseBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgDateColumnBaseBuilder");
-  }
-  static [entityKind] = "PgDateColumnBaseBuilder";
-  defaultNow() {
-    return this.default(sql`now()`);
-  }
-};
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/date.js
-var PgDateBuilder = class extends PgDateColumnBaseBuilder {
-  static {
-    __name(this, "PgDateBuilder");
-  }
-  static [entityKind] = "PgDateBuilder";
-  constructor(name) {
-    super(name, "date", "PgDate");
-  }
-  /** @internal */
-  build(table) {
-    return new PgDate(table, this.config);
-  }
-};
-var PgDate = class extends PgColumn {
-  static {
-    __name(this, "PgDate");
-  }
-  static [entityKind] = "PgDate";
-  getSQLType() {
-    return "date";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") return new Date(value);
-    return value;
-  }
-  mapToDriverValue(value) {
-    return value.toISOString();
-  }
-};
-var PgDateStringBuilder = class extends PgDateColumnBaseBuilder {
-  static {
-    __name(this, "PgDateStringBuilder");
-  }
-  static [entityKind] = "PgDateStringBuilder";
-  constructor(name) {
-    super(name, "string", "PgDateString");
-  }
-  /** @internal */
-  build(table) {
-    return new PgDateString(
-      table,
-      this.config
-    );
-  }
-};
-var PgDateString = class extends PgColumn {
-  static {
-    __name(this, "PgDateString");
-  }
-  static [entityKind] = "PgDateString";
-  getSQLType() {
-    return "date";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") return value;
-    return value.toISOString().slice(0, -14);
-  }
-};
-function date(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (config?.mode === "date") {
-    return new PgDateBuilder(name);
-  }
-  return new PgDateStringBuilder(name);
-}
-__name(date, "date");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/double-precision.js
-var PgDoublePrecisionBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgDoublePrecisionBuilder");
-  }
-  static [entityKind] = "PgDoublePrecisionBuilder";
-  constructor(name) {
-    super(name, "number", "PgDoublePrecision");
-  }
-  /** @internal */
-  build(table) {
-    return new PgDoublePrecision(
-      table,
-      this.config
-    );
-  }
-};
-var PgDoublePrecision = class extends PgColumn {
-  static {
-    __name(this, "PgDoublePrecision");
-  }
-  static [entityKind] = "PgDoublePrecision";
-  getSQLType() {
-    return "double precision";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") {
-      return Number.parseFloat(value);
-    }
-    return value;
-  }
-};
-function doublePrecision(name) {
-  return new PgDoublePrecisionBuilder(name ?? "");
-}
-__name(doublePrecision, "doublePrecision");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/inet.js
-var PgInetBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgInetBuilder");
-  }
-  static [entityKind] = "PgInetBuilder";
-  constructor(name) {
-    super(name, "string", "PgInet");
-  }
-  /** @internal */
-  build(table) {
-    return new PgInet(table, this.config);
-  }
-};
-var PgInet = class extends PgColumn {
-  static {
-    __name(this, "PgInet");
-  }
-  static [entityKind] = "PgInet";
-  getSQLType() {
-    return "inet";
-  }
-};
-function inet(name) {
-  return new PgInetBuilder(name ?? "");
-}
-__name(inet, "inet");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/integer.js
-var PgIntegerBuilder = class extends PgIntColumnBaseBuilder {
-  static {
-    __name(this, "PgIntegerBuilder");
-  }
-  static [entityKind] = "PgIntegerBuilder";
-  constructor(name) {
-    super(name, "number", "PgInteger");
-  }
-  /** @internal */
-  build(table) {
-    return new PgInteger(table, this.config);
-  }
-};
-var PgInteger = class extends PgColumn {
-  static {
-    __name(this, "PgInteger");
-  }
-  static [entityKind] = "PgInteger";
-  getSQLType() {
-    return "integer";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") {
-      return Number.parseInt(value);
-    }
-    return value;
-  }
-};
-function integer(name) {
-  return new PgIntegerBuilder(name ?? "");
-}
-__name(integer, "integer");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/interval.js
-var PgIntervalBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgIntervalBuilder");
-  }
-  static [entityKind] = "PgIntervalBuilder";
-  constructor(name, intervalConfig) {
-    super(name, "string", "PgInterval");
-    this.config.intervalConfig = intervalConfig;
-  }
-  /** @internal */
-  build(table) {
-    return new PgInterval(table, this.config);
-  }
-};
-var PgInterval = class extends PgColumn {
-  static {
-    __name(this, "PgInterval");
-  }
-  static [entityKind] = "PgInterval";
-  fields = this.config.intervalConfig.fields;
-  precision = this.config.intervalConfig.precision;
-  getSQLType() {
-    const fields = this.fields ? ` ${this.fields}` : "";
-    const precision = this.precision ? `(${this.precision})` : "";
-    return `interval${fields}${precision}`;
-  }
-};
-function interval(a2, b2 = {}) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgIntervalBuilder(name, config);
-}
-__name(interval, "interval");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/json.js
-var PgJsonBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgJsonBuilder");
-  }
-  static [entityKind] = "PgJsonBuilder";
-  constructor(name) {
-    super(name, "json", "PgJson");
-  }
-  /** @internal */
-  build(table) {
-    return new PgJson(table, this.config);
-  }
-};
-var PgJson = class extends PgColumn {
-  static {
-    __name(this, "PgJson");
-  }
-  static [entityKind] = "PgJson";
-  constructor(table, config) {
-    super(table, config);
-  }
-  getSQLType() {
-    return "json";
-  }
-  mapToDriverValue(value) {
-    return JSON.stringify(value);
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
-    }
-    return value;
-  }
-};
-function json(name) {
-  return new PgJsonBuilder(name ?? "");
-}
-__name(json, "json");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/jsonb.js
-var PgJsonbBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgJsonbBuilder");
-  }
-  static [entityKind] = "PgJsonbBuilder";
-  constructor(name) {
-    super(name, "json", "PgJsonb");
-  }
-  /** @internal */
-  build(table) {
-    return new PgJsonb(table, this.config);
-  }
-};
-var PgJsonb = class extends PgColumn {
-  static {
-    __name(this, "PgJsonb");
-  }
-  static [entityKind] = "PgJsonb";
-  constructor(table, config) {
-    super(table, config);
-  }
-  getSQLType() {
-    return "jsonb";
-  }
-  mapToDriverValue(value) {
-    return JSON.stringify(value);
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
-    }
-    return value;
-  }
-};
-function jsonb(name) {
-  return new PgJsonbBuilder(name ?? "");
-}
-__name(jsonb, "jsonb");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/line.js
-var PgLineBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgLineBuilder");
-  }
-  static [entityKind] = "PgLineBuilder";
-  constructor(name) {
-    super(name, "array", "PgLine");
-  }
-  /** @internal */
-  build(table) {
-    return new PgLineTuple(
-      table,
-      this.config
-    );
-  }
-};
-var PgLineTuple = class extends PgColumn {
-  static {
-    __name(this, "PgLineTuple");
-  }
-  static [entityKind] = "PgLine";
-  getSQLType() {
-    return "line";
-  }
-  mapFromDriverValue(value) {
-    const [a2, b2, c] = value.slice(1, -1).split(",");
-    return [Number.parseFloat(a2), Number.parseFloat(b2), Number.parseFloat(c)];
-  }
-  mapToDriverValue(value) {
-    return `{${value[0]},${value[1]},${value[2]}}`;
-  }
-};
-var PgLineABCBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgLineABCBuilder");
-  }
-  static [entityKind] = "PgLineABCBuilder";
-  constructor(name) {
-    super(name, "json", "PgLineABC");
-  }
-  /** @internal */
-  build(table) {
-    return new PgLineABC(
-      table,
-      this.config
-    );
-  }
-};
-var PgLineABC = class extends PgColumn {
-  static {
-    __name(this, "PgLineABC");
-  }
-  static [entityKind] = "PgLineABC";
-  getSQLType() {
-    return "line";
-  }
-  mapFromDriverValue(value) {
-    const [a2, b2, c] = value.slice(1, -1).split(",");
-    return { a: Number.parseFloat(a2), b: Number.parseFloat(b2), c: Number.parseFloat(c) };
-  }
-  mapToDriverValue(value) {
-    return `{${value.a},${value.b},${value.c}}`;
-  }
-};
-function line(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (!config?.mode || config.mode === "tuple") {
-    return new PgLineBuilder(name);
-  }
-  return new PgLineABCBuilder(name);
-}
-__name(line, "line");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/macaddr.js
-var PgMacaddrBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgMacaddrBuilder");
-  }
-  static [entityKind] = "PgMacaddrBuilder";
-  constructor(name) {
-    super(name, "string", "PgMacaddr");
-  }
-  /** @internal */
-  build(table) {
-    return new PgMacaddr(table, this.config);
-  }
-};
-var PgMacaddr = class extends PgColumn {
-  static {
-    __name(this, "PgMacaddr");
-  }
-  static [entityKind] = "PgMacaddr";
-  getSQLType() {
-    return "macaddr";
-  }
-};
-function macaddr(name) {
-  return new PgMacaddrBuilder(name ?? "");
-}
-__name(macaddr, "macaddr");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/macaddr8.js
-var PgMacaddr8Builder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgMacaddr8Builder");
-  }
-  static [entityKind] = "PgMacaddr8Builder";
-  constructor(name) {
-    super(name, "string", "PgMacaddr8");
-  }
-  /** @internal */
-  build(table) {
-    return new PgMacaddr8(table, this.config);
-  }
-};
-var PgMacaddr8 = class extends PgColumn {
-  static {
-    __name(this, "PgMacaddr8");
-  }
-  static [entityKind] = "PgMacaddr8";
-  getSQLType() {
-    return "macaddr8";
-  }
-};
-function macaddr8(name) {
-  return new PgMacaddr8Builder(name ?? "");
-}
-__name(macaddr8, "macaddr8");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/numeric.js
-var PgNumericBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgNumericBuilder");
-  }
-  static [entityKind] = "PgNumericBuilder";
-  constructor(name, precision, scale) {
-    super(name, "string", "PgNumeric");
-    this.config.precision = precision;
-    this.config.scale = scale;
-  }
-  /** @internal */
-  build(table) {
-    return new PgNumeric(table, this.config);
-  }
-};
-var PgNumeric = class extends PgColumn {
-  static {
-    __name(this, "PgNumeric");
-  }
-  static [entityKind] = "PgNumeric";
-  precision;
-  scale;
-  constructor(table, config) {
-    super(table, config);
-    this.precision = config.precision;
-    this.scale = config.scale;
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") return value;
-    return String(value);
-  }
-  getSQLType() {
-    if (this.precision !== void 0 && this.scale !== void 0) {
-      return `numeric(${this.precision}, ${this.scale})`;
-    } else if (this.precision === void 0) {
-      return "numeric";
-    } else {
-      return `numeric(${this.precision})`;
-    }
-  }
-};
-var PgNumericNumberBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgNumericNumberBuilder");
-  }
-  static [entityKind] = "PgNumericNumberBuilder";
-  constructor(name, precision, scale) {
-    super(name, "number", "PgNumericNumber");
-    this.config.precision = precision;
-    this.config.scale = scale;
-  }
-  /** @internal */
-  build(table) {
-    return new PgNumericNumber(
-      table,
-      this.config
-    );
-  }
-};
-var PgNumericNumber = class extends PgColumn {
-  static {
-    __name(this, "PgNumericNumber");
-  }
-  static [entityKind] = "PgNumericNumber";
-  precision;
-  scale;
-  constructor(table, config) {
-    super(table, config);
-    this.precision = config.precision;
-    this.scale = config.scale;
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "number") return value;
-    return Number(value);
-  }
-  mapToDriverValue = String;
-  getSQLType() {
-    if (this.precision !== void 0 && this.scale !== void 0) {
-      return `numeric(${this.precision}, ${this.scale})`;
-    } else if (this.precision === void 0) {
-      return "numeric";
-    } else {
-      return `numeric(${this.precision})`;
-    }
-  }
-};
-var PgNumericBigIntBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgNumericBigIntBuilder");
-  }
-  static [entityKind] = "PgNumericBigIntBuilder";
-  constructor(name, precision, scale) {
-    super(name, "bigint", "PgNumericBigInt");
-    this.config.precision = precision;
-    this.config.scale = scale;
-  }
-  /** @internal */
-  build(table) {
-    return new PgNumericBigInt(
-      table,
-      this.config
-    );
-  }
-};
-var PgNumericBigInt = class extends PgColumn {
-  static {
-    __name(this, "PgNumericBigInt");
-  }
-  static [entityKind] = "PgNumericBigInt";
-  precision;
-  scale;
-  constructor(table, config) {
-    super(table, config);
-    this.precision = config.precision;
-    this.scale = config.scale;
-  }
-  mapFromDriverValue = BigInt;
-  mapToDriverValue = String;
-  getSQLType() {
-    if (this.precision !== void 0 && this.scale !== void 0) {
-      return `numeric(${this.precision}, ${this.scale})`;
-    } else if (this.precision === void 0) {
-      return "numeric";
-    } else {
-      return `numeric(${this.precision})`;
-    }
-  }
-};
-function numeric(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  const mode = config?.mode;
-  return mode === "number" ? new PgNumericNumberBuilder(name, config?.precision, config?.scale) : mode === "bigint" ? new PgNumericBigIntBuilder(name, config?.precision, config?.scale) : new PgNumericBuilder(name, config?.precision, config?.scale);
-}
-__name(numeric, "numeric");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/point.js
-var PgPointTupleBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgPointTupleBuilder");
-  }
-  static [entityKind] = "PgPointTupleBuilder";
-  constructor(name) {
-    super(name, "array", "PgPointTuple");
-  }
-  /** @internal */
-  build(table) {
-    return new PgPointTuple(
-      table,
-      this.config
-    );
-  }
-};
-var PgPointTuple = class extends PgColumn {
-  static {
-    __name(this, "PgPointTuple");
-  }
-  static [entityKind] = "PgPointTuple";
-  getSQLType() {
-    return "point";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") {
-      const [x2, y] = value.slice(1, -1).split(",");
-      return [Number.parseFloat(x2), Number.parseFloat(y)];
-    }
-    return [value.x, value.y];
-  }
-  mapToDriverValue(value) {
-    return `(${value[0]},${value[1]})`;
-  }
-};
-var PgPointObjectBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgPointObjectBuilder");
-  }
-  static [entityKind] = "PgPointObjectBuilder";
-  constructor(name) {
-    super(name, "json", "PgPointObject");
-  }
-  /** @internal */
-  build(table) {
-    return new PgPointObject(
-      table,
-      this.config
-    );
-  }
-};
-var PgPointObject = class extends PgColumn {
-  static {
-    __name(this, "PgPointObject");
-  }
-  static [entityKind] = "PgPointObject";
-  getSQLType() {
-    return "point";
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") {
-      const [x2, y] = value.slice(1, -1).split(",");
-      return { x: Number.parseFloat(x2), y: Number.parseFloat(y) };
-    }
-    return value;
-  }
-  mapToDriverValue(value) {
-    return `(${value.x},${value.y})`;
-  }
-};
-function point(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (!config?.mode || config.mode === "tuple") {
-    return new PgPointTupleBuilder(name);
-  }
-  return new PgPointObjectBuilder(name);
-}
-__name(point, "point");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/postgis_extension/utils.js
-function hexToBytes(hex) {
-  const bytes = [];
-  for (let c = 0; c < hex.length; c += 2) {
-    bytes.push(Number.parseInt(hex.slice(c, c + 2), 16));
-  }
-  return new Uint8Array(bytes);
-}
-__name(hexToBytes, "hexToBytes");
-function bytesToFloat64(bytes, offset) {
-  const buffer = new ArrayBuffer(8);
-  const view = new DataView(buffer);
-  for (let i = 0; i < 8; i++) {
-    view.setUint8(i, bytes[offset + i]);
-  }
-  return view.getFloat64(0, true);
-}
-__name(bytesToFloat64, "bytesToFloat64");
-function parseEWKB(hex) {
-  const bytes = hexToBytes(hex);
-  let offset = 0;
-  const byteOrder = bytes[offset];
-  offset += 1;
-  const view = new DataView(bytes.buffer);
-  const geomType = view.getUint32(offset, byteOrder === 1);
-  offset += 4;
-  let _srid;
-  if (geomType & 536870912) {
-    _srid = view.getUint32(offset, byteOrder === 1);
-    offset += 4;
-  }
-  if ((geomType & 65535) === 1) {
-    const x2 = bytesToFloat64(bytes, offset);
-    offset += 8;
-    const y = bytesToFloat64(bytes, offset);
-    offset += 8;
-    return [x2, y];
-  }
-  throw new Error("Unsupported geometry type");
-}
-__name(parseEWKB, "parseEWKB");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/postgis_extension/geometry.js
-var PgGeometryBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgGeometryBuilder");
-  }
-  static [entityKind] = "PgGeometryBuilder";
-  constructor(name) {
-    super(name, "array", "PgGeometry");
-  }
-  /** @internal */
-  build(table) {
-    return new PgGeometry(
-      table,
-      this.config
-    );
-  }
-};
-var PgGeometry = class extends PgColumn {
-  static {
-    __name(this, "PgGeometry");
-  }
-  static [entityKind] = "PgGeometry";
-  getSQLType() {
-    return "geometry(point)";
-  }
-  mapFromDriverValue(value) {
-    return parseEWKB(value);
-  }
-  mapToDriverValue(value) {
-    return `point(${value[0]} ${value[1]})`;
-  }
-};
-var PgGeometryObjectBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgGeometryObjectBuilder");
-  }
-  static [entityKind] = "PgGeometryObjectBuilder";
-  constructor(name) {
-    super(name, "json", "PgGeometryObject");
-  }
-  /** @internal */
-  build(table) {
-    return new PgGeometryObject(
-      table,
-      this.config
-    );
-  }
-};
-var PgGeometryObject = class extends PgColumn {
-  static {
-    __name(this, "PgGeometryObject");
-  }
-  static [entityKind] = "PgGeometryObject";
-  getSQLType() {
-    return "geometry(point)";
-  }
-  mapFromDriverValue(value) {
-    const parsed = parseEWKB(value);
-    return { x: parsed[0], y: parsed[1] };
-  }
-  mapToDriverValue(value) {
-    return `point(${value.x} ${value.y})`;
-  }
-};
-function geometry(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (!config?.mode || config.mode === "tuple") {
-    return new PgGeometryBuilder(name);
-  }
-  return new PgGeometryObjectBuilder(name);
-}
-__name(geometry, "geometry");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/real.js
-var PgRealBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgRealBuilder");
-  }
-  static [entityKind] = "PgRealBuilder";
-  constructor(name, length) {
-    super(name, "number", "PgReal");
-    this.config.length = length;
-  }
-  /** @internal */
-  build(table) {
-    return new PgReal(table, this.config);
-  }
-};
-var PgReal = class extends PgColumn {
-  static {
-    __name(this, "PgReal");
-  }
-  static [entityKind] = "PgReal";
-  constructor(table, config) {
-    super(table, config);
-  }
-  getSQLType() {
-    return "real";
-  }
-  mapFromDriverValue = /* @__PURE__ */ __name((value) => {
-    if (typeof value === "string") {
-      return Number.parseFloat(value);
-    }
-    return value;
-  }, "mapFromDriverValue");
-};
-function real(name) {
-  return new PgRealBuilder(name ?? "");
-}
-__name(real, "real");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/serial.js
-var PgSerialBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgSerialBuilder");
-  }
-  static [entityKind] = "PgSerialBuilder";
-  constructor(name) {
-    super(name, "number", "PgSerial");
-    this.config.hasDefault = true;
-    this.config.notNull = true;
-  }
-  /** @internal */
-  build(table) {
-    return new PgSerial(table, this.config);
-  }
-};
-var PgSerial = class extends PgColumn {
-  static {
-    __name(this, "PgSerial");
-  }
-  static [entityKind] = "PgSerial";
-  getSQLType() {
-    return "serial";
-  }
-};
-function serial(name) {
-  return new PgSerialBuilder(name ?? "");
-}
-__name(serial, "serial");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/smallint.js
-var PgSmallIntBuilder = class extends PgIntColumnBaseBuilder {
-  static {
-    __name(this, "PgSmallIntBuilder");
-  }
-  static [entityKind] = "PgSmallIntBuilder";
-  constructor(name) {
-    super(name, "number", "PgSmallInt");
-  }
-  /** @internal */
-  build(table) {
-    return new PgSmallInt(table, this.config);
-  }
-};
-var PgSmallInt = class extends PgColumn {
-  static {
-    __name(this, "PgSmallInt");
-  }
-  static [entityKind] = "PgSmallInt";
-  getSQLType() {
-    return "smallint";
-  }
-  mapFromDriverValue = /* @__PURE__ */ __name((value) => {
-    if (typeof value === "string") {
-      return Number(value);
-    }
-    return value;
-  }, "mapFromDriverValue");
-};
-function smallint(name) {
-  return new PgSmallIntBuilder(name ?? "");
-}
-__name(smallint, "smallint");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/smallserial.js
-var PgSmallSerialBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgSmallSerialBuilder");
-  }
-  static [entityKind] = "PgSmallSerialBuilder";
-  constructor(name) {
-    super(name, "number", "PgSmallSerial");
-    this.config.hasDefault = true;
-    this.config.notNull = true;
-  }
-  /** @internal */
-  build(table) {
-    return new PgSmallSerial(
-      table,
-      this.config
-    );
-  }
-};
-var PgSmallSerial = class extends PgColumn {
-  static {
-    __name(this, "PgSmallSerial");
-  }
-  static [entityKind] = "PgSmallSerial";
-  getSQLType() {
-    return "smallserial";
-  }
-};
-function smallserial(name) {
-  return new PgSmallSerialBuilder(name ?? "");
-}
-__name(smallserial, "smallserial");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/text.js
-var PgTextBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgTextBuilder");
-  }
-  static [entityKind] = "PgTextBuilder";
-  constructor(name, config) {
-    super(name, "string", "PgText");
-    this.config.enumValues = config.enum;
-  }
-  /** @internal */
-  build(table) {
-    return new PgText(table, this.config);
-  }
-};
-var PgText = class extends PgColumn {
-  static {
-    __name(this, "PgText");
-  }
-  static [entityKind] = "PgText";
-  enumValues = this.config.enumValues;
-  getSQLType() {
-    return "text";
-  }
-};
-function text(a2, b2 = {}) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgTextBuilder(name, config);
-}
-__name(text, "text");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/time.js
-var PgTimeBuilder = class extends PgDateColumnBaseBuilder {
-  static {
-    __name(this, "PgTimeBuilder");
-  }
-  constructor(name, withTimezone, precision) {
-    super(name, "string", "PgTime");
-    this.withTimezone = withTimezone;
-    this.precision = precision;
-    this.config.withTimezone = withTimezone;
-    this.config.precision = precision;
-  }
-  static [entityKind] = "PgTimeBuilder";
-  /** @internal */
-  build(table) {
-    return new PgTime(table, this.config);
-  }
-};
-var PgTime = class extends PgColumn {
-  static {
-    __name(this, "PgTime");
-  }
-  static [entityKind] = "PgTime";
-  withTimezone;
-  precision;
-  constructor(table, config) {
-    super(table, config);
-    this.withTimezone = config.withTimezone;
-    this.precision = config.precision;
-  }
-  getSQLType() {
-    const precision = this.precision === void 0 ? "" : `(${this.precision})`;
-    return `time${precision}${this.withTimezone ? " with time zone" : ""}`;
-  }
-};
-function time(a2, b2 = {}) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgTimeBuilder(name, config.withTimezone ?? false, config.precision);
-}
-__name(time, "time");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/timestamp.js
-var PgTimestampBuilder = class extends PgDateColumnBaseBuilder {
-  static {
-    __name(this, "PgTimestampBuilder");
-  }
-  static [entityKind] = "PgTimestampBuilder";
-  constructor(name, withTimezone, precision) {
-    super(name, "date", "PgTimestamp");
-    this.config.withTimezone = withTimezone;
-    this.config.precision = precision;
-  }
-  /** @internal */
-  build(table) {
-    return new PgTimestamp(table, this.config);
-  }
-};
-var PgTimestamp = class extends PgColumn {
-  static {
-    __name(this, "PgTimestamp");
-  }
-  static [entityKind] = "PgTimestamp";
-  withTimezone;
-  precision;
-  constructor(table, config) {
-    super(table, config);
-    this.withTimezone = config.withTimezone;
-    this.precision = config.precision;
-  }
-  getSQLType() {
-    const precision = this.precision === void 0 ? "" : ` (${this.precision})`;
-    return `timestamp${precision}${this.withTimezone ? " with time zone" : ""}`;
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") return new Date(this.withTimezone ? value : value + "+0000");
-    return value;
-  }
-  mapToDriverValue = /* @__PURE__ */ __name((value) => {
-    return value.toISOString();
-  }, "mapToDriverValue");
-};
-var PgTimestampStringBuilder = class extends PgDateColumnBaseBuilder {
-  static {
-    __name(this, "PgTimestampStringBuilder");
-  }
-  static [entityKind] = "PgTimestampStringBuilder";
-  constructor(name, withTimezone, precision) {
-    super(name, "string", "PgTimestampString");
-    this.config.withTimezone = withTimezone;
-    this.config.precision = precision;
-  }
-  /** @internal */
-  build(table) {
-    return new PgTimestampString(
-      table,
-      this.config
-    );
-  }
-};
-var PgTimestampString = class extends PgColumn {
-  static {
-    __name(this, "PgTimestampString");
-  }
-  static [entityKind] = "PgTimestampString";
-  withTimezone;
-  precision;
-  constructor(table, config) {
-    super(table, config);
-    this.withTimezone = config.withTimezone;
-    this.precision = config.precision;
-  }
-  getSQLType() {
-    const precision = this.precision === void 0 ? "" : `(${this.precision})`;
-    return `timestamp${precision}${this.withTimezone ? " with time zone" : ""}`;
-  }
-  mapFromDriverValue(value) {
-    if (typeof value === "string") return value;
-    const shortened = value.toISOString().slice(0, -1).replace("T", " ");
-    if (this.withTimezone) {
-      const offset = value.getTimezoneOffset();
-      const sign = offset <= 0 ? "+" : "-";
-      return `${shortened}${sign}${Math.floor(Math.abs(offset) / 60).toString().padStart(2, "0")}`;
-    }
-    return shortened;
-  }
-};
-function timestamp(a2, b2 = {}) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  if (config?.mode === "string") {
-    return new PgTimestampStringBuilder(name, config.withTimezone ?? false, config.precision);
-  }
-  return new PgTimestampBuilder(name, config?.withTimezone ?? false, config?.precision);
-}
-__name(timestamp, "timestamp");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/uuid.js
-var PgUUIDBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgUUIDBuilder");
-  }
-  static [entityKind] = "PgUUIDBuilder";
-  constructor(name) {
-    super(name, "string", "PgUUID");
-  }
-  /**
-   * Adds `default gen_random_uuid()` to the column definition.
-   */
-  defaultRandom() {
-    return this.default(sql`gen_random_uuid()`);
-  }
-  /** @internal */
-  build(table) {
-    return new PgUUID(table, this.config);
-  }
-};
-var PgUUID = class extends PgColumn {
-  static {
-    __name(this, "PgUUID");
-  }
-  static [entityKind] = "PgUUID";
-  getSQLType() {
-    return "uuid";
-  }
-};
-function uuid(name) {
-  return new PgUUIDBuilder(name ?? "");
-}
-__name(uuid, "uuid");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/varchar.js
-var PgVarcharBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgVarcharBuilder");
-  }
-  static [entityKind] = "PgVarcharBuilder";
-  constructor(name, config) {
-    super(name, "string", "PgVarchar");
-    this.config.length = config.length;
-    this.config.enumValues = config.enum;
-  }
-  /** @internal */
-  build(table) {
-    return new PgVarchar(
-      table,
-      this.config
-    );
-  }
-};
-var PgVarchar = class extends PgColumn {
-  static {
-    __name(this, "PgVarchar");
-  }
-  static [entityKind] = "PgVarchar";
-  length = this.config.length;
-  enumValues = this.config.enumValues;
-  getSQLType() {
-    return this.length === void 0 ? `varchar` : `varchar(${this.length})`;
-  }
-};
-function varchar(a2, b2 = {}) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgVarcharBuilder(name, config);
-}
-__name(varchar, "varchar");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/vector_extension/bit.js
-var PgBinaryVectorBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgBinaryVectorBuilder");
-  }
-  static [entityKind] = "PgBinaryVectorBuilder";
-  constructor(name, config) {
-    super(name, "string", "PgBinaryVector");
-    this.config.dimensions = config.dimensions;
-  }
-  /** @internal */
-  build(table) {
-    return new PgBinaryVector(
-      table,
-      this.config
-    );
-  }
-};
-var PgBinaryVector = class extends PgColumn {
-  static {
-    __name(this, "PgBinaryVector");
-  }
-  static [entityKind] = "PgBinaryVector";
-  dimensions = this.config.dimensions;
-  getSQLType() {
-    return `bit(${this.dimensions})`;
-  }
-};
-function bit(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgBinaryVectorBuilder(name, config);
-}
-__name(bit, "bit");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/vector_extension/halfvec.js
-var PgHalfVectorBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgHalfVectorBuilder");
-  }
-  static [entityKind] = "PgHalfVectorBuilder";
-  constructor(name, config) {
-    super(name, "array", "PgHalfVector");
-    this.config.dimensions = config.dimensions;
-  }
-  /** @internal */
-  build(table) {
-    return new PgHalfVector(
-      table,
-      this.config
-    );
-  }
-};
-var PgHalfVector = class extends PgColumn {
-  static {
-    __name(this, "PgHalfVector");
-  }
-  static [entityKind] = "PgHalfVector";
-  dimensions = this.config.dimensions;
-  getSQLType() {
-    return `halfvec(${this.dimensions})`;
-  }
-  mapToDriverValue(value) {
-    return JSON.stringify(value);
-  }
-  mapFromDriverValue(value) {
-    return value.slice(1, -1).split(",").map((v2) => Number.parseFloat(v2));
-  }
-};
-function halfvec(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgHalfVectorBuilder(name, config);
-}
-__name(halfvec, "halfvec");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/vector_extension/sparsevec.js
-var PgSparseVectorBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgSparseVectorBuilder");
-  }
-  static [entityKind] = "PgSparseVectorBuilder";
-  constructor(name, config) {
-    super(name, "string", "PgSparseVector");
-    this.config.dimensions = config.dimensions;
-  }
-  /** @internal */
-  build(table) {
-    return new PgSparseVector(
-      table,
-      this.config
-    );
-  }
-};
-var PgSparseVector = class extends PgColumn {
-  static {
-    __name(this, "PgSparseVector");
-  }
-  static [entityKind] = "PgSparseVector";
-  dimensions = this.config.dimensions;
-  getSQLType() {
-    return `sparsevec(${this.dimensions})`;
-  }
-};
-function sparsevec(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgSparseVectorBuilder(name, config);
-}
-__name(sparsevec, "sparsevec");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/vector_extension/vector.js
-var PgVectorBuilder = class extends PgColumnBuilder {
-  static {
-    __name(this, "PgVectorBuilder");
-  }
-  static [entityKind] = "PgVectorBuilder";
-  constructor(name, config) {
-    super(name, "array", "PgVector");
-    this.config.dimensions = config.dimensions;
-  }
-  /** @internal */
-  build(table) {
-    return new PgVector(
-      table,
-      this.config
-    );
-  }
-};
-var PgVector = class extends PgColumn {
-  static {
-    __name(this, "PgVector");
-  }
-  static [entityKind] = "PgVector";
-  dimensions = this.config.dimensions;
-  getSQLType() {
-    return `vector(${this.dimensions})`;
-  }
-  mapToDriverValue(value) {
-    return JSON.stringify(value);
-  }
-  mapFromDriverValue(value) {
-    return value.slice(1, -1).split(",").map((v2) => Number.parseFloat(v2));
-  }
-};
-function vector(a2, b2) {
-  const { name, config } = getColumnNameAndConfig(a2, b2);
-  return new PgVectorBuilder(name, config);
-}
-__name(vector, "vector");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/columns/all.js
-function getPgColumnBuilders() {
-  return {
-    bigint,
-    bigserial,
-    boolean,
-    char,
-    cidr,
-    customType,
-    date,
-    doublePrecision,
-    inet,
-    integer,
-    interval,
-    json,
-    jsonb,
-    line,
-    macaddr,
-    macaddr8,
-    numeric,
-    point,
-    geometry,
-    real,
-    serial,
-    smallint,
-    smallserial,
-    text,
-    time,
-    timestamp,
-    uuid,
-    varchar,
-    bit,
-    halfvec,
-    sparsevec,
-    vector
-  };
-}
-__name(getPgColumnBuilders, "getPgColumnBuilders");
 
 // ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/table.js
 var InlineForeignKeys = /* @__PURE__ */ Symbol.for("drizzle:PgInlineForeignKeys");
@@ -4152,52 +2472,8 @@ var PgTable = class extends Table {
   /** @internal */
   [Table.Symbol.ExtraConfigColumns] = {};
 };
-function pgTableWithSchema(name, columns, extraConfig, schema, baseName = name) {
-  const rawTable = new PgTable(name, schema, baseName);
-  const parsedColumns = typeof columns === "function" ? columns(getPgColumnBuilders()) : columns;
-  const builtColumns = Object.fromEntries(
-    Object.entries(parsedColumns).map(([name2, colBuilderBase]) => {
-      const colBuilder = colBuilderBase;
-      colBuilder.setName(name2);
-      const column = colBuilder.build(rawTable);
-      rawTable[InlineForeignKeys].push(...colBuilder.buildForeignKeys(column, rawTable));
-      return [name2, column];
-    })
-  );
-  const builtColumnsForExtraConfig = Object.fromEntries(
-    Object.entries(parsedColumns).map(([name2, colBuilderBase]) => {
-      const colBuilder = colBuilderBase;
-      colBuilder.setName(name2);
-      const column = colBuilder.buildExtraConfigColumn(rawTable);
-      return [name2, column];
-    })
-  );
-  const table = Object.assign(rawTable, builtColumns);
-  table[Table.Symbol.Columns] = builtColumns;
-  table[Table.Symbol.ExtraConfigColumns] = builtColumnsForExtraConfig;
-  if (extraConfig) {
-    table[PgTable.Symbol.ExtraConfigBuilder] = extraConfig;
-  }
-  return Object.assign(table, {
-    enableRLS: /* @__PURE__ */ __name(() => {
-      table[PgTable.Symbol.EnableRLS] = true;
-      return table;
-    }, "enableRLS")
-  });
-}
-__name(pgTableWithSchema, "pgTableWithSchema");
-var pgTable = /* @__PURE__ */ __name((name, columns, extraConfig) => {
-  return pgTableWithSchema(name, columns, extraConfig, void 0);
-}, "pgTable");
 
 // ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/primary-keys.js
-function primaryKey(...config) {
-  if (config[0].columns) {
-    return new PrimaryKeyBuilder(config[0].columns, config[0].name);
-  }
-  return new PrimaryKeyBuilder(config);
-}
-__name(primaryKey, "primaryKey");
 var PrimaryKeyBuilder = class {
   static {
     __name(this, "PrimaryKeyBuilder");
@@ -4302,7 +2578,7 @@ function inArray(column, values) {
     if (values.length === 0) {
       return sql`false`;
     }
-    return sql`${column} in ${values.map((v2) => bindIfParam(v2, column))}`;
+    return sql`${column} in ${values.map((v) => bindIfParam(v, column))}`;
   }
   return sql`${column} in ${bindIfParam(values, column)}`;
 }
@@ -4312,7 +2588,7 @@ function notInArray(column, values) {
     if (values.length === 0) {
       return sql`true`;
     }
-    return sql`${column} not in ${values.map((v2) => bindIfParam(v2, column))}`;
+    return sql`${column} not in ${values.map((v) => bindIfParam(v, column))}`;
   }
   return sql`${column} not in ${bindIfParam(values, column)}`;
 }
@@ -4662,7 +2938,7 @@ var MIN_PASSWORD_LENGTH = 6;
 var SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
 function toB64(bytes) {
   let s = "";
-  for (const b2 of bytes) s += String.fromCharCode(b2);
+  for (const b of bytes) s += String.fromCharCode(b);
   return btoa(s);
 }
 __name(toB64, "toB64");
@@ -4706,5507 +2982,9 @@ function newSessionToken() {
 __name(newSessionToken, "newSessionToken");
 async function sha256Hex(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(digest)].map((b2) => b2.toString(16).padStart(2, "0")).join("");
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 __name(sha256Hex, "sha256Hex");
-
-// ../node_modules/.pnpm/@neondatabase+serverless@1.1.0/node_modules/@neondatabase/serverless/index.mjs
-var So = Object.create;
-var Ie = Object.defineProperty;
-var Eo = Object.getOwnPropertyDescriptor;
-var Ao = Object.getOwnPropertyNames;
-var Co = Object.getPrototypeOf;
-var _o = Object.prototype.hasOwnProperty;
-var Io = /* @__PURE__ */ __name((r, e, t) => e in r ? Ie(r, e, { enumerable: true, configurable: true, writable: true, value: t }) : r[e] = t, "Io");
-var a = /* @__PURE__ */ __name((r, e) => Ie(r, "name", { value: e, configurable: true }), "a");
-var G = /* @__PURE__ */ __name((r, e) => () => (r && (e = r(r = 0)), e), "G");
-var T = /* @__PURE__ */ __name((r, e) => () => (e || r((e = { exports: {} }).exports, e), e.exports), "T");
-var ie = /* @__PURE__ */ __name((r, e) => {
-  for (var t in e) Ie(r, t, {
-    get: e[t],
-    enumerable: true
-  });
-}, "ie");
-var Dn = /* @__PURE__ */ __name((r, e, t, n) => {
-  if (e && typeof e == "object" || typeof e == "function") for (let i of Ao(e)) !_o.call(r, i) && i !== t && Ie(r, i, { get: /* @__PURE__ */ __name(() => e[i], "get"), enumerable: !(n = Eo(e, i)) || n.enumerable });
-  return r;
-}, "Dn");
-var Se = /* @__PURE__ */ __name((r, e, t) => (t = r != null ? So(Co(r)) : {}, Dn(e || !r || !r.__esModule ? Ie(t, "default", { value: r, enumerable: true }) : t, r)), "Se");
-var O = /* @__PURE__ */ __name((r) => Dn(Ie({}, "__esModule", { value: true }), r), "O");
-var E = /* @__PURE__ */ __name((r, e, t) => Io(r, typeof e != "symbol" ? e + "" : e, t), "E");
-var Qn = T((lt2) => {
-  "use strict";
-  p();
-  lt2.byteLength = Po;
-  lt2.toByteArray = Bo;
-  lt2.fromByteArray = ko;
-  var ae = [], te = [], To = typeof Uint8Array < "u" ? Uint8Array : Array, qt = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  for (Ee = 0, On = qt.length; Ee < On; ++Ee) ae[Ee] = qt[Ee], te[qt.charCodeAt(Ee)] = Ee;
-  var Ee, On;
-  te[45] = 62;
-  te[95] = 63;
-  function qn(r) {
-    var e = r.length;
-    if (e % 4 > 0) throw new Error("Invalid string. Length must be a multiple of 4");
-    var t = r.indexOf("=");
-    t === -1 && (t = e);
-    var n = t === e ? 0 : 4 - t % 4;
-    return [t, n];
-  }
-  __name(qn, "qn");
-  a(qn, "getLens");
-  function Po(r) {
-    var e = qn(r), t = e[0], n = e[1];
-    return (t + n) * 3 / 4 - n;
-  }
-  __name(Po, "Po");
-  a(Po, "byteLength");
-  function Ro(r, e, t) {
-    return (e + t) * 3 / 4 - t;
-  }
-  __name(Ro, "Ro");
-  a(Ro, "_byteLength");
-  function Bo(r) {
-    var e, t = qn(r), n = t[0], i = t[1], s = new To(Ro(r, n, i)), o = 0, u = i > 0 ? n - 4 : n, c;
-    for (c = 0; c < u; c += 4) e = te[r.charCodeAt(c)] << 18 | te[r.charCodeAt(c + 1)] << 12 | te[r.charCodeAt(c + 2)] << 6 | te[r.charCodeAt(c + 3)], s[o++] = e >> 16 & 255, s[o++] = e >> 8 & 255, s[o++] = e & 255;
-    return i === 2 && (e = te[r.charCodeAt(
-      c
-    )] << 2 | te[r.charCodeAt(c + 1)] >> 4, s[o++] = e & 255), i === 1 && (e = te[r.charCodeAt(c)] << 10 | te[r.charCodeAt(c + 1)] << 4 | te[r.charCodeAt(c + 2)] >> 2, s[o++] = e >> 8 & 255, s[o++] = e & 255), s;
-  }
-  __name(Bo, "Bo");
-  a(Bo, "toByteArray");
-  function Lo(r) {
-    return ae[r >> 18 & 63] + ae[r >> 12 & 63] + ae[r >> 6 & 63] + ae[r & 63];
-  }
-  __name(Lo, "Lo");
-  a(Lo, "tripletToBase64");
-  function Fo(r, e, t) {
-    for (var n, i = [], s = e; s < t; s += 3) n = (r[s] << 16 & 16711680) + (r[s + 1] << 8 & 65280) + (r[s + 2] & 255), i.push(Lo(n));
-    return i.join("");
-  }
-  __name(Fo, "Fo");
-  a(Fo, "encodeChunk");
-  function ko(r) {
-    for (var e, t = r.length, n = t % 3, i = [], s = 16383, o = 0, u = t - n; o < u; o += s) i.push(Fo(
-      r,
-      o,
-      o + s > u ? u : o + s
-    ));
-    return n === 1 ? (e = r[t - 1], i.push(ae[e >> 2] + ae[e << 4 & 63] + "==")) : n === 2 && (e = (r[t - 2] << 8) + r[t - 1], i.push(ae[e >> 10] + ae[e >> 4 & 63] + ae[e << 2 & 63] + "=")), i.join("");
-  }
-  __name(ko, "ko");
-  a(ko, "fromByteArray");
-});
-var Nn = T((Qt) => {
-  p();
-  Qt.read = function(r, e, t, n, i) {
-    var s, o, u = i * 8 - n - 1, c = (1 << u) - 1, l = c >> 1, f = -7, y = t ? i - 1 : 0, g = t ? -1 : 1, A = r[e + y];
-    for (y += g, s = A & (1 << -f) - 1, A >>= -f, f += u; f > 0; s = s * 256 + r[e + y], y += g, f -= 8) ;
-    for (o = s & (1 << -f) - 1, s >>= -f, f += n; f > 0; o = o * 256 + r[e + y], y += g, f -= 8) ;
-    if (s === 0) s = 1 - l;
-    else {
-      if (s === c) return o ? NaN : (A ? -1 : 1) * (1 / 0);
-      o = o + Math.pow(2, n), s = s - l;
-    }
-    return (A ? -1 : 1) * o * Math.pow(2, s - n);
-  };
-  Qt.write = function(r, e, t, n, i, s) {
-    var o, u, c, l = s * 8 - i - 1, f = (1 << l) - 1, y = f >> 1, g = i === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0, A = n ? 0 : s - 1, C = n ? 1 : -1, D = e < 0 || e === 0 && 1 / e < 0 ? 1 : 0;
-    for (e = Math.abs(e), isNaN(e) || e === 1 / 0 ? (u = isNaN(e) ? 1 : 0, o = f) : (o = Math.floor(Math.log(e) / Math.LN2), e * (c = Math.pow(2, -o)) < 1 && (o--, c *= 2), o + y >= 1 ? e += g / c : e += g * Math.pow(2, 1 - y), e * c >= 2 && (o++, c /= 2), o + y >= f ? (u = 0, o = f) : o + y >= 1 ? (u = (e * c - 1) * Math.pow(2, i), o = o + y) : (u = e * Math.pow(2, y - 1) * Math.pow(2, i), o = 0)); i >= 8; r[t + A] = u & 255, A += C, u /= 256, i -= 8) ;
-    for (o = o << i | u, l += i; l > 0; r[t + A] = o & 255, A += C, o /= 256, l -= 8) ;
-    r[t + A - C] |= D * 128;
-  };
-});
-var ii = T((Be) => {
-  "use strict";
-  p();
-  var Nt = Qn(), Pe = Nn(), Wn = typeof Symbol == "function" && typeof Symbol.for == "function" ? /* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom") : null;
-  Be.Buffer = h;
-  Be.SlowBuffer = Qo;
-  Be.INSPECT_MAX_BYTES = 50;
-  var ft = 2147483647;
-  Be.kMaxLength = ft;
-  h.TYPED_ARRAY_SUPPORT = Mo();
-  !h.TYPED_ARRAY_SUPPORT && typeof console < "u" && typeof console.error == "function" && console.error("This browser lacks typed array (Uint8Array) support which is required by `buffer` v5.x. Use `buffer` v4.x if you require old browser support.");
-  function Mo() {
-    try {
-      let r = new Uint8Array(1), e = { foo: a(function() {
-        return 42;
-      }, "foo") };
-      return Object.setPrototypeOf(e, Uint8Array.prototype), Object.setPrototypeOf(r, e), r.foo() === 42;
-    } catch {
-      return false;
-    }
-  }
-  __name(Mo, "Mo");
-  a(Mo, "typedArraySupport");
-  Object.defineProperty(h.prototype, "parent", { enumerable: true, get: a(function() {
-    if (h.isBuffer(this)) return this.buffer;
-  }, "get") });
-  Object.defineProperty(h.prototype, "offset", { enumerable: true, get: a(function() {
-    if (h.isBuffer(
-      this
-    )) return this.byteOffset;
-  }, "get") });
-  function he(r) {
-    if (r > ft) throw new RangeError('The value "' + r + '" is invalid for option "size"');
-    let e = new Uint8Array(r);
-    return Object.setPrototypeOf(e, h.prototype), e;
-  }
-  __name(he, "he");
-  a(he, "createBuffer");
-  function h(r, e, t) {
-    if (typeof r == "number") {
-      if (typeof e == "string") throw new TypeError(
-        'The "string" argument must be of type string. Received type number'
-      );
-      return $t(r);
-    }
-    return Gn(r, e, t);
-  }
-  __name(h, "h");
-  a(h, "Buffer");
-  h.poolSize = 8192;
-  function Gn(r, e, t) {
-    if (typeof r == "string") return Do(r, e);
-    if (ArrayBuffer.isView(r)) return Oo(r);
-    if (r == null) throw new TypeError("The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type " + typeof r);
-    if (ue(r, ArrayBuffer) || r && ue(r.buffer, ArrayBuffer) || typeof SharedArrayBuffer < "u" && (ue(r, SharedArrayBuffer) || r && ue(
-      r.buffer,
-      SharedArrayBuffer
-    ))) return jt(r, e, t);
-    if (typeof r == "number") throw new TypeError('The "value" argument must not be of type number. Received type number');
-    let n = r.valueOf && r.valueOf();
-    if (n != null && n !== r) return h.from(n, e, t);
-    let i = qo(r);
-    if (i) return i;
-    if (typeof Symbol < "u" && Symbol.toPrimitive != null && typeof r[Symbol.toPrimitive] == "function") return h.from(r[Symbol.toPrimitive]("string"), e, t);
-    throw new TypeError("The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type " + typeof r);
-  }
-  __name(Gn, "Gn");
-  a(Gn, "from");
-  h.from = function(r, e, t) {
-    return Gn(r, e, t);
-  };
-  Object.setPrototypeOf(
-    h.prototype,
-    Uint8Array.prototype
-  );
-  Object.setPrototypeOf(h, Uint8Array);
-  function Vn(r) {
-    if (typeof r != "number") throw new TypeError(
-      '"size" argument must be of type number'
-    );
-    if (r < 0) throw new RangeError('The value "' + r + '" is invalid for option "size"');
-  }
-  __name(Vn, "Vn");
-  a(Vn, "assertSize");
-  function Uo(r, e, t) {
-    return Vn(r), r <= 0 ? he(r) : e !== void 0 ? typeof t == "string" ? he(r).fill(e, t) : he(r).fill(e) : he(r);
-  }
-  __name(Uo, "Uo");
-  a(Uo, "alloc");
-  h.alloc = function(r, e, t) {
-    return Uo(r, e, t);
-  };
-  function $t(r) {
-    return Vn(r), he(r < 0 ? 0 : Gt(r) | 0);
-  }
-  __name($t, "$t");
-  a($t, "allocUnsafe");
-  h.allocUnsafe = function(r) {
-    return $t(
-      r
-    );
-  };
-  h.allocUnsafeSlow = function(r) {
-    return $t(r);
-  };
-  function Do(r, e) {
-    if ((typeof e != "string" || e === "") && (e = "utf8"), !h.isEncoding(e)) throw new TypeError("Unknown encoding: " + e);
-    let t = zn(r, e) | 0, n = he(t), i = n.write(
-      r,
-      e
-    );
-    return i !== t && (n = n.slice(0, i)), n;
-  }
-  __name(Do, "Do");
-  a(Do, "fromString");
-  function Wt(r) {
-    let e = r.length < 0 ? 0 : Gt(r.length) | 0, t = he(e);
-    for (let n = 0; n < e; n += 1) t[n] = r[n] & 255;
-    return t;
-  }
-  __name(Wt, "Wt");
-  a(Wt, "fromArrayLike");
-  function Oo(r) {
-    if (ue(r, Uint8Array)) {
-      let e = new Uint8Array(r);
-      return jt(e.buffer, e.byteOffset, e.byteLength);
-    }
-    return Wt(r);
-  }
-  __name(Oo, "Oo");
-  a(Oo, "fromArrayView");
-  function jt(r, e, t) {
-    if (e < 0 || r.byteLength < e) throw new RangeError('"offset" is outside of buffer bounds');
-    if (r.byteLength < e + (t || 0)) throw new RangeError('"length" is outside of buffer bounds');
-    let n;
-    return e === void 0 && t === void 0 ? n = new Uint8Array(r) : t === void 0 ? n = new Uint8Array(r, e) : n = new Uint8Array(
-      r,
-      e,
-      t
-    ), Object.setPrototypeOf(n, h.prototype), n;
-  }
-  __name(jt, "jt");
-  a(jt, "fromArrayBuffer");
-  function qo(r) {
-    if (h.isBuffer(r)) {
-      let e = Gt(r.length) | 0, t = he(e);
-      return t.length === 0 || r.copy(t, 0, 0, e), t;
-    }
-    if (r.length !== void 0) return typeof r.length != "number" || zt(r.length) ? he(0) : Wt(r);
-    if (r.type === "Buffer" && Array.isArray(r.data)) return Wt(r.data);
-  }
-  __name(qo, "qo");
-  a(qo, "fromObject");
-  function Gt(r) {
-    if (r >= ft) throw new RangeError("Attempt to allocate Buffer larger than maximum size: 0x" + ft.toString(16) + " bytes");
-    return r | 0;
-  }
-  __name(Gt, "Gt");
-  a(Gt, "checked");
-  function Qo(r) {
-    return +r != r && (r = 0), h.alloc(+r);
-  }
-  __name(Qo, "Qo");
-  a(Qo, "SlowBuffer");
-  h.isBuffer = a(function(e) {
-    return e != null && e._isBuffer === true && e !== h.prototype;
-  }, "isBuffer");
-  h.compare = a(function(e, t) {
-    if (ue(e, Uint8Array) && (e = h.from(e, e.offset, e.byteLength)), ue(t, Uint8Array) && (t = h.from(t, t.offset, t.byteLength)), !h.isBuffer(e) || !h.isBuffer(t)) throw new TypeError(
-      'The "buf1", "buf2" arguments must be one of type Buffer or Uint8Array'
-    );
-    if (e === t) return 0;
-    let n = e.length, i = t.length;
-    for (let s = 0, o = Math.min(n, i); s < o; ++s) if (e[s] !== t[s]) {
-      n = e[s], i = t[s];
-      break;
-    }
-    return n < i ? -1 : i < n ? 1 : 0;
-  }, "compare");
-  h.isEncoding = a(function(e) {
-    switch (String(e).toLowerCase()) {
-      case "hex":
-      case "utf8":
-      case "utf-8":
-      case "ascii":
-      case "latin1":
-      case "binary":
-      case "base64":
-      case "ucs2":
-      case "ucs-2":
-      case "utf16le":
-      case "utf-16le":
-        return true;
-      default:
-        return false;
-    }
-  }, "isEncoding");
-  h.concat = a(function(e, t) {
-    if (!Array.isArray(e)) throw new TypeError(
-      '"list" argument must be an Array of Buffers'
-    );
-    if (e.length === 0) return h.alloc(0);
-    let n;
-    if (t === void 0)
-      for (t = 0, n = 0; n < e.length; ++n) t += e[n].length;
-    let i = h.allocUnsafe(t), s = 0;
-    for (n = 0; n < e.length; ++n) {
-      let o = e[n];
-      if (ue(o, Uint8Array)) s + o.length > i.length ? (h.isBuffer(o) || (o = h.from(o)), o.copy(i, s)) : Uint8Array.prototype.set.call(i, o, s);
-      else if (h.isBuffer(o)) o.copy(i, s);
-      else throw new TypeError('"list" argument must be an Array of Buffers');
-      s += o.length;
-    }
-    return i;
-  }, "concat");
-  function zn(r, e) {
-    if (h.isBuffer(r)) return r.length;
-    if (ArrayBuffer.isView(r) || ue(r, ArrayBuffer)) return r.byteLength;
-    if (typeof r != "string") throw new TypeError(
-      'The "string" argument must be one of type string, Buffer, or ArrayBuffer. Received type ' + typeof r
-    );
-    let t = r.length, n = arguments.length > 2 && arguments[2] === true;
-    if (!n && t === 0) return 0;
-    let i = false;
-    for (; ; ) switch (e) {
-      case "ascii":
-      case "latin1":
-      case "binary":
-        return t;
-      case "utf8":
-      case "utf-8":
-        return Ht(r).length;
-      case "ucs2":
-      case "ucs-2":
-      case "utf16le":
-      case "utf-16le":
-        return t * 2;
-      case "hex":
-        return t >>> 1;
-      case "base64":
-        return ni(r).length;
-      default:
-        if (i) return n ? -1 : Ht(r).length;
-        e = ("" + e).toLowerCase(), i = true;
-    }
-  }
-  __name(zn, "zn");
-  a(zn, "byteLength");
-  h.byteLength = zn;
-  function No(r, e, t) {
-    let n = false;
-    if ((e === void 0 || e < 0) && (e = 0), e > this.length || ((t === void 0 || t > this.length) && (t = this.length), t <= 0) || (t >>>= 0, e >>>= 0, t <= e)) return "";
-    for (r || (r = "utf8"); ; ) switch (r) {
-      case "hex":
-        return Zo(this, e, t);
-      case "utf8":
-      case "utf-8":
-        return Yn(this, e, t);
-      case "ascii":
-        return Ko(this, e, t);
-      case "latin1":
-      case "binary":
-        return Yo(
-          this,
-          e,
-          t
-        );
-      case "base64":
-        return Vo(this, e, t);
-      case "ucs2":
-      case "ucs-2":
-      case "utf16le":
-      case "utf-16le":
-        return Jo(
-          this,
-          e,
-          t
-        );
-      default:
-        if (n) throw new TypeError("Unknown encoding: " + r);
-        r = (r + "").toLowerCase(), n = true;
-    }
-  }
-  __name(No, "No");
-  a(
-    No,
-    "slowToString"
-  );
-  h.prototype._isBuffer = true;
-  function Ae(r, e, t) {
-    let n = r[e];
-    r[e] = r[t], r[t] = n;
-  }
-  __name(Ae, "Ae");
-  a(Ae, "swap");
-  h.prototype.swap16 = a(function() {
-    let e = this.length;
-    if (e % 2 !== 0) throw new RangeError("Buffer size must be a multiple of 16-bits");
-    for (let t = 0; t < e; t += 2) Ae(this, t, t + 1);
-    return this;
-  }, "swap16");
-  h.prototype.swap32 = a(function() {
-    let e = this.length;
-    if (e % 4 !== 0) throw new RangeError("Buffer size must be a multiple of 32-bits");
-    for (let t = 0; t < e; t += 4) Ae(this, t, t + 3), Ae(this, t + 1, t + 2);
-    return this;
-  }, "swap32");
-  h.prototype.swap64 = a(
-    function() {
-      let e = this.length;
-      if (e % 8 !== 0) throw new RangeError("Buffer size must be a multiple of 64-bits");
-      for (let t = 0; t < e; t += 8) Ae(this, t, t + 7), Ae(this, t + 1, t + 6), Ae(this, t + 2, t + 5), Ae(this, t + 3, t + 4);
-      return this;
-    },
-    "swap64"
-  );
-  h.prototype.toString = a(function() {
-    let e = this.length;
-    return e === 0 ? "" : arguments.length === 0 ? Yn(
-      this,
-      0,
-      e
-    ) : No.apply(this, arguments);
-  }, "toString");
-  h.prototype.toLocaleString = h.prototype.toString;
-  h.prototype.equals = a(function(e) {
-    if (!h.isBuffer(e)) throw new TypeError("Argument must be a Buffer");
-    return this === e ? true : h.compare(this, e) === 0;
-  }, "equals");
-  h.prototype.inspect = a(function() {
-    let e = "", t = Be.INSPECT_MAX_BYTES;
-    return e = this.toString("hex", 0, t).replace(/(.{2})/g, "$1 ").trim(), this.length > t && (e += " ... "), "<Buffer " + e + ">";
-  }, "inspect");
-  Wn && (h.prototype[Wn] = h.prototype.inspect);
-  h.prototype.compare = a(function(e, t, n, i, s) {
-    if (ue(e, Uint8Array) && (e = h.from(e, e.offset, e.byteLength)), !h.isBuffer(e)) throw new TypeError('The "target" argument must be one of type Buffer or Uint8Array. Received type ' + typeof e);
-    if (t === void 0 && (t = 0), n === void 0 && (n = e ? e.length : 0), i === void 0 && (i = 0), s === void 0 && (s = this.length), t < 0 || n > e.length || i < 0 || s > this.length) throw new RangeError("out of range index");
-    if (i >= s && t >= n) return 0;
-    if (i >= s) return -1;
-    if (t >= n) return 1;
-    if (t >>>= 0, n >>>= 0, i >>>= 0, s >>>= 0, this === e) return 0;
-    let o = s - i, u = n - t, c = Math.min(o, u), l = this.slice(
-      i,
-      s
-    ), f = e.slice(t, n);
-    for (let y = 0; y < c; ++y) if (l[y] !== f[y]) {
-      o = l[y], u = f[y];
-      break;
-    }
-    return o < u ? -1 : u < o ? 1 : 0;
-  }, "compare");
-  function Kn(r, e, t, n, i) {
-    if (r.length === 0) return -1;
-    if (typeof t == "string" ? (n = t, t = 0) : t > 2147483647 ? t = 2147483647 : t < -2147483648 && (t = -2147483648), t = +t, zt(t) && (t = i ? 0 : r.length - 1), t < 0 && (t = r.length + t), t >= r.length) {
-      if (i) return -1;
-      t = r.length - 1;
-    } else if (t < 0) if (i) t = 0;
-    else return -1;
-    if (typeof e == "string" && (e = h.from(
-      e,
-      n
-    )), h.isBuffer(e)) return e.length === 0 ? -1 : jn(r, e, t, n, i);
-    if (typeof e == "number") return e = e & 255, typeof Uint8Array.prototype.indexOf == "function" ? i ? Uint8Array.prototype.indexOf.call(r, e, t) : Uint8Array.prototype.lastIndexOf.call(r, e, t) : jn(r, [e], t, n, i);
-    throw new TypeError("val must be string, number or Buffer");
-  }
-  __name(Kn, "Kn");
-  a(Kn, "bidirectionalIndexOf");
-  function jn(r, e, t, n, i) {
-    let s = 1, o = r.length, u = e.length;
-    if (n !== void 0 && (n = String(n).toLowerCase(), n === "ucs2" || n === "ucs-2" || n === "utf16le" || n === "utf-16le")) {
-      if (r.length < 2 || e.length < 2) return -1;
-      s = 2, o /= 2, u /= 2, t /= 2;
-    }
-    function c(f, y) {
-      return s === 1 ? f[y] : f.readUInt16BE(y * s);
-    }
-    __name(c, "c");
-    a(c, "read");
-    let l;
-    if (i) {
-      let f = -1;
-      for (l = t; l < o; l++) if (c(r, l) === c(e, f === -1 ? 0 : l - f)) {
-        if (f === -1 && (f = l), l - f + 1 === u) return f * s;
-      } else f !== -1 && (l -= l - f), f = -1;
-    } else for (t + u > o && (t = o - u), l = t; l >= 0; l--) {
-      let f = true;
-      for (let y = 0; y < u; y++) if (c(r, l + y) !== c(e, y)) {
-        f = false;
-        break;
-      }
-      if (f) return l;
-    }
-    return -1;
-  }
-  __name(jn, "jn");
-  a(jn, "arrayIndexOf");
-  h.prototype.includes = a(function(e, t, n) {
-    return this.indexOf(
-      e,
-      t,
-      n
-    ) !== -1;
-  }, "includes");
-  h.prototype.indexOf = a(function(e, t, n) {
-    return Kn(this, e, t, n, true);
-  }, "indexOf");
-  h.prototype.lastIndexOf = a(function(e, t, n) {
-    return Kn(this, e, t, n, false);
-  }, "lastIndexOf");
-  function Wo(r, e, t, n) {
-    t = Number(t) || 0;
-    let i = r.length - t;
-    n ? (n = Number(n), n > i && (n = i)) : n = i;
-    let s = e.length;
-    n > s / 2 && (n = s / 2);
-    let o;
-    for (o = 0; o < n; ++o) {
-      let u = parseInt(e.substr(o * 2, 2), 16);
-      if (zt(u)) return o;
-      r[t + o] = u;
-    }
-    return o;
-  }
-  __name(Wo, "Wo");
-  a(Wo, "hexWrite");
-  function jo(r, e, t, n) {
-    return ht(Ht(e, r.length - t), r, t, n);
-  }
-  __name(jo, "jo");
-  a(jo, "utf8Write");
-  function Ho(r, e, t, n) {
-    return ht(ra(e), r, t, n);
-  }
-  __name(Ho, "Ho");
-  a(
-    Ho,
-    "asciiWrite"
-  );
-  function $o(r, e, t, n) {
-    return ht(ni(e), r, t, n);
-  }
-  __name($o, "$o");
-  a($o, "base64Write");
-  function Go(r, e, t, n) {
-    return ht(
-      na(e, r.length - t),
-      r,
-      t,
-      n
-    );
-  }
-  __name(Go, "Go");
-  a(Go, "ucs2Write");
-  h.prototype.write = a(function(e, t, n, i) {
-    if (t === void 0) i = "utf8", n = this.length, t = 0;
-    else if (n === void 0 && typeof t == "string") i = t, n = this.length, t = 0;
-    else if (isFinite(t))
-      t = t >>> 0, isFinite(n) ? (n = n >>> 0, i === void 0 && (i = "utf8")) : (i = n, n = void 0);
-    else throw new Error("Buffer.write(string, encoding, offset[, length]) is no longer supported");
-    let s = this.length - t;
-    if ((n === void 0 || n > s) && (n = s), e.length > 0 && (n < 0 || t < 0) || t > this.length) throw new RangeError("Attempt to write outside buffer bounds");
-    i || (i = "utf8");
-    let o = false;
-    for (; ; ) switch (i) {
-      case "hex":
-        return Wo(this, e, t, n);
-      case "utf8":
-      case "utf-8":
-        return jo(this, e, t, n);
-      case "ascii":
-      case "latin1":
-      case "binary":
-        return Ho(this, e, t, n);
-      case "base64":
-        return $o(this, e, t, n);
-      case "ucs2":
-      case "ucs-2":
-      case "utf16le":
-      case "utf-16le":
-        return Go(this, e, t, n);
-      default:
-        if (o) throw new TypeError("Unknown encoding: " + i);
-        i = ("" + i).toLowerCase(), o = true;
-    }
-  }, "write");
-  h.prototype.toJSON = a(function() {
-    return { type: "Buffer", data: Array.prototype.slice.call(this._arr || this, 0) };
-  }, "toJSON");
-  function Vo(r, e, t) {
-    return e === 0 && t === r.length ? Nt.fromByteArray(r) : Nt.fromByteArray(r.slice(e, t));
-  }
-  __name(Vo, "Vo");
-  a(Vo, "base64Slice");
-  function Yn(r, e, t) {
-    t = Math.min(r.length, t);
-    let n = [], i = e;
-    for (; i < t; ) {
-      let s = r[i], o = null, u = s > 239 ? 4 : s > 223 ? 3 : s > 191 ? 2 : 1;
-      if (i + u <= t) {
-        let c, l, f, y;
-        switch (u) {
-          case 1:
-            s < 128 && (o = s);
-            break;
-          case 2:
-            c = r[i + 1], (c & 192) === 128 && (y = (s & 31) << 6 | c & 63, y > 127 && (o = y));
-            break;
-          case 3:
-            c = r[i + 1], l = r[i + 2], (c & 192) === 128 && (l & 192) === 128 && (y = (s & 15) << 12 | (c & 63) << 6 | l & 63, y > 2047 && (y < 55296 || y > 57343) && (o = y));
-            break;
-          case 4:
-            c = r[i + 1], l = r[i + 2], f = r[i + 3], (c & 192) === 128 && (l & 192) === 128 && (f & 192) === 128 && (y = (s & 15) << 18 | (c & 63) << 12 | (l & 63) << 6 | f & 63, y > 65535 && y < 1114112 && (o = y));
-        }
-      }
-      o === null ? (o = 65533, u = 1) : o > 65535 && (o -= 65536, n.push(o >>> 10 & 1023 | 55296), o = 56320 | o & 1023), n.push(o), i += u;
-    }
-    return zo(n);
-  }
-  __name(Yn, "Yn");
-  a(Yn, "utf8Slice");
-  var Hn = 4096;
-  function zo(r) {
-    let e = r.length;
-    if (e <= Hn) return String.fromCharCode.apply(String, r);
-    let t = "", n = 0;
-    for (; n < e; ) t += String.fromCharCode.apply(String, r.slice(n, n += Hn));
-    return t;
-  }
-  __name(zo, "zo");
-  a(zo, "decodeCodePointsArray");
-  function Ko(r, e, t) {
-    let n = "";
-    t = Math.min(r.length, t);
-    for (let i = e; i < t; ++i) n += String.fromCharCode(r[i] & 127);
-    return n;
-  }
-  __name(Ko, "Ko");
-  a(Ko, "asciiSlice");
-  function Yo(r, e, t) {
-    let n = "";
-    t = Math.min(r.length, t);
-    for (let i = e; i < t; ++i) n += String.fromCharCode(r[i]);
-    return n;
-  }
-  __name(Yo, "Yo");
-  a(Yo, "latin1Slice");
-  function Zo(r, e, t) {
-    let n = r.length;
-    (!e || e < 0) && (e = 0), (!t || t < 0 || t > n) && (t = n);
-    let i = "";
-    for (let s = e; s < t; ++s) i += ia[r[s]];
-    return i;
-  }
-  __name(Zo, "Zo");
-  a(Zo, "hexSlice");
-  function Jo(r, e, t) {
-    let n = r.slice(e, t), i = "";
-    for (let s = 0; s < n.length - 1; s += 2) i += String.fromCharCode(n[s] + n[s + 1] * 256);
-    return i;
-  }
-  __name(Jo, "Jo");
-  a(Jo, "utf16leSlice");
-  h.prototype.slice = a(function(e, t) {
-    let n = this.length;
-    e = ~~e, t = t === void 0 ? n : ~~t, e < 0 ? (e += n, e < 0 && (e = 0)) : e > n && (e = n), t < 0 ? (t += n, t < 0 && (t = 0)) : t > n && (t = n), t < e && (t = e);
-    let i = this.subarray(e, t);
-    return Object.setPrototypeOf(i, h.prototype), i;
-  }, "slice");
-  function q(r, e, t) {
-    if (r % 1 !== 0 || r < 0) throw new RangeError("offset is not uint");
-    if (r + e > t) throw new RangeError("Trying to access beyond buffer length");
-  }
-  __name(q, "q");
-  a(q, "checkOffset");
-  h.prototype.readUintLE = h.prototype.readUIntLE = a(
-    function(e, t, n) {
-      e = e >>> 0, t = t >>> 0, n || q(e, t, this.length);
-      let i = this[e], s = 1, o = 0;
-      for (; ++o < t && (s *= 256); ) i += this[e + o] * s;
-      return i;
-    },
-    "readUIntLE"
-  );
-  h.prototype.readUintBE = h.prototype.readUIntBE = a(function(e, t, n) {
-    e = e >>> 0, t = t >>> 0, n || q(
-      e,
-      t,
-      this.length
-    );
-    let i = this[e + --t], s = 1;
-    for (; t > 0 && (s *= 256); ) i += this[e + --t] * s;
-    return i;
-  }, "readUIntBE");
-  h.prototype.readUint8 = h.prototype.readUInt8 = a(
-    function(e, t) {
-      return e = e >>> 0, t || q(e, 1, this.length), this[e];
-    },
-    "readUInt8"
-  );
-  h.prototype.readUint16LE = h.prototype.readUInt16LE = a(function(e, t) {
-    return e = e >>> 0, t || q(
-      e,
-      2,
-      this.length
-    ), this[e] | this[e + 1] << 8;
-  }, "readUInt16LE");
-  h.prototype.readUint16BE = h.prototype.readUInt16BE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 2, this.length), this[e] << 8 | this[e + 1];
-  }, "readUInt16BE");
-  h.prototype.readUint32LE = h.prototype.readUInt32LE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 4, this.length), (this[e] | this[e + 1] << 8 | this[e + 2] << 16) + this[e + 3] * 16777216;
-  }, "readUInt32LE");
-  h.prototype.readUint32BE = h.prototype.readUInt32BE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 4, this.length), this[e] * 16777216 + (this[e + 1] << 16 | this[e + 2] << 8 | this[e + 3]);
-  }, "readUInt32BE");
-  h.prototype.readBigUInt64LE = we(a(function(e) {
-    e = e >>> 0, Re(e, "offset");
-    let t = this[e], n = this[e + 7];
-    (t === void 0 || n === void 0) && je(e, this.length - 8);
-    let i = t + this[++e] * 2 ** 8 + this[++e] * 2 ** 16 + this[++e] * 2 ** 24, s = this[++e] + this[++e] * 2 ** 8 + this[++e] * 2 ** 16 + n * 2 ** 24;
-    return BigInt(i) + (BigInt(s) << BigInt(32));
-  }, "readBigUInt64LE"));
-  h.prototype.readBigUInt64BE = we(a(function(e) {
-    e = e >>> 0, Re(e, "offset");
-    let t = this[e], n = this[e + 7];
-    (t === void 0 || n === void 0) && je(e, this.length - 8);
-    let i = t * 2 ** 24 + this[++e] * 2 ** 16 + this[++e] * 2 ** 8 + this[++e], s = this[++e] * 2 ** 24 + this[++e] * 2 ** 16 + this[++e] * 2 ** 8 + n;
-    return (BigInt(i) << BigInt(
-      32
-    )) + BigInt(s);
-  }, "readBigUInt64BE"));
-  h.prototype.readIntLE = a(function(e, t, n) {
-    e = e >>> 0, t = t >>> 0, n || q(
-      e,
-      t,
-      this.length
-    );
-    let i = this[e], s = 1, o = 0;
-    for (; ++o < t && (s *= 256); ) i += this[e + o] * s;
-    return s *= 128, i >= s && (i -= Math.pow(2, 8 * t)), i;
-  }, "readIntLE");
-  h.prototype.readIntBE = a(function(e, t, n) {
-    e = e >>> 0, t = t >>> 0, n || q(e, t, this.length);
-    let i = t, s = 1, o = this[e + --i];
-    for (; i > 0 && (s *= 256); ) o += this[e + --i] * s;
-    return s *= 128, o >= s && (o -= Math.pow(2, 8 * t)), o;
-  }, "readIntBE");
-  h.prototype.readInt8 = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 1, this.length), this[e] & 128 ? (255 - this[e] + 1) * -1 : this[e];
-  }, "readInt8");
-  h.prototype.readInt16LE = a(function(e, t) {
-    e = e >>> 0, t || q(
-      e,
-      2,
-      this.length
-    );
-    let n = this[e] | this[e + 1] << 8;
-    return n & 32768 ? n | 4294901760 : n;
-  }, "readInt16LE");
-  h.prototype.readInt16BE = a(function(e, t) {
-    e = e >>> 0, t || q(e, 2, this.length);
-    let n = this[e + 1] | this[e] << 8;
-    return n & 32768 ? n | 4294901760 : n;
-  }, "readInt16BE");
-  h.prototype.readInt32LE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 4, this.length), this[e] | this[e + 1] << 8 | this[e + 2] << 16 | this[e + 3] << 24;
-  }, "readInt32LE");
-  h.prototype.readInt32BE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 4, this.length), this[e] << 24 | this[e + 1] << 16 | this[e + 2] << 8 | this[e + 3];
-  }, "readInt32BE");
-  h.prototype.readBigInt64LE = we(a(function(e) {
-    e = e >>> 0, Re(e, "offset");
-    let t = this[e], n = this[e + 7];
-    (t === void 0 || n === void 0) && je(e, this.length - 8);
-    let i = this[e + 4] + this[e + 5] * 2 ** 8 + this[e + 6] * 2 ** 16 + (n << 24);
-    return (BigInt(i) << BigInt(
-      32
-    )) + BigInt(t + this[++e] * 2 ** 8 + this[++e] * 2 ** 16 + this[++e] * 2 ** 24);
-  }, "readBigInt64LE"));
-  h.prototype.readBigInt64BE = we(a(function(e) {
-    e = e >>> 0, Re(e, "offset");
-    let t = this[e], n = this[e + 7];
-    (t === void 0 || n === void 0) && je(e, this.length - 8);
-    let i = (t << 24) + this[++e] * 2 ** 16 + this[++e] * 2 ** 8 + this[++e];
-    return (BigInt(i) << BigInt(32)) + BigInt(
-      this[++e] * 2 ** 24 + this[++e] * 2 ** 16 + this[++e] * 2 ** 8 + n
-    );
-  }, "readBigInt64BE"));
-  h.prototype.readFloatLE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 4, this.length), Pe.read(this, e, true, 23, 4);
-  }, "readFloatLE");
-  h.prototype.readFloatBE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 4, this.length), Pe.read(this, e, false, 23, 4);
-  }, "readFloatBE");
-  h.prototype.readDoubleLE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 8, this.length), Pe.read(this, e, true, 52, 8);
-  }, "readDoubleLE");
-  h.prototype.readDoubleBE = a(function(e, t) {
-    return e = e >>> 0, t || q(e, 8, this.length), Pe.read(
-      this,
-      e,
-      false,
-      52,
-      8
-    );
-  }, "readDoubleBE");
-  function V(r, e, t, n, i, s) {
-    if (!h.isBuffer(r)) throw new TypeError('"buffer" argument must be a Buffer instance');
-    if (e > i || e < s) throw new RangeError('"value" argument is out of bounds');
-    if (t + n > r.length) throw new RangeError("Index out of range");
-  }
-  __name(V, "V");
-  a(V, "checkInt");
-  h.prototype.writeUintLE = h.prototype.writeUIntLE = a(function(e, t, n, i) {
-    if (e = +e, t = t >>> 0, n = n >>> 0, !i) {
-      let u = Math.pow(2, 8 * n) - 1;
-      V(
-        this,
-        e,
-        t,
-        n,
-        u,
-        0
-      );
-    }
-    let s = 1, o = 0;
-    for (this[t] = e & 255; ++o < n && (s *= 256); ) this[t + o] = e / s & 255;
-    return t + n;
-  }, "writeUIntLE");
-  h.prototype.writeUintBE = h.prototype.writeUIntBE = a(function(e, t, n, i) {
-    if (e = +e, t = t >>> 0, n = n >>> 0, !i) {
-      let u = Math.pow(2, 8 * n) - 1;
-      V(this, e, t, n, u, 0);
-    }
-    let s = n - 1, o = 1;
-    for (this[t + s] = e & 255; --s >= 0 && (o *= 256); ) this[t + s] = e / o & 255;
-    return t + n;
-  }, "writeUIntBE");
-  h.prototype.writeUint8 = h.prototype.writeUInt8 = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(this, e, t, 1, 255, 0), this[t] = e & 255, t + 1;
-  }, "writeUInt8");
-  h.prototype.writeUint16LE = h.prototype.writeUInt16LE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(this, e, t, 2, 65535, 0), this[t] = e & 255, this[t + 1] = e >>> 8, t + 2;
-  }, "writeUInt16LE");
-  h.prototype.writeUint16BE = h.prototype.writeUInt16BE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(this, e, t, 2, 65535, 0), this[t] = e >>> 8, this[t + 1] = e & 255, t + 2;
-  }, "writeUInt16BE");
-  h.prototype.writeUint32LE = h.prototype.writeUInt32LE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(
-      this,
-      e,
-      t,
-      4,
-      4294967295,
-      0
-    ), this[t + 3] = e >>> 24, this[t + 2] = e >>> 16, this[t + 1] = e >>> 8, this[t] = e & 255, t + 4;
-  }, "writeUInt32LE");
-  h.prototype.writeUint32BE = h.prototype.writeUInt32BE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(
-      this,
-      e,
-      t,
-      4,
-      4294967295,
-      0
-    ), this[t] = e >>> 24, this[t + 1] = e >>> 16, this[t + 2] = e >>> 8, this[t + 3] = e & 255, t + 4;
-  }, "writeUInt32BE");
-  function Zn(r, e, t, n, i) {
-    ri(e, n, i, r, t, 7);
-    let s = Number(e & BigInt(4294967295));
-    r[t++] = s, s = s >> 8, r[t++] = s, s = s >> 8, r[t++] = s, s = s >> 8, r[t++] = s;
-    let o = Number(e >> BigInt(32) & BigInt(4294967295));
-    return r[t++] = o, o = o >> 8, r[t++] = o, o = o >> 8, r[t++] = o, o = o >> 8, r[t++] = o, t;
-  }
-  __name(Zn, "Zn");
-  a(Zn, "wrtBigUInt64LE");
-  function Jn(r, e, t, n, i) {
-    ri(e, n, i, r, t, 7);
-    let s = Number(e & BigInt(4294967295));
-    r[t + 7] = s, s = s >> 8, r[t + 6] = s, s = s >> 8, r[t + 5] = s, s = s >> 8, r[t + 4] = s;
-    let o = Number(e >> BigInt(32) & BigInt(4294967295));
-    return r[t + 3] = o, o = o >> 8, r[t + 2] = o, o = o >> 8, r[t + 1] = o, o = o >> 8, r[t] = o, t + 8;
-  }
-  __name(Jn, "Jn");
-  a(Jn, "wrtBigUInt64BE");
-  h.prototype.writeBigUInt64LE = we(a(function(e, t = 0) {
-    return Zn(this, e, t, BigInt(0), BigInt("0xffffffffffffffff"));
-  }, "writeBigUInt64LE"));
-  h.prototype.writeBigUInt64BE = we(a(function(e, t = 0) {
-    return Jn(this, e, t, BigInt(0), BigInt(
-      "0xffffffffffffffff"
-    ));
-  }, "writeBigUInt64BE"));
-  h.prototype.writeIntLE = a(function(e, t, n, i) {
-    if (e = +e, t = t >>> 0, !i) {
-      let c = Math.pow(2, 8 * n - 1);
-      V(this, e, t, n, c - 1, -c);
-    }
-    let s = 0, o = 1, u = 0;
-    for (this[t] = e & 255; ++s < n && (o *= 256); )
-      e < 0 && u === 0 && this[t + s - 1] !== 0 && (u = 1), this[t + s] = (e / o >> 0) - u & 255;
-    return t + n;
-  }, "writeIntLE");
-  h.prototype.writeIntBE = a(function(e, t, n, i) {
-    if (e = +e, t = t >>> 0, !i) {
-      let c = Math.pow(2, 8 * n - 1);
-      V(this, e, t, n, c - 1, -c);
-    }
-    let s = n - 1, o = 1, u = 0;
-    for (this[t + s] = e & 255; --s >= 0 && (o *= 256); ) e < 0 && u === 0 && this[t + s + 1] !== 0 && (u = 1), this[t + s] = (e / o >> 0) - u & 255;
-    return t + n;
-  }, "writeIntBE");
-  h.prototype.writeInt8 = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(this, e, t, 1, 127, -128), e < 0 && (e = 255 + e + 1), this[t] = e & 255, t + 1;
-  }, "writeInt8");
-  h.prototype.writeInt16LE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(this, e, t, 2, 32767, -32768), this[t] = e & 255, this[t + 1] = e >>> 8, t + 2;
-  }, "writeInt16LE");
-  h.prototype.writeInt16BE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(this, e, t, 2, 32767, -32768), this[t] = e >>> 8, this[t + 1] = e & 255, t + 2;
-  }, "writeInt16BE");
-  h.prototype.writeInt32LE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(
-      this,
-      e,
-      t,
-      4,
-      2147483647,
-      -2147483648
-    ), this[t] = e & 255, this[t + 1] = e >>> 8, this[t + 2] = e >>> 16, this[t + 3] = e >>> 24, t + 4;
-  }, "writeInt32LE");
-  h.prototype.writeInt32BE = a(function(e, t, n) {
-    return e = +e, t = t >>> 0, n || V(
-      this,
-      e,
-      t,
-      4,
-      2147483647,
-      -2147483648
-    ), e < 0 && (e = 4294967295 + e + 1), this[t] = e >>> 24, this[t + 1] = e >>> 16, this[t + 2] = e >>> 8, this[t + 3] = e & 255, t + 4;
-  }, "writeInt32BE");
-  h.prototype.writeBigInt64LE = we(a(function(e, t = 0) {
-    return Zn(this, e, t, -BigInt("0x8000000000000000"), BigInt("0x7fffffffffffffff"));
-  }, "writeBigInt64LE"));
-  h.prototype.writeBigInt64BE = we(
-    a(function(e, t = 0) {
-      return Jn(this, e, t, -BigInt("0x8000000000000000"), BigInt("0x7fffffffffffffff"));
-    }, "writeBigInt64BE")
-  );
-  function Xn(r, e, t, n, i, s) {
-    if (t + n > r.length) throw new RangeError("Index out of range");
-    if (t < 0) throw new RangeError("Index out of range");
-  }
-  __name(Xn, "Xn");
-  a(Xn, "checkIEEE754");
-  function ei(r, e, t, n, i) {
-    return e = +e, t = t >>> 0, i || Xn(r, e, t, 4, 34028234663852886e22, -34028234663852886e22), Pe.write(r, e, t, n, 23, 4), t + 4;
-  }
-  __name(ei, "ei");
-  a(
-    ei,
-    "writeFloat"
-  );
-  h.prototype.writeFloatLE = a(function(e, t, n) {
-    return ei(this, e, t, true, n);
-  }, "writeFloatLE");
-  h.prototype.writeFloatBE = a(function(e, t, n) {
-    return ei(this, e, t, false, n);
-  }, "writeFloatBE");
-  function ti(r, e, t, n, i) {
-    return e = +e, t = t >>> 0, i || Xn(r, e, t, 8, 17976931348623157e292, -17976931348623157e292), Pe.write(
-      r,
-      e,
-      t,
-      n,
-      52,
-      8
-    ), t + 8;
-  }
-  __name(ti, "ti");
-  a(ti, "writeDouble");
-  h.prototype.writeDoubleLE = a(function(e, t, n) {
-    return ti(this, e, t, true, n);
-  }, "writeDoubleLE");
-  h.prototype.writeDoubleBE = a(function(e, t, n) {
-    return ti(this, e, t, false, n);
-  }, "writeDoubleBE");
-  h.prototype.copy = a(function(e, t, n, i) {
-    if (!h.isBuffer(e)) throw new TypeError("argument should be a Buffer");
-    if (n || (n = 0), !i && i !== 0 && (i = this.length), t >= e.length && (t = e.length), t || (t = 0), i > 0 && i < n && (i = n), i === n || e.length === 0 || this.length === 0) return 0;
-    if (t < 0) throw new RangeError("targetStart out of bounds");
-    if (n < 0 || n >= this.length) throw new RangeError("Index out of range");
-    if (i < 0) throw new RangeError("sourceEnd out of bounds");
-    i > this.length && (i = this.length), e.length - t < i - n && (i = e.length - t + n);
-    let s = i - n;
-    return this === e && typeof Uint8Array.prototype.copyWithin == "function" ? this.copyWithin(t, n, i) : Uint8Array.prototype.set.call(e, this.subarray(n, i), t), s;
-  }, "copy");
-  h.prototype.fill = a(function(e, t, n, i) {
-    if (typeof e == "string") {
-      if (typeof t == "string" ? (i = t, t = 0, n = this.length) : typeof n == "string" && (i = n, n = this.length), i !== void 0 && typeof i != "string") throw new TypeError("encoding must be a string");
-      if (typeof i == "string" && !h.isEncoding(i)) throw new TypeError(
-        "Unknown encoding: " + i
-      );
-      if (e.length === 1) {
-        let o = e.charCodeAt(0);
-        (i === "utf8" && o < 128 || i === "latin1") && (e = o);
-      }
-    } else typeof e == "number" ? e = e & 255 : typeof e == "boolean" && (e = Number(e));
-    if (t < 0 || this.length < t || this.length < n) throw new RangeError("Out of range index");
-    if (n <= t) return this;
-    t = t >>> 0, n = n === void 0 ? this.length : n >>> 0, e || (e = 0);
-    let s;
-    if (typeof e == "number") for (s = t; s < n; ++s) this[s] = e;
-    else {
-      let o = h.isBuffer(e) ? e : h.from(
-        e,
-        i
-      ), u = o.length;
-      if (u === 0) throw new TypeError('The value "' + e + '" is invalid for argument "value"');
-      for (s = 0; s < n - t; ++s) this[s + t] = o[s % u];
-    }
-    return this;
-  }, "fill");
-  var Te = {};
-  function Vt(r, e, t) {
-    var n;
-    Te[r] = (n = class extends t {
-      static {
-        __name(this, "n");
-      }
-      constructor() {
-        super(), Object.defineProperty(this, "message", { value: e.apply(this, arguments), writable: true, configurable: true }), this.name = `${this.name} [${r}]`, this.stack, delete this.name;
-      }
-      get code() {
-        return r;
-      }
-      set code(s) {
-        Object.defineProperty(
-          this,
-          "code",
-          { configurable: true, enumerable: true, value: s, writable: true }
-        );
-      }
-      toString() {
-        return `${this.name} [${r}]: ${this.message}`;
-      }
-    }, a(n, "NodeError"), n);
-  }
-  __name(Vt, "Vt");
-  a(Vt, "E");
-  Vt("ERR_BUFFER_OUT_OF_BOUNDS", function(r) {
-    return r ? `${r} is outside of buffer bounds` : "Attempt to access memory outside buffer bounds";
-  }, RangeError);
-  Vt(
-    "ERR_INVALID_ARG_TYPE",
-    function(r, e) {
-      return `The "${r}" argument must be of type number. Received type ${typeof e}`;
-    },
-    TypeError
-  );
-  Vt("ERR_OUT_OF_RANGE", function(r, e, t) {
-    let n = `The value of "${r}" is out of range.`, i = t;
-    return Number.isInteger(t) && Math.abs(t) > 2 ** 32 ? i = $n(String(t)) : typeof t == "bigint" && (i = String(
-      t
-    ), (t > BigInt(2) ** BigInt(32) || t < -(BigInt(2) ** BigInt(32))) && (i = $n(i)), i += "n"), n += ` It must be ${e}. Received ${i}`, n;
-  }, RangeError);
-  function $n(r) {
-    let e = "", t = r.length, n = r[0] === "-" ? 1 : 0;
-    for (; t >= n + 4; t -= 3) e = `_${r.slice(t - 3, t)}${e}`;
-    return `${r.slice(0, t)}${e}`;
-  }
-  __name($n, "$n");
-  a($n, "addNumericalSeparator");
-  function Xo(r, e, t) {
-    Re(e, "offset"), (r[e] === void 0 || r[e + t] === void 0) && je(e, r.length - (t + 1));
-  }
-  __name(Xo, "Xo");
-  a(Xo, "checkBounds");
-  function ri(r, e, t, n, i, s) {
-    if (r > t || r < e) {
-      let o = typeof e == "bigint" ? "n" : "", u;
-      throw s > 3 ? e === 0 || e === BigInt(0) ? u = `>= 0${o} and < 2${o} ** ${(s + 1) * 8}${o}` : u = `>= -(2${o} ** ${(s + 1) * 8 - 1}${o}) and < 2 ** ${(s + 1) * 8 - 1}${o}` : u = `>= ${e}${o} and <= ${t}${o}`, new Te.ERR_OUT_OF_RANGE("value", u, r);
-    }
-    Xo(n, i, s);
-  }
-  __name(ri, "ri");
-  a(ri, "checkIntBI");
-  function Re(r, e) {
-    if (typeof r != "number") throw new Te.ERR_INVALID_ARG_TYPE(e, "number", r);
-  }
-  __name(Re, "Re");
-  a(Re, "validateNumber");
-  function je(r, e, t) {
-    throw Math.floor(r) !== r ? (Re(r, t), new Te.ERR_OUT_OF_RANGE(t || "offset", "an integer", r)) : e < 0 ? new Te.ERR_BUFFER_OUT_OF_BOUNDS() : new Te.ERR_OUT_OF_RANGE(t || "offset", `>= ${t ? 1 : 0} and <= ${e}`, r);
-  }
-  __name(je, "je");
-  a(je, "boundsError");
-  var ea = /[^+/0-9A-Za-z-_]/g;
-  function ta(r) {
-    if (r = r.split("=")[0], r = r.trim().replace(ea, ""), r.length < 2) return "";
-    for (; r.length % 4 !== 0; ) r = r + "=";
-    return r;
-  }
-  __name(ta, "ta");
-  a(ta, "base64clean");
-  function Ht(r, e) {
-    e = e || 1 / 0;
-    let t, n = r.length, i = null, s = [];
-    for (let o = 0; o < n; ++o) {
-      if (t = r.charCodeAt(o), t > 55295 && t < 57344) {
-        if (!i) {
-          if (t > 56319) {
-            (e -= 3) > -1 && s.push(239, 191, 189);
-            continue;
-          } else if (o + 1 === n) {
-            (e -= 3) > -1 && s.push(239, 191, 189);
-            continue;
-          }
-          i = t;
-          continue;
-        }
-        if (t < 56320) {
-          (e -= 3) > -1 && s.push(239, 191, 189), i = t;
-          continue;
-        }
-        t = (i - 55296 << 10 | t - 56320) + 65536;
-      } else i && (e -= 3) > -1 && s.push(239, 191, 189);
-      if (i = null, t < 128) {
-        if ((e -= 1) < 0) break;
-        s.push(t);
-      } else if (t < 2048) {
-        if ((e -= 2) < 0) break;
-        s.push(t >> 6 | 192, t & 63 | 128);
-      } else if (t < 65536) {
-        if ((e -= 3) < 0) break;
-        s.push(t >> 12 | 224, t >> 6 & 63 | 128, t & 63 | 128);
-      } else if (t < 1114112) {
-        if ((e -= 4) < 0) break;
-        s.push(t >> 18 | 240, t >> 12 & 63 | 128, t >> 6 & 63 | 128, t & 63 | 128);
-      } else throw new Error("Invalid code point");
-    }
-    return s;
-  }
-  __name(Ht, "Ht");
-  a(Ht, "utf8ToBytes");
-  function ra(r) {
-    let e = [];
-    for (let t = 0; t < r.length; ++t) e.push(r.charCodeAt(t) & 255);
-    return e;
-  }
-  __name(ra, "ra");
-  a(
-    ra,
-    "asciiToBytes"
-  );
-  function na(r, e) {
-    let t, n, i, s = [];
-    for (let o = 0; o < r.length && !((e -= 2) < 0); ++o) t = r.charCodeAt(
-      o
-    ), n = t >> 8, i = t % 256, s.push(i), s.push(n);
-    return s;
-  }
-  __name(na, "na");
-  a(na, "utf16leToBytes");
-  function ni(r) {
-    return Nt.toByteArray(
-      ta(r)
-    );
-  }
-  __name(ni, "ni");
-  a(ni, "base64ToBytes");
-  function ht(r, e, t, n) {
-    let i;
-    for (i = 0; i < n && !(i + t >= e.length || i >= r.length); ++i)
-      e[i + t] = r[i];
-    return i;
-  }
-  __name(ht, "ht");
-  a(ht, "blitBuffer");
-  function ue(r, e) {
-    return r instanceof e || r != null && r.constructor != null && r.constructor.name != null && r.constructor.name === e.name;
-  }
-  __name(ue, "ue");
-  a(ue, "isInstance");
-  function zt(r) {
-    return r !== r;
-  }
-  __name(zt, "zt");
-  a(zt, "numberIsNaN");
-  var ia = (function() {
-    let r = "0123456789abcdef", e = new Array(256);
-    for (let t = 0; t < 16; ++t) {
-      let n = t * 16;
-      for (let i = 0; i < 16; ++i) e[n + i] = r[t] + r[i];
-    }
-    return e;
-  })();
-  function we(r) {
-    return typeof BigInt > "u" ? sa : r;
-  }
-  __name(we, "we");
-  a(we, "defineBigIntMethod");
-  function sa() {
-    throw new Error("BigInt not supported");
-  }
-  __name(sa, "sa");
-  a(sa, "BufferBigIntNotDefined");
-});
-var b;
-var v;
-var x;
-var d;
-var m;
-var p = G(() => {
-  "use strict";
-  b = globalThis, v = globalThis.setImmediate ?? ((r) => setTimeout(r, 0)), x = globalThis.clearImmediate ?? ((r) => clearTimeout(r)), d = typeof globalThis.Buffer == "function" && typeof globalThis.Buffer.allocUnsafe == "function" ? globalThis.Buffer : ii().Buffer, m = globalThis.process ?? {};
-  m.env ?? (m.env = {});
-  try {
-    m.nextTick(() => {
-    });
-  } catch {
-    let e = Promise.resolve();
-    m.nextTick = e.then.bind(e);
-  }
-});
-var ge = T((Bl, Kt) => {
-  "use strict";
-  p();
-  var Le = typeof Reflect == "object" ? Reflect : null, si = Le && typeof Le.apply == "function" ? Le.apply : a(function(e, t, n) {
-    return Function.prototype.apply.call(e, t, n);
-  }, "ReflectApply"), pt;
-  Le && typeof Le.ownKeys == "function" ? pt = Le.ownKeys : Object.getOwnPropertySymbols ? pt = a(function(e) {
-    return Object.getOwnPropertyNames(e).concat(Object.getOwnPropertySymbols(e));
-  }, "ReflectOwnKeys") : pt = a(function(e) {
-    return Object.getOwnPropertyNames(e);
-  }, "ReflectOwnKeys");
-  function oa(r) {
-    console && console.warn && console.warn(r);
-  }
-  __name(oa, "oa");
-  a(
-    oa,
-    "ProcessEmitWarning"
-  );
-  var ai = Number.isNaN || a(function(e) {
-    return e !== e;
-  }, "NumberIsNaN");
-  function R() {
-    R.init.call(this);
-  }
-  __name(R, "R");
-  a(R, "EventEmitter");
-  Kt.exports = R;
-  Kt.exports.once = la;
-  R.EventEmitter = R;
-  R.prototype._events = void 0;
-  R.prototype._eventsCount = 0;
-  R.prototype._maxListeners = void 0;
-  var oi = 10;
-  function dt(r) {
-    if (typeof r != "function") throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof r);
-  }
-  __name(dt, "dt");
-  a(dt, "checkListener");
-  Object.defineProperty(R, "defaultMaxListeners", { enumerable: true, get: a(function() {
-    return oi;
-  }, "get"), set: a(
-    function(r) {
-      if (typeof r != "number" || r < 0 || ai(r)) throw new RangeError('The value of "defaultMaxListeners" is out of range. It must be a non-negative number. Received ' + r + ".");
-      oi = r;
-    },
-    "set"
-  ) });
-  R.init = function() {
-    (this._events === void 0 || this._events === Object.getPrototypeOf(this)._events) && (this._events = /* @__PURE__ */ Object.create(null), this._eventsCount = 0), this._maxListeners = this._maxListeners || void 0;
-  };
-  R.prototype.setMaxListeners = a(function(e) {
-    if (typeof e != "number" || e < 0 || ai(e)) throw new RangeError('The value of "n" is out of range. It must be a non-negative number. Received ' + e + ".");
-    return this._maxListeners = e, this;
-  }, "setMaxListeners");
-  function ui(r) {
-    return r._maxListeners === void 0 ? R.defaultMaxListeners : r._maxListeners;
-  }
-  __name(ui, "ui");
-  a(ui, "_getMaxListeners");
-  R.prototype.getMaxListeners = a(function() {
-    return ui(this);
-  }, "getMaxListeners");
-  R.prototype.emit = a(function(e) {
-    for (var t = [], n = 1; n < arguments.length; n++) t.push(arguments[n]);
-    var i = e === "error", s = this._events;
-    if (s !== void 0) i = i && s.error === void 0;
-    else if (!i) return false;
-    if (i) {
-      var o;
-      if (t.length > 0 && (o = t[0]), o instanceof Error) throw o;
-      var u = new Error("Unhandled error." + (o ? " (" + o.message + ")" : ""));
-      throw u.context = o, u;
-    }
-    var c = s[e];
-    if (c === void 0) return false;
-    if (typeof c == "function") si(c, this, t);
-    else for (var l = c.length, f = pi(c, l), n = 0; n < l; ++n) si(f[n], this, t);
-    return true;
-  }, "emit");
-  function ci(r, e, t, n) {
-    var i, s, o;
-    if (dt(
-      t
-    ), s = r._events, s === void 0 ? (s = r._events = /* @__PURE__ */ Object.create(null), r._eventsCount = 0) : (s.newListener !== void 0 && (r.emit("newListener", e, t.listener ? t.listener : t), s = r._events), o = s[e]), o === void 0) o = s[e] = t, ++r._eventsCount;
-    else if (typeof o == "function" ? o = s[e] = n ? [t, o] : [o, t] : n ? o.unshift(t) : o.push(t), i = ui(r), i > 0 && o.length > i && !o.warned) {
-      o.warned = true;
-      var u = new Error("Possible EventEmitter memory leak detected. " + o.length + " " + String(e) + " listeners added. Use emitter.setMaxListeners() to increase limit");
-      u.name = "MaxListenersExceededWarning", u.emitter = r, u.type = e, u.count = o.length, oa(u);
-    }
-    return r;
-  }
-  __name(ci, "ci");
-  a(ci, "_addListener");
-  R.prototype.addListener = a(function(e, t) {
-    return ci(this, e, t, false);
-  }, "addListener");
-  R.prototype.on = R.prototype.addListener;
-  R.prototype.prependListener = a(function(e, t) {
-    return ci(this, e, t, true);
-  }, "prependListener");
-  function aa() {
-    if (!this.fired) return this.target.removeListener(this.type, this.wrapFn), this.fired = true, arguments.length === 0 ? this.listener.call(this.target) : this.listener.apply(this.target, arguments);
-  }
-  __name(aa, "aa");
-  a(aa, "onceWrapper");
-  function li(r, e, t) {
-    var n = {
-      fired: false,
-      wrapFn: void 0,
-      target: r,
-      type: e,
-      listener: t
-    }, i = aa.bind(n);
-    return i.listener = t, n.wrapFn = i, i;
-  }
-  __name(li, "li");
-  a(li, "_onceWrap");
-  R.prototype.once = a(function(e, t) {
-    return dt(t), this.on(e, li(this, e, t)), this;
-  }, "once");
-  R.prototype.prependOnceListener = a(function(e, t) {
-    return dt(t), this.prependListener(e, li(this, e, t)), this;
-  }, "prependOnceListener");
-  R.prototype.removeListener = a(function(e, t) {
-    var n, i, s, o, u;
-    if (dt(t), i = this._events, i === void 0) return this;
-    if (n = i[e], n === void 0) return this;
-    if (n === t || n.listener === t) --this._eventsCount === 0 ? this._events = /* @__PURE__ */ Object.create(null) : (delete i[e], i.removeListener && this.emit("removeListener", e, n.listener || t));
-    else if (typeof n != "function") {
-      for (s = -1, o = n.length - 1; o >= 0; o--) if (n[o] === t || n[o].listener === t) {
-        u = n[o].listener, s = o;
-        break;
-      }
-      if (s < 0) return this;
-      s === 0 ? n.shift() : ua(n, s), n.length === 1 && (i[e] = n[0]), i.removeListener !== void 0 && this.emit("removeListener", e, u || t);
-    }
-    return this;
-  }, "removeListener");
-  R.prototype.off = R.prototype.removeListener;
-  R.prototype.removeAllListeners = a(function(e) {
-    var t, n, i;
-    if (n = this._events, n === void 0) return this;
-    if (n.removeListener === void 0) return arguments.length === 0 ? (this._events = /* @__PURE__ */ Object.create(null), this._eventsCount = 0) : n[e] !== void 0 && (--this._eventsCount === 0 ? this._events = /* @__PURE__ */ Object.create(null) : delete n[e]), this;
-    if (arguments.length === 0) {
-      var s = Object.keys(n), o;
-      for (i = 0; i < s.length; ++i) o = s[i], o !== "removeListener" && this.removeAllListeners(
-        o
-      );
-      return this.removeAllListeners("removeListener"), this._events = /* @__PURE__ */ Object.create(null), this._eventsCount = 0, this;
-    }
-    if (t = n[e], typeof t == "function") this.removeListener(e, t);
-    else if (t !== void 0) for (i = t.length - 1; i >= 0; i--) this.removeListener(e, t[i]);
-    return this;
-  }, "removeAllListeners");
-  function fi(r, e, t) {
-    var n = r._events;
-    if (n === void 0) return [];
-    var i = n[e];
-    return i === void 0 ? [] : typeof i == "function" ? t ? [i.listener || i] : [i] : t ? ca(i) : pi(i, i.length);
-  }
-  __name(fi, "fi");
-  a(fi, "_listeners");
-  R.prototype.listeners = a(function(e) {
-    return fi(this, e, true);
-  }, "listeners");
-  R.prototype.rawListeners = a(function(e) {
-    return fi(this, e, false);
-  }, "rawListeners");
-  R.listenerCount = function(r, e) {
-    return typeof r.listenerCount == "function" ? r.listenerCount(e) : hi.call(r, e);
-  };
-  R.prototype.listenerCount = hi;
-  function hi(r) {
-    var e = this._events;
-    if (e !== void 0) {
-      var t = e[r];
-      if (typeof t == "function")
-        return 1;
-      if (t !== void 0) return t.length;
-    }
-    return 0;
-  }
-  __name(hi, "hi");
-  a(hi, "listenerCount");
-  R.prototype.eventNames = a(function() {
-    return this._eventsCount > 0 ? pt(this._events) : [];
-  }, "eventNames");
-  function pi(r, e) {
-    for (var t = new Array(e), n = 0; n < e; ++n) t[n] = r[n];
-    return t;
-  }
-  __name(pi, "pi");
-  a(pi, "arrayClone");
-  function ua(r, e) {
-    for (; e + 1 < r.length; e++) r[e] = r[e + 1];
-    r.pop();
-  }
-  __name(ua, "ua");
-  a(ua, "spliceOne");
-  function ca(r) {
-    for (var e = new Array(r.length), t = 0; t < e.length; ++t) e[t] = r[t].listener || r[t];
-    return e;
-  }
-  __name(ca, "ca");
-  a(ca, "unwrapListeners");
-  function la(r, e) {
-    return new Promise(function(t, n) {
-      function i(o) {
-        r.removeListener(e, s), n(o);
-      }
-      __name(i, "i");
-      a(i, "errorListener");
-      function s() {
-        typeof r.removeListener == "function" && r.removeListener("error", i), t([].slice.call(arguments));
-      }
-      __name(s, "s");
-      a(s, "resolver"), di(r, e, s, { once: true }), e !== "error" && fa(r, i, { once: true });
-    });
-  }
-  __name(la, "la");
-  a(la, "once");
-  function fa(r, e, t) {
-    typeof r.on == "function" && di(r, "error", e, t);
-  }
-  __name(fa, "fa");
-  a(
-    fa,
-    "addErrorHandlerIfEventEmitter"
-  );
-  function di(r, e, t, n) {
-    if (typeof r.on == "function") n.once ? r.once(e, t) : r.on(e, t);
-    else if (typeof r.addEventListener == "function") r.addEventListener(e, a(/* @__PURE__ */ __name(function i(s) {
-      n.once && r.removeEventListener(e, i), t(s);
-    }, "i"), "wrapListener"));
-    else throw new TypeError('The "emitter" argument must be of type EventEmitter. Received type ' + typeof r);
-  }
-  __name(di, "di");
-  a(di, "eventTargetAgnosticAddListener");
-});
-var wi = {};
-ie(wi, { Socket: /* @__PURE__ */ __name(() => ce, "Socket"), isIP: /* @__PURE__ */ __name(() => ha, "isIP") });
-function ha(r) {
-  return 0;
-}
-__name(ha, "ha");
-var mi;
-var yi;
-var S;
-var ce;
-var Fe = G(() => {
-  "use strict";
-  p();
-  mi = Se(ge(), 1);
-  a(ha, "isIP");
-  yi = /^[^.]+\./, S = class S2 extends mi.EventEmitter {
-    static {
-      __name(this, "S");
-    }
-    constructor() {
-      super(...arguments);
-      E(this, "opts", {});
-      E(this, "connecting", false);
-      E(this, "pending", true);
-      E(
-        this,
-        "writable",
-        true
-      );
-      E(this, "encrypted", false);
-      E(this, "authorized", false);
-      E(this, "destroyed", false);
-      E(this, "ws", null);
-      E(this, "writeBuffer");
-      E(this, "tlsState", 0);
-      E(this, "tlsRead");
-      E(this, "tlsWrite");
-    }
-    static get poolQueryViaFetch() {
-      return S2.opts.poolQueryViaFetch ?? S2.defaults.poolQueryViaFetch;
-    }
-    static set poolQueryViaFetch(t) {
-      S2.opts.poolQueryViaFetch = t;
-    }
-    static get fetchEndpoint() {
-      return S2.opts.fetchEndpoint ?? S2.defaults.fetchEndpoint;
-    }
-    static set fetchEndpoint(t) {
-      S2.opts.fetchEndpoint = t;
-    }
-    static get fetchConnectionCache() {
-      return true;
-    }
-    static set fetchConnectionCache(t) {
-      console.warn("The `fetchConnectionCache` option is deprecated (now always `true`)");
-    }
-    static get fetchFunction() {
-      return S2.opts.fetchFunction ?? S2.defaults.fetchFunction;
-    }
-    static set fetchFunction(t) {
-      S2.opts.fetchFunction = t;
-    }
-    static get webSocketConstructor() {
-      return S2.opts.webSocketConstructor ?? S2.defaults.webSocketConstructor;
-    }
-    static set webSocketConstructor(t) {
-      S2.opts.webSocketConstructor = t;
-    }
-    get webSocketConstructor() {
-      return this.opts.webSocketConstructor ?? S2.webSocketConstructor;
-    }
-    set webSocketConstructor(t) {
-      this.opts.webSocketConstructor = t;
-    }
-    static get wsProxy() {
-      return S2.opts.wsProxy ?? S2.defaults.wsProxy;
-    }
-    static set wsProxy(t) {
-      S2.opts.wsProxy = t;
-    }
-    get wsProxy() {
-      return this.opts.wsProxy ?? S2.wsProxy;
-    }
-    set wsProxy(t) {
-      this.opts.wsProxy = t;
-    }
-    static get coalesceWrites() {
-      return S2.opts.coalesceWrites ?? S2.defaults.coalesceWrites;
-    }
-    static set coalesceWrites(t) {
-      S2.opts.coalesceWrites = t;
-    }
-    get coalesceWrites() {
-      return this.opts.coalesceWrites ?? S2.coalesceWrites;
-    }
-    set coalesceWrites(t) {
-      this.opts.coalesceWrites = t;
-    }
-    static get useSecureWebSocket() {
-      return S2.opts.useSecureWebSocket ?? S2.defaults.useSecureWebSocket;
-    }
-    static set useSecureWebSocket(t) {
-      S2.opts.useSecureWebSocket = t;
-    }
-    get useSecureWebSocket() {
-      return this.opts.useSecureWebSocket ?? S2.useSecureWebSocket;
-    }
-    set useSecureWebSocket(t) {
-      this.opts.useSecureWebSocket = t;
-    }
-    static get forceDisablePgSSL() {
-      return S2.opts.forceDisablePgSSL ?? S2.defaults.forceDisablePgSSL;
-    }
-    static set forceDisablePgSSL(t) {
-      S2.opts.forceDisablePgSSL = t;
-    }
-    get forceDisablePgSSL() {
-      return this.opts.forceDisablePgSSL ?? S2.forceDisablePgSSL;
-    }
-    set forceDisablePgSSL(t) {
-      this.opts.forceDisablePgSSL = t;
-    }
-    static get disableSNI() {
-      return S2.opts.disableSNI ?? S2.defaults.disableSNI;
-    }
-    static set disableSNI(t) {
-      S2.opts.disableSNI = t;
-    }
-    get disableSNI() {
-      return this.opts.disableSNI ?? S2.disableSNI;
-    }
-    set disableSNI(t) {
-      this.opts.disableSNI = t;
-    }
-    static get disableWarningInBrowsers() {
-      return S2.opts.disableWarningInBrowsers ?? S2.defaults.disableWarningInBrowsers;
-    }
-    static set disableWarningInBrowsers(t) {
-      S2.opts.disableWarningInBrowsers = t;
-    }
-    get disableWarningInBrowsers() {
-      return this.opts.disableWarningInBrowsers ?? S2.disableWarningInBrowsers;
-    }
-    set disableWarningInBrowsers(t) {
-      this.opts.disableWarningInBrowsers = t;
-    }
-    static get pipelineConnect() {
-      return S2.opts.pipelineConnect ?? S2.defaults.pipelineConnect;
-    }
-    static set pipelineConnect(t) {
-      S2.opts.pipelineConnect = t;
-    }
-    get pipelineConnect() {
-      return this.opts.pipelineConnect ?? S2.pipelineConnect;
-    }
-    set pipelineConnect(t) {
-      this.opts.pipelineConnect = t;
-    }
-    static get subtls() {
-      return S2.opts.subtls ?? S2.defaults.subtls;
-    }
-    static set subtls(t) {
-      S2.opts.subtls = t;
-    }
-    get subtls() {
-      return this.opts.subtls ?? S2.subtls;
-    }
-    set subtls(t) {
-      this.opts.subtls = t;
-    }
-    static get pipelineTLS() {
-      return S2.opts.pipelineTLS ?? S2.defaults.pipelineTLS;
-    }
-    static set pipelineTLS(t) {
-      S2.opts.pipelineTLS = t;
-    }
-    get pipelineTLS() {
-      return this.opts.pipelineTLS ?? S2.pipelineTLS;
-    }
-    set pipelineTLS(t) {
-      this.opts.pipelineTLS = t;
-    }
-    static get rootCerts() {
-      return S2.opts.rootCerts ?? S2.defaults.rootCerts;
-    }
-    static set rootCerts(t) {
-      S2.opts.rootCerts = t;
-    }
-    get rootCerts() {
-      return this.opts.rootCerts ?? S2.rootCerts;
-    }
-    set rootCerts(t) {
-      this.opts.rootCerts = t;
-    }
-    wsProxyAddrForHost(t, n) {
-      let i = this.wsProxy;
-      if (i === void 0) throw new Error("No WebSocket proxy is configured. Please see https://github.com/neondatabase/serverless/blob/main/CONFIG.md#wsproxy-string--host-string-port-number--string--string");
-      return typeof i == "function" ? i(t, n) : `${i}?address=${t}:${n}`;
-    }
-    setNoDelay() {
-      return this;
-    }
-    setKeepAlive() {
-      return this;
-    }
-    ref() {
-      return this;
-    }
-    unref() {
-      return this;
-    }
-    connect(t, n, i) {
-      this.connecting = true, i && this.once("connect", i);
-      let s = a(() => {
-        this.connecting = false, this.pending = false, this.emit("connect"), this.emit("ready");
-      }, "handleWebSocketOpen"), o = a((c, l = false) => {
-        c.binaryType = "arraybuffer", c.addEventListener("error", (f) => {
-          this.emit("error", f), this.emit("close");
-        }), c.addEventListener("message", (f) => {
-          if (this.tlsState === 0) {
-            let y = d.from(f.data);
-            this.emit("data", y);
-          }
-        }), c.addEventListener("close", () => {
-          this.emit("close");
-        }), l ? s() : c.addEventListener(
-          "open",
-          s
-        );
-      }, "configureWebSocket"), u;
-      try {
-        u = this.wsProxyAddrForHost(n, typeof t == "string" ? parseInt(t, 10) : t);
-      } catch (c) {
-        this.emit("error", c), this.emit("close");
-        return;
-      }
-      try {
-        let l = (this.useSecureWebSocket ? "wss:" : "ws:") + "//" + u;
-        if (this.webSocketConstructor !== void 0) this.ws = new this.webSocketConstructor(l), o(this.ws);
-        else try {
-          this.ws = new WebSocket(l), o(this.ws);
-        } catch {
-          this.ws = new __unstable_WebSocket(l), o(this.ws);
-        }
-      } catch (c) {
-        let f = (this.useSecureWebSocket ? "https:" : "http:") + "//" + u;
-        fetch(f, { headers: { Upgrade: "websocket" } }).then(
-          (y) => {
-            if (this.ws = y.webSocket, this.ws == null) throw c;
-            this.ws.accept(), o(this.ws, true);
-          }
-        ).catch((y) => {
-          this.emit(
-            "error",
-            new Error(`All attempts to open a WebSocket to connect to the database failed. Please refer to https://github.com/neondatabase/serverless/blob/main/CONFIG.md#websocketconstructor-typeof-websocket--undefined. Details: ${y}`)
-          ), this.emit("close");
-        });
-      }
-    }
-    async startTls(t) {
-      if (this.subtls === void 0) throw new Error(
-        "For Postgres SSL connections, you must set `neonConfig.subtls` to the subtls library. See https://github.com/neondatabase/serverless/blob/main/CONFIG.md for more information."
-      );
-      this.tlsState = 1;
-      let n = await this.subtls.TrustedCert.databaseFromPEM(this.rootCerts), i = new this.subtls.WebSocketReadQueue(this.ws), s = i.read.bind(i), o = this.rawWrite.bind(this), { read: u, write: c } = await this.subtls.startTls(t, n, s, o, { useSNI: !this.disableSNI, expectPreData: this.pipelineTLS ? new Uint8Array([83]) : void 0 });
-      this.tlsRead = u, this.tlsWrite = c, this.tlsState = 2, this.encrypted = true, this.authorized = true, this.emit("secureConnection", this), this.tlsReadLoop();
-    }
-    async tlsReadLoop() {
-      for (; ; ) {
-        let t = await this.tlsRead();
-        if (t === void 0) break;
-        {
-          let n = d.from(t);
-          this.emit("data", n);
-        }
-      }
-    }
-    rawWrite(t) {
-      if (!this.coalesceWrites) {
-        this.ws && this.ws.send(t);
-        return;
-      }
-      if (this.writeBuffer === void 0) this.writeBuffer = t, setTimeout(() => {
-        this.ws && this.ws.send(this.writeBuffer), this.writeBuffer = void 0;
-      }, 0);
-      else {
-        let n = new Uint8Array(
-          this.writeBuffer.length + t.length
-        );
-        n.set(this.writeBuffer), n.set(t, this.writeBuffer.length), this.writeBuffer = n;
-      }
-    }
-    write(t, n = "utf8", i = (s) => {
-    }) {
-      return t.length === 0 ? (i(), true) : (typeof t == "string" && (t = d.from(t, n)), this.tlsState === 0 ? (this.rawWrite(t), i()) : this.tlsState === 1 ? this.once("secureConnection", () => {
-        this.write(
-          t,
-          n,
-          i
-        );
-      }) : (this.tlsWrite(t), i()), true);
-    }
-    end(t = d.alloc(0), n = "utf8", i = () => {
-    }) {
-      return this.write(t, n, () => {
-        this.ws.close(), i();
-      }), this;
-    }
-    destroy() {
-      return this.destroyed = true, this.end();
-    }
-  };
-  a(S, "Socket"), E(S, "defaults", {
-    poolQueryViaFetch: false,
-    fetchEndpoint: a((t, n, i) => {
-      let s;
-      return i?.jwtAuth ? s = t.replace(yi, "apiauth.") : s = t.replace(yi, "api."), "https://" + s + "/sql";
-    }, "fetchEndpoint"),
-    fetchConnectionCache: true,
-    fetchFunction: void 0,
-    webSocketConstructor: void 0,
-    wsProxy: a((t) => t + "/v2", "wsProxy"),
-    useSecureWebSocket: true,
-    forceDisablePgSSL: true,
-    coalesceWrites: true,
-    pipelineConnect: "password",
-    subtls: void 0,
-    rootCerts: "",
-    pipelineTLS: false,
-    disableSNI: false,
-    disableWarningInBrowsers: false
-  }), E(S, "opts", {});
-  ce = S;
-});
-var gi = {};
-ie(gi, { parse: /* @__PURE__ */ __name(() => Yt, "parse") });
-function Yt(r, e = false) {
-  let { protocol: t } = new URL(r), n = "http:" + r.substring(
-    t.length
-  ), { username: i, password: s, host: o, hostname: u, port: c, pathname: l, search: f, searchParams: y, hash: g } = new URL(
-    n
-  );
-  s = decodeURIComponent(s), i = decodeURIComponent(i), l = decodeURIComponent(l);
-  let A = i + ":" + s, C = e ? Object.fromEntries(y.entries()) : f;
-  return {
-    href: r,
-    protocol: t,
-    auth: A,
-    username: i,
-    password: s,
-    host: o,
-    hostname: u,
-    port: c,
-    pathname: l,
-    search: f,
-    query: C,
-    hash: g
-  };
-}
-__name(Yt, "Yt");
-var Zt = G(() => {
-  "use strict";
-  p();
-  a(Yt, "parse");
-});
-var tr = T((Ai) => {
-  "use strict";
-  p();
-  Ai.parse = function(r, e) {
-    return new er(r, e).parse();
-  };
-  var vt = class vt2 {
-    static {
-      __name(this, "vt");
-    }
-    constructor(e, t) {
-      this.source = e, this.transform = t || Ca, this.position = 0, this.entries = [], this.recorded = [], this.dimension = 0;
-    }
-    isEof() {
-      return this.position >= this.source.length;
-    }
-    nextCharacter() {
-      var e = this.source[this.position++];
-      return e === "\\" ? { value: this.source[this.position++], escaped: true } : { value: e, escaped: false };
-    }
-    record(e) {
-      this.recorded.push(
-        e
-      );
-    }
-    newEntry(e) {
-      var t;
-      (this.recorded.length > 0 || e) && (t = this.recorded.join(""), t === "NULL" && !e && (t = null), t !== null && (t = this.transform(t)), this.entries.push(t), this.recorded = []);
-    }
-    consumeDimensions() {
-      if (this.source[0] === "[") for (; !this.isEof(); ) {
-        var e = this.nextCharacter();
-        if (e.value === "=") break;
-      }
-    }
-    parse(e) {
-      var t, n, i;
-      for (this.consumeDimensions(); !this.isEof(); ) if (t = this.nextCharacter(), t.value === "{" && !i) this.dimension++, this.dimension > 1 && (n = new vt2(this.source.substr(this.position - 1), this.transform), this.entries.push(n.parse(
-        true
-      )), this.position += n.position - 2);
-      else if (t.value === "}" && !i) {
-        if (this.dimension--, !this.dimension && (this.newEntry(), e)) return this.entries;
-      } else t.value === '"' && !t.escaped ? (i && this.newEntry(true), i = !i) : t.value === "," && !i ? this.newEntry() : this.record(t.value);
-      if (this.dimension !== 0) throw new Error("array dimension not balanced");
-      return this.entries;
-    }
-  };
-  a(vt, "ArrayParser");
-  var er = vt;
-  function Ca(r) {
-    return r;
-  }
-  __name(Ca, "Ca");
-  a(Ca, "identity");
-});
-var rr = T((Zl, Ci) => {
-  p();
-  var _a = tr();
-  Ci.exports = { create: a(function(r, e) {
-    return { parse: a(function() {
-      return _a.parse(r, e);
-    }, "parse") };
-  }, "create") };
-});
-var Ti = T((ef, Ii) => {
-  "use strict";
-  p();
-  var Ia = /(\d{1,})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\.\d{1,})?.*?( BC)?$/, Ta = /^(\d{1,})-(\d{2})-(\d{2})( BC)?$/, Pa = /([Z+-])(\d{2})?:?(\d{2})?:?(\d{2})?/, Ra = /^-?infinity$/;
-  Ii.exports = a(function(e) {
-    if (Ra.test(e)) return Number(e.replace("i", "I"));
-    var t = Ia.exec(e);
-    if (!t) return Ba(
-      e
-    ) || null;
-    var n = !!t[8], i = parseInt(t[1], 10);
-    n && (i = _i(i));
-    var s = parseInt(t[2], 10) - 1, o = t[3], u = parseInt(
-      t[4],
-      10
-    ), c = parseInt(t[5], 10), l = parseInt(t[6], 10), f = t[7];
-    f = f ? 1e3 * parseFloat(f) : 0;
-    var y, g = La(e);
-    return g != null ? (y = new Date(Date.UTC(i, s, o, u, c, l, f)), nr(i) && y.setUTCFullYear(i), g !== 0 && y.setTime(y.getTime() - g)) : (y = new Date(i, s, o, u, c, l, f), nr(i) && y.setFullYear(i)), y;
-  }, "parseDate");
-  function Ba(r) {
-    var e = Ta.exec(r);
-    if (e) {
-      var t = parseInt(e[1], 10), n = !!e[4];
-      n && (t = _i(t));
-      var i = parseInt(e[2], 10) - 1, s = e[3], o = new Date(t, i, s);
-      return nr(
-        t
-      ) && o.setFullYear(t), o;
-    }
-  }
-  __name(Ba, "Ba");
-  a(Ba, "getDate");
-  function La(r) {
-    if (r.endsWith("+00")) return 0;
-    var e = Pa.exec(r.split(" ")[1]);
-    if (e) {
-      var t = e[1];
-      if (t === "Z") return 0;
-      var n = t === "-" ? -1 : 1, i = parseInt(e[2], 10) * 3600 + parseInt(
-        e[3] || 0,
-        10
-      ) * 60 + parseInt(e[4] || 0, 10);
-      return i * n * 1e3;
-    }
-  }
-  __name(La, "La");
-  a(La, "timeZoneOffset");
-  function _i(r) {
-    return -(r - 1);
-  }
-  __name(_i, "_i");
-  a(_i, "bcYearToNegativeYear");
-  function nr(r) {
-    return r >= 0 && r < 100;
-  }
-  __name(nr, "nr");
-  a(nr, "is0To99");
-});
-var Ri = T((nf, Pi) => {
-  p();
-  Pi.exports = ka;
-  var Fa = Object.prototype.hasOwnProperty;
-  function ka(r) {
-    for (var e = 1; e < arguments.length; e++) {
-      var t = arguments[e];
-      for (var n in t) Fa.call(t, n) && (r[n] = t[n]);
-    }
-    return r;
-  }
-  __name(ka, "ka");
-  a(ka, "extend");
-});
-var Fi = T((af, Li) => {
-  "use strict";
-  p();
-  var Ma = Ri();
-  Li.exports = ke;
-  function ke(r) {
-    if (!(this instanceof ke))
-      return new ke(r);
-    Ma(this, Va(r));
-  }
-  __name(ke, "ke");
-  a(ke, "PostgresInterval");
-  var Ua = [
-    "seconds",
-    "minutes",
-    "hours",
-    "days",
-    "months",
-    "years"
-  ];
-  ke.prototype.toPostgres = function() {
-    var r = Ua.filter(this.hasOwnProperty, this);
-    return this.milliseconds && r.indexOf("seconds") < 0 && r.push("seconds"), r.length === 0 ? "0" : r.map(function(e) {
-      var t = this[e] || 0;
-      return e === "seconds" && this.milliseconds && (t = (t + this.milliseconds / 1e3).toFixed(6).replace(
-        /\.?0+$/,
-        ""
-      )), t + " " + e;
-    }, this).join(" ");
-  };
-  var Da = { years: "Y", months: "M", days: "D", hours: "H", minutes: "M", seconds: "S" }, Oa = ["years", "months", "days"], qa = ["hours", "minutes", "seconds"];
-  ke.prototype.toISOString = ke.prototype.toISO = function() {
-    var r = Oa.map(t, this).join(""), e = qa.map(t, this).join("");
-    return "P" + r + "T" + e;
-    function t(n) {
-      var i = this[n] || 0;
-      return n === "seconds" && this.milliseconds && (i = (i + this.milliseconds / 1e3).toFixed(6).replace(
-        /0+$/,
-        ""
-      )), i + Da[n];
-    }
-    __name(t, "t");
-  };
-  var ir = "([+-]?\\d+)", Qa = ir + "\\s+years?", Na = ir + "\\s+mons?", Wa = ir + "\\s+days?", ja = "([+-])?([\\d]*):(\\d\\d):(\\d\\d)\\.?(\\d{1,6})?", Ha = new RegExp([Qa, Na, Wa, ja].map(function(r) {
-    return "(" + r + ")?";
-  }).join("\\s*")), Bi = { years: 2, months: 4, days: 6, hours: 9, minutes: 10, seconds: 11, milliseconds: 12 }, $a = ["hours", "minutes", "seconds", "milliseconds"];
-  function Ga(r) {
-    var e = r + "000000".slice(r.length);
-    return parseInt(
-      e,
-      10
-    ) / 1e3;
-  }
-  __name(Ga, "Ga");
-  a(Ga, "parseMilliseconds");
-  function Va(r) {
-    if (!r) return {};
-    var e = Ha.exec(r), t = e[8] === "-";
-    return Object.keys(Bi).reduce(function(n, i) {
-      var s = Bi[i], o = e[s];
-      return !o || (o = i === "milliseconds" ? Ga(o) : parseInt(o, 10), !o) || (t && ~$a.indexOf(i) && (o *= -1), n[i] = o), n;
-    }, {});
-  }
-  __name(Va, "Va");
-  a(Va, "parse");
-});
-var Mi = T((lf, ki) => {
-  "use strict";
-  p();
-  ki.exports = a(function(e) {
-    if (/^\\x/.test(e)) return new d(e.substr(
-      2
-    ), "hex");
-    for (var t = "", n = 0; n < e.length; ) if (e[n] !== "\\") t += e[n], ++n;
-    else if (/[0-7]{3}/.test(e.substr(n + 1, 3))) t += String.fromCharCode(parseInt(e.substr(n + 1, 3), 8)), n += 4;
-    else {
-      for (var i = 1; n + i < e.length && e[n + i] === "\\"; ) i++;
-      for (var s = 0; s < Math.floor(i / 2); ++s) t += "\\";
-      n += Math.floor(i / 2) * 2;
-    }
-    return new d(t, "binary");
-  }, "parseBytea");
-});
-var Wi = T((pf, Ni) => {
-  p();
-  var Ve = tr(), ze = rr(), xt = Ti(), Di = Fi(), Oi = Mi();
-  function St(r) {
-    return a(function(t) {
-      return t === null ? t : r(t);
-    }, "nullAllowed");
-  }
-  __name(St, "St");
-  a(St, "allowNull");
-  function qi(r) {
-    return r === null ? r : r === "TRUE" || r === "t" || r === "true" || r === "y" || r === "yes" || r === "on" || r === "1";
-  }
-  __name(qi, "qi");
-  a(qi, "parseBool");
-  function za(r) {
-    return r ? Ve.parse(r, qi) : null;
-  }
-  __name(za, "za");
-  a(za, "parseBoolArray");
-  function Ka(r) {
-    return parseInt(r, 10);
-  }
-  __name(Ka, "Ka");
-  a(Ka, "parseBaseTenInt");
-  function sr(r) {
-    return r ? Ve.parse(r, St(Ka)) : null;
-  }
-  __name(sr, "sr");
-  a(sr, "parseIntegerArray");
-  function Ya(r) {
-    return r ? Ve.parse(r, St(function(e) {
-      return Qi(e).trim();
-    })) : null;
-  }
-  __name(Ya, "Ya");
-  a(Ya, "parseBigIntegerArray");
-  var Za = a(function(r) {
-    if (!r) return null;
-    var e = ze.create(r, function(t) {
-      return t !== null && (t = cr(t)), t;
-    });
-    return e.parse();
-  }, "parsePointArray"), or2 = a(function(r) {
-    if (!r) return null;
-    var e = ze.create(r, function(t) {
-      return t !== null && (t = parseFloat(t)), t;
-    });
-    return e.parse();
-  }, "parseFloatArray"), re = a(function(r) {
-    if (!r) return null;
-    var e = ze.create(r);
-    return e.parse();
-  }, "parseStringArray"), ar = a(function(r) {
-    if (!r) return null;
-    var e = ze.create(
-      r,
-      function(t) {
-        return t !== null && (t = xt(t)), t;
-      }
-    );
-    return e.parse();
-  }, "parseDateArray"), Ja = a(function(r) {
-    if (!r)
-      return null;
-    var e = ze.create(r, function(t) {
-      return t !== null && (t = Di(t)), t;
-    });
-    return e.parse();
-  }, "parseIntervalArray"), Xa = a(function(r) {
-    return r ? Ve.parse(r, St(Oi)) : null;
-  }, "parseByteAArray"), ur = a(function(r) {
-    return parseInt(r, 10);
-  }, "parseInteger"), Qi = a(function(r) {
-    var e = String(r);
-    return /^\d+$/.test(e) ? e : r;
-  }, "parseBigInteger"), Ui = a(function(r) {
-    return r ? Ve.parse(r, St(JSON.parse)) : null;
-  }, "parseJsonArray"), cr = a(
-    function(r) {
-      return r[0] !== "(" ? null : (r = r.substring(1, r.length - 1).split(","), { x: parseFloat(r[0]), y: parseFloat(
-        r[1]
-      ) });
-    },
-    "parsePoint"
-  ), eu = a(function(r) {
-    if (r[0] !== "<" && r[1] !== "(") return null;
-    for (var e = "(", t = "", n = false, i = 2; i < r.length - 1; i++) {
-      if (n || (e += r[i]), r[i] === ")") {
-        n = true;
-        continue;
-      } else if (!n) continue;
-      r[i] !== "," && (t += r[i]);
-    }
-    var s = cr(e);
-    return s.radius = parseFloat(t), s;
-  }, "parseCircle"), tu = a(function(r) {
-    r(20, Qi), r(21, ur), r(23, ur), r(26, ur), r(700, parseFloat), r(701, parseFloat), r(16, qi), r(1082, xt), r(1114, xt), r(1184, xt), r(
-      600,
-      cr
-    ), r(651, re), r(718, eu), r(1e3, za), r(1001, Xa), r(1005, sr), r(1007, sr), r(1028, sr), r(1016, Ya), r(1017, Za), r(1021, or2), r(1022, or2), r(1231, or2), r(1014, re), r(1015, re), r(1008, re), r(1009, re), r(1040, re), r(1041, re), r(
-      1115,
-      ar
-    ), r(1182, ar), r(1185, ar), r(1186, Di), r(1187, Ja), r(17, Oi), r(114, JSON.parse.bind(JSON)), r(3802, JSON.parse.bind(JSON)), r(199, Ui), r(3807, Ui), r(3907, re), r(2951, re), r(791, re), r(1183, re), r(1270, re);
-  }, "init");
-  Ni.exports = { init: tu };
-});
-var Hi = T((mf, ji) => {
-  "use strict";
-  p();
-  var z = 1e6;
-  function ru(r) {
-    var e = r.readInt32BE(0), t = r.readUInt32BE(
-      4
-    ), n = "";
-    e < 0 && (e = ~e + (t === 0), t = ~t + 1 >>> 0, n = "-");
-    var i = "", s, o, u, c, l, f;
-    {
-      if (s = e % z, e = e / z >>> 0, o = 4294967296 * s + t, t = o / z >>> 0, u = "" + (o - z * t), t === 0 && e === 0) return n + u + i;
-      for (c = "", l = 6 - u.length, f = 0; f < l; f++) c += "0";
-      i = c + u + i;
-    }
-    {
-      if (s = e % z, e = e / z >>> 0, o = 4294967296 * s + t, t = o / z >>> 0, u = "" + (o - z * t), t === 0 && e === 0) return n + u + i;
-      for (c = "", l = 6 - u.length, f = 0; f < l; f++) c += "0";
-      i = c + u + i;
-    }
-    {
-      if (s = e % z, e = e / z >>> 0, o = 4294967296 * s + t, t = o / z >>> 0, u = "" + (o - z * t), t === 0 && e === 0) return n + u + i;
-      for (c = "", l = 6 - u.length, f = 0; f < l; f++) c += "0";
-      i = c + u + i;
-    }
-    return s = e % z, o = 4294967296 * s + t, u = "" + o % z, n + u + i;
-  }
-  __name(ru, "ru");
-  a(ru, "readInt8");
-  ji.exports = ru;
-});
-var Ki = T((bf, zi) => {
-  p();
-  var nu = Hi(), L = a(function(r, e, t, n, i) {
-    t = t || 0, n = n || false, i = i || function(A, C, D) {
-      return A * Math.pow(2, D) + C;
-    };
-    var s = t >> 3, o = a(function(A) {
-      return n ? ~A & 255 : A;
-    }, "inv"), u = 255, c = 8 - t % 8;
-    e < c && (u = 255 << 8 - e & 255, c = e), t && (u = u >> t % 8);
-    var l = 0;
-    t % 8 + e >= 8 && (l = i(0, o(r[s]) & u, c));
-    for (var f = e + t >> 3, y = s + 1; y < f; y++) l = i(l, o(
-      r[y]
-    ), 8);
-    var g = (e + t) % 8;
-    return g > 0 && (l = i(l, o(r[f]) >> 8 - g, g)), l;
-  }, "parseBits"), Vi = a(function(r, e, t) {
-    var n = Math.pow(2, t - 1) - 1, i = L(r, 1), s = L(r, t, 1);
-    if (s === 0) return 0;
-    var o = 1, u = a(function(l, f, y) {
-      l === 0 && (l = 1);
-      for (var g = 1; g <= y; g++) o /= 2, (f & 1 << y - g) > 0 && (l += o);
-      return l;
-    }, "parsePrecisionBits"), c = L(r, e, t + 1, false, u);
-    return s == Math.pow(
-      2,
-      t + 1
-    ) - 1 ? c === 0 ? i === 0 ? 1 / 0 : -1 / 0 : NaN : (i === 0 ? 1 : -1) * Math.pow(2, s - n) * c;
-  }, "parseFloatFromBits"), iu = a(function(r) {
-    return L(r, 1) == 1 ? -1 * (L(r, 15, 1, true) + 1) : L(r, 15, 1);
-  }, "parseInt16"), $i = a(function(r) {
-    return L(r, 1) == 1 ? -1 * (L(
-      r,
-      31,
-      1,
-      true
-    ) + 1) : L(r, 31, 1);
-  }, "parseInt32"), su = a(function(r) {
-    return Vi(r, 23, 8);
-  }, "parseFloat32"), ou = a(function(r) {
-    return Vi(r, 52, 11);
-  }, "parseFloat64"), au = a(function(r) {
-    var e = L(r, 16, 32);
-    if (e == 49152) return NaN;
-    for (var t = Math.pow(1e4, L(r, 16, 16)), n = 0, i = [], s = L(r, 16), o = 0; o < s; o++) n += L(r, 16, 64 + 16 * o) * t, t /= 1e4;
-    var u = Math.pow(10, L(
-      r,
-      16,
-      48
-    ));
-    return (e === 0 ? 1 : -1) * Math.round(n * u) / u;
-  }, "parseNumeric"), Gi = a(function(r, e) {
-    var t = L(e, 1), n = L(
-      e,
-      63,
-      1
-    ), i = new Date((t === 0 ? 1 : -1) * n / 1e3 + 9466848e5);
-    return r || i.setTime(i.getTime() + i.getTimezoneOffset() * 6e4), i.usec = n % 1e3, i.getMicroSeconds = function() {
-      return this.usec;
-    }, i.setMicroSeconds = function(s) {
-      this.usec = s;
-    }, i.getUTCMicroSeconds = function() {
-      return this.usec;
-    }, i;
-  }, "parseDate"), Ke = a(
-    function(r) {
-      for (var e = L(
-        r,
-        32
-      ), t = L(r, 32, 32), n = L(r, 32, 64), i = 96, s = [], o = 0; o < e; o++) s[o] = L(r, 32, i), i += 32, i += 32;
-      var u = a(function(l) {
-        var f = L(r, 32, i);
-        if (i += 32, f == 4294967295) return null;
-        var y;
-        if (l == 23 || l == 20) return y = L(r, f * 8, i), i += f * 8, y;
-        if (l == 25) return y = r.toString(this.encoding, i >> 3, (i += f << 3) >> 3), y;
-        console.log("ERROR: ElementType not implemented: " + l);
-      }, "parseElement"), c = a(function(l, f) {
-        var y = [], g;
-        if (l.length > 1) {
-          var A = l.shift();
-          for (g = 0; g < A; g++) y[g] = c(l, f);
-          l.unshift(A);
-        } else for (g = 0; g < l[0]; g++) y[g] = u(f);
-        return y;
-      }, "parse");
-      return c(s, n);
-    },
-    "parseArray"
-  ), uu = a(function(r) {
-    return r.toString("utf8");
-  }, "parseText"), cu = a(function(r) {
-    return r === null ? null : L(r, 8) > 0;
-  }, "parseBool"), lu = a(function(r) {
-    r(20, nu), r(21, iu), r(23, $i), r(26, $i), r(1700, au), r(700, su), r(701, ou), r(16, cu), r(1114, Gi.bind(null, false)), r(1184, Gi.bind(null, true)), r(1e3, Ke), r(1007, Ke), r(1016, Ke), r(1008, Ke), r(1009, Ke), r(25, uu);
-  }, "init");
-  zi.exports = { init: lu };
-});
-var Zi = T((Sf, Yi) => {
-  p();
-  Yi.exports = {
-    BOOL: 16,
-    BYTEA: 17,
-    CHAR: 18,
-    INT8: 20,
-    INT2: 21,
-    INT4: 23,
-    REGPROC: 24,
-    TEXT: 25,
-    OID: 26,
-    TID: 27,
-    XID: 28,
-    CID: 29,
-    JSON: 114,
-    XML: 142,
-    PG_NODE_TREE: 194,
-    SMGR: 210,
-    PATH: 602,
-    POLYGON: 604,
-    CIDR: 650,
-    FLOAT4: 700,
-    FLOAT8: 701,
-    ABSTIME: 702,
-    RELTIME: 703,
-    TINTERVAL: 704,
-    CIRCLE: 718,
-    MACADDR8: 774,
-    MONEY: 790,
-    MACADDR: 829,
-    INET: 869,
-    ACLITEM: 1033,
-    BPCHAR: 1042,
-    VARCHAR: 1043,
-    DATE: 1082,
-    TIME: 1083,
-    TIMESTAMP: 1114,
-    TIMESTAMPTZ: 1184,
-    INTERVAL: 1186,
-    TIMETZ: 1266,
-    BIT: 1560,
-    VARBIT: 1562,
-    NUMERIC: 1700,
-    REFCURSOR: 1790,
-    REGPROCEDURE: 2202,
-    REGOPER: 2203,
-    REGOPERATOR: 2204,
-    REGCLASS: 2205,
-    REGTYPE: 2206,
-    UUID: 2950,
-    TXID_SNAPSHOT: 2970,
-    PG_LSN: 3220,
-    PG_NDISTINCT: 3361,
-    PG_DEPENDENCIES: 3402,
-    TSVECTOR: 3614,
-    TSQUERY: 3615,
-    GTSVECTOR: 3642,
-    REGCONFIG: 3734,
-    REGDICTIONARY: 3769,
-    JSONB: 3802,
-    REGNAMESPACE: 4089,
-    REGROLE: 4096
-  };
-});
-var Je = T((Ze) => {
-  p();
-  var fu = Wi(), hu = Ki(), pu = rr(), du = Zi();
-  Ze.getTypeParser = yu;
-  Ze.setTypeParser = mu;
-  Ze.arrayParser = pu;
-  Ze.builtins = du;
-  var Ye = { text: {}, binary: {} };
-  function Ji(r) {
-    return String(r);
-  }
-  __name(Ji, "Ji");
-  a(Ji, "noParse");
-  function yu(r, e) {
-    return e = e || "text", Ye[e] && Ye[e][r] || Ji;
-  }
-  __name(yu, "yu");
-  a(yu, "getTypeParser");
-  function mu(r, e, t) {
-    typeof e == "function" && (t = e, e = "text"), Ye[e][r] = t;
-  }
-  __name(mu, "mu");
-  a(mu, "setTypeParser");
-  fu.init(function(r, e) {
-    Ye.text[r] = e;
-  });
-  hu.init(function(r, e) {
-    Ye.binary[r] = e;
-  });
-});
-var At = T((If, Xi) => {
-  "use strict";
-  p();
-  var wu = Je();
-  function Et(r) {
-    this._types = r || wu, this.text = {}, this.binary = {};
-  }
-  __name(Et, "Et");
-  a(Et, "TypeOverrides");
-  Et.prototype.getOverrides = function(r) {
-    switch (r) {
-      case "text":
-        return this.text;
-      case "binary":
-        return this.binary;
-      default:
-        return {};
-    }
-  };
-  Et.prototype.setTypeParser = function(r, e, t) {
-    typeof e == "function" && (t = e, e = "text"), this.getOverrides(e)[r] = t;
-  };
-  Et.prototype.getTypeParser = function(r, e) {
-    return e = e || "text", this.getOverrides(e)[r] || this._types.getTypeParser(r, e);
-  };
-  Xi.exports = Et;
-});
-function Xe(r) {
-  let e = 1779033703, t = 3144134277, n = 1013904242, i = 2773480762, s = 1359893119, o = 2600822924, u = 528734635, c = 1541459225, l = 0, f = 0, y = [
-    1116352408,
-    1899447441,
-    3049323471,
-    3921009573,
-    961987163,
-    1508970993,
-    2453635748,
-    2870763221,
-    3624381080,
-    310598401,
-    607225278,
-    1426881987,
-    1925078388,
-    2162078206,
-    2614888103,
-    3248222580,
-    3835390401,
-    4022224774,
-    264347078,
-    604807628,
-    770255983,
-    1249150122,
-    1555081692,
-    1996064986,
-    2554220882,
-    2821834349,
-    2952996808,
-    3210313671,
-    3336571891,
-    3584528711,
-    113926993,
-    338241895,
-    666307205,
-    773529912,
-    1294757372,
-    1396182291,
-    1695183700,
-    1986661051,
-    2177026350,
-    2456956037,
-    2730485921,
-    2820302411,
-    3259730800,
-    3345764771,
-    3516065817,
-    3600352804,
-    4094571909,
-    275423344,
-    430227734,
-    506948616,
-    659060556,
-    883997877,
-    958139571,
-    1322822218,
-    1537002063,
-    1747873779,
-    1955562222,
-    2024104815,
-    2227730452,
-    2361852424,
-    2428436474,
-    2756734187,
-    3204031479,
-    3329325298
-  ], g = a((I, w) => I >>> w | I << 32 - w, "rrot"), A = new Uint32Array(64), C = new Uint8Array(64), D = a(() => {
-    for (let B = 0, j = 0; B < 16; B++, j += 4) A[B] = C[j] << 24 | C[j + 1] << 16 | C[j + 2] << 8 | C[j + 3];
-    for (let B = 16; B < 64; B++) {
-      let j = g(A[B - 15], 7) ^ g(A[B - 15], 18) ^ A[B - 15] >>> 3, le = g(
-        A[B - 2],
-        17
-      ) ^ g(A[B - 2], 19) ^ A[B - 2] >>> 10;
-      A[B] = A[B - 16] + j + A[B - 7] + le | 0;
-    }
-    let I = e, w = t, Z = n, W = i, J = s, X = o, se = u, oe = c;
-    for (let B = 0; B < 64; B++) {
-      let j = g(J, 6) ^ g(J, 11) ^ g(J, 25), le = J & X ^ ~J & se, de = oe + j + le + y[B] + A[B] | 0, We = g(I, 2) ^ g(
-        I,
-        13
-      ) ^ g(I, 22), fe = I & w ^ I & Z ^ w & Z, _e = We + fe | 0;
-      oe = se, se = X, X = J, J = W + de | 0, W = Z, Z = w, w = I, I = de + _e | 0;
-    }
-    e = e + I | 0, t = t + w | 0, n = n + Z | 0, i = i + W | 0, s = s + J | 0, o = o + X | 0, u = u + se | 0, c = c + oe | 0, f = 0;
-  }, "process"), Y = a((I) => {
-    typeof I == "string" && (I = new TextEncoder().encode(I));
-    for (let w = 0; w < I.length; w++) C[f++] = I[w], f === 64 && D();
-    l += I.length;
-  }, "add"), P = a(() => {
-    if (C[f++] = 128, f == 64 && D(), f + 8 > 64) {
-      for (; f < 64; ) C[f++] = 0;
-      D();
-    }
-    for (; f < 58; ) C[f++] = 0;
-    let I = l * 8;
-    C[f++] = I / 1099511627776 & 255, C[f++] = I / 4294967296 & 255, C[f++] = I >>> 24, C[f++] = I >>> 16 & 255, C[f++] = I >>> 8 & 255, C[f++] = I & 255, D();
-    let w = new Uint8Array(
-      32
-    );
-    return w[0] = e >>> 24, w[1] = e >>> 16 & 255, w[2] = e >>> 8 & 255, w[3] = e & 255, w[4] = t >>> 24, w[5] = t >>> 16 & 255, w[6] = t >>> 8 & 255, w[7] = t & 255, w[8] = n >>> 24, w[9] = n >>> 16 & 255, w[10] = n >>> 8 & 255, w[11] = n & 255, w[12] = i >>> 24, w[13] = i >>> 16 & 255, w[14] = i >>> 8 & 255, w[15] = i & 255, w[16] = s >>> 24, w[17] = s >>> 16 & 255, w[18] = s >>> 8 & 255, w[19] = s & 255, w[20] = o >>> 24, w[21] = o >>> 16 & 255, w[22] = o >>> 8 & 255, w[23] = o & 255, w[24] = u >>> 24, w[25] = u >>> 16 & 255, w[26] = u >>> 8 & 255, w[27] = u & 255, w[28] = c >>> 24, w[29] = c >>> 16 & 255, w[30] = c >>> 8 & 255, w[31] = c & 255, w;
-  }, "digest");
-  return r === void 0 ? { add: Y, digest: P } : (Y(r), P());
-}
-__name(Xe, "Xe");
-var es = G(() => {
-  "use strict";
-  p();
-  a(Xe, "sha256");
-});
-var U;
-var et;
-var ts = G(() => {
-  "use strict";
-  p();
-  U = class U2 {
-    static {
-      __name(this, "U");
-    }
-    constructor() {
-      E(this, "_dataLength", 0);
-      E(this, "_bufferLength", 0);
-      E(this, "_state", new Int32Array(4));
-      E(this, "_buffer", new ArrayBuffer(68));
-      E(this, "_buffer8");
-      E(this, "_buffer32");
-      this._buffer8 = new Uint8Array(this._buffer, 0, 68), this._buffer32 = new Uint32Array(this._buffer, 0, 17), this.start();
-    }
-    static hashByteArray(e, t = false) {
-      return this.onePassHasher.start().appendByteArray(
-        e
-      ).end(t);
-    }
-    static hashStr(e, t = false) {
-      return this.onePassHasher.start().appendStr(e).end(t);
-    }
-    static hashAsciiStr(e, t = false) {
-      return this.onePassHasher.start().appendAsciiStr(e).end(t);
-    }
-    static _hex(e) {
-      let t = U2.hexChars, n = U2.hexOut, i, s, o, u;
-      for (u = 0; u < 4; u += 1) for (s = u * 8, i = e[u], o = 0; o < 8; o += 2) n[s + 1 + o] = t.charAt(i & 15), i >>>= 4, n[s + 0 + o] = t.charAt(
-        i & 15
-      ), i >>>= 4;
-      return n.join("");
-    }
-    static _md5cycle(e, t) {
-      let n = e[0], i = e[1], s = e[2], o = e[3];
-      n += (i & s | ~i & o) + t[0] - 680876936 | 0, n = (n << 7 | n >>> 25) + i | 0, o += (n & i | ~n & s) + t[1] - 389564586 | 0, o = (o << 12 | o >>> 20) + n | 0, s += (o & n | ~o & i) + t[2] + 606105819 | 0, s = (s << 17 | s >>> 15) + o | 0, i += (s & o | ~s & n) + t[3] - 1044525330 | 0, i = (i << 22 | i >>> 10) + s | 0, n += (i & s | ~i & o) + t[4] - 176418897 | 0, n = (n << 7 | n >>> 25) + i | 0, o += (n & i | ~n & s) + t[5] + 1200080426 | 0, o = (o << 12 | o >>> 20) + n | 0, s += (o & n | ~o & i) + t[6] - 1473231341 | 0, s = (s << 17 | s >>> 15) + o | 0, i += (s & o | ~s & n) + t[7] - 45705983 | 0, i = (i << 22 | i >>> 10) + s | 0, n += (i & s | ~i & o) + t[8] + 1770035416 | 0, n = (n << 7 | n >>> 25) + i | 0, o += (n & i | ~n & s) + t[9] - 1958414417 | 0, o = (o << 12 | o >>> 20) + n | 0, s += (o & n | ~o & i) + t[10] - 42063 | 0, s = (s << 17 | s >>> 15) + o | 0, i += (s & o | ~s & n) + t[11] - 1990404162 | 0, i = (i << 22 | i >>> 10) + s | 0, n += (i & s | ~i & o) + t[12] + 1804603682 | 0, n = (n << 7 | n >>> 25) + i | 0, o += (n & i | ~n & s) + t[13] - 40341101 | 0, o = (o << 12 | o >>> 20) + n | 0, s += (o & n | ~o & i) + t[14] - 1502002290 | 0, s = (s << 17 | s >>> 15) + o | 0, i += (s & o | ~s & n) + t[15] + 1236535329 | 0, i = (i << 22 | i >>> 10) + s | 0, n += (i & o | s & ~o) + t[1] - 165796510 | 0, n = (n << 5 | n >>> 27) + i | 0, o += (n & s | i & ~s) + t[6] - 1069501632 | 0, o = (o << 9 | o >>> 23) + n | 0, s += (o & i | n & ~i) + t[11] + 643717713 | 0, s = (s << 14 | s >>> 18) + o | 0, i += (s & n | o & ~n) + t[0] - 373897302 | 0, i = (i << 20 | i >>> 12) + s | 0, n += (i & o | s & ~o) + t[5] - 701558691 | 0, n = (n << 5 | n >>> 27) + i | 0, o += (n & s | i & ~s) + t[10] + 38016083 | 0, o = (o << 9 | o >>> 23) + n | 0, s += (o & i | n & ~i) + t[15] - 660478335 | 0, s = (s << 14 | s >>> 18) + o | 0, i += (s & n | o & ~n) + t[4] - 405537848 | 0, i = (i << 20 | i >>> 12) + s | 0, n += (i & o | s & ~o) + t[9] + 568446438 | 0, n = (n << 5 | n >>> 27) + i | 0, o += (n & s | i & ~s) + t[14] - 1019803690 | 0, o = (o << 9 | o >>> 23) + n | 0, s += (o & i | n & ~i) + t[3] - 187363961 | 0, s = (s << 14 | s >>> 18) + o | 0, i += (s & n | o & ~n) + t[8] + 1163531501 | 0, i = (i << 20 | i >>> 12) + s | 0, n += (i & o | s & ~o) + t[13] - 1444681467 | 0, n = (n << 5 | n >>> 27) + i | 0, o += (n & s | i & ~s) + t[2] - 51403784 | 0, o = (o << 9 | o >>> 23) + n | 0, s += (o & i | n & ~i) + t[7] + 1735328473 | 0, s = (s << 14 | s >>> 18) + o | 0, i += (s & n | o & ~n) + t[12] - 1926607734 | 0, i = (i << 20 | i >>> 12) + s | 0, n += (i ^ s ^ o) + t[5] - 378558 | 0, n = (n << 4 | n >>> 28) + i | 0, o += (n ^ i ^ s) + t[8] - 2022574463 | 0, o = (o << 11 | o >>> 21) + n | 0, s += (o ^ n ^ i) + t[11] + 1839030562 | 0, s = (s << 16 | s >>> 16) + o | 0, i += (s ^ o ^ n) + t[14] - 35309556 | 0, i = (i << 23 | i >>> 9) + s | 0, n += (i ^ s ^ o) + t[1] - 1530992060 | 0, n = (n << 4 | n >>> 28) + i | 0, o += (n ^ i ^ s) + t[4] + 1272893353 | 0, o = (o << 11 | o >>> 21) + n | 0, s += (o ^ n ^ i) + t[7] - 155497632 | 0, s = (s << 16 | s >>> 16) + o | 0, i += (s ^ o ^ n) + t[10] - 1094730640 | 0, i = (i << 23 | i >>> 9) + s | 0, n += (i ^ s ^ o) + t[13] + 681279174 | 0, n = (n << 4 | n >>> 28) + i | 0, o += (n ^ i ^ s) + t[0] - 358537222 | 0, o = (o << 11 | o >>> 21) + n | 0, s += (o ^ n ^ i) + t[3] - 722521979 | 0, s = (s << 16 | s >>> 16) + o | 0, i += (s ^ o ^ n) + t[6] + 76029189 | 0, i = (i << 23 | i >>> 9) + s | 0, n += (i ^ s ^ o) + t[9] - 640364487 | 0, n = (n << 4 | n >>> 28) + i | 0, o += (n ^ i ^ s) + t[12] - 421815835 | 0, o = (o << 11 | o >>> 21) + n | 0, s += (o ^ n ^ i) + t[15] + 530742520 | 0, s = (s << 16 | s >>> 16) + o | 0, i += (s ^ o ^ n) + t[2] - 995338651 | 0, i = (i << 23 | i >>> 9) + s | 0, n += (s ^ (i | ~o)) + t[0] - 198630844 | 0, n = (n << 6 | n >>> 26) + i | 0, o += (i ^ (n | ~s)) + t[7] + 1126891415 | 0, o = (o << 10 | o >>> 22) + n | 0, s += (n ^ (o | ~i)) + t[14] - 1416354905 | 0, s = (s << 15 | s >>> 17) + o | 0, i += (o ^ (s | ~n)) + t[5] - 57434055 | 0, i = (i << 21 | i >>> 11) + s | 0, n += (s ^ (i | ~o)) + t[12] + 1700485571 | 0, n = (n << 6 | n >>> 26) + i | 0, o += (i ^ (n | ~s)) + t[3] - 1894986606 | 0, o = (o << 10 | o >>> 22) + n | 0, s += (n ^ (o | ~i)) + t[10] - 1051523 | 0, s = (s << 15 | s >>> 17) + o | 0, i += (o ^ (s | ~n)) + t[1] - 2054922799 | 0, i = (i << 21 | i >>> 11) + s | 0, n += (s ^ (i | ~o)) + t[8] + 1873313359 | 0, n = (n << 6 | n >>> 26) + i | 0, o += (i ^ (n | ~s)) + t[15] - 30611744 | 0, o = (o << 10 | o >>> 22) + n | 0, s += (n ^ (o | ~i)) + t[6] - 1560198380 | 0, s = (s << 15 | s >>> 17) + o | 0, i += (o ^ (s | ~n)) + t[13] + 1309151649 | 0, i = (i << 21 | i >>> 11) + s | 0, n += (s ^ (i | ~o)) + t[4] - 145523070 | 0, n = (n << 6 | n >>> 26) + i | 0, o += (i ^ (n | ~s)) + t[11] - 1120210379 | 0, o = (o << 10 | o >>> 22) + n | 0, s += (n ^ (o | ~i)) + t[2] + 718787259 | 0, s = (s << 15 | s >>> 17) + o | 0, i += (o ^ (s | ~n)) + t[9] - 343485551 | 0, i = (i << 21 | i >>> 11) + s | 0, e[0] = n + e[0] | 0, e[1] = i + e[1] | 0, e[2] = s + e[2] | 0, e[3] = o + e[3] | 0;
-    }
-    start() {
-      return this._dataLength = 0, this._bufferLength = 0, this._state.set(U2.stateIdentity), this;
-    }
-    appendStr(e) {
-      let t = this._buffer8, n = this._buffer32, i = this._bufferLength, s, o;
-      for (o = 0; o < e.length; o += 1) {
-        if (s = e.charCodeAt(o), s < 128) t[i++] = s;
-        else if (s < 2048) t[i++] = (s >>> 6) + 192, t[i++] = s & 63 | 128;
-        else if (s < 55296 || s > 56319) t[i++] = (s >>> 12) + 224, t[i++] = s >>> 6 & 63 | 128, t[i++] = s & 63 | 128;
-        else {
-          if (s = (s - 55296) * 1024 + (e.charCodeAt(++o) - 56320) + 65536, s > 1114111) throw new Error(
-            "Unicode standard supports code points up to U+10FFFF"
-          );
-          t[i++] = (s >>> 18) + 240, t[i++] = s >>> 12 & 63 | 128, t[i++] = s >>> 6 & 63 | 128, t[i++] = s & 63 | 128;
-        }
-        i >= 64 && (this._dataLength += 64, U2._md5cycle(this._state, n), i -= 64, n[0] = n[16]);
-      }
-      return this._bufferLength = i, this;
-    }
-    appendAsciiStr(e) {
-      let t = this._buffer8, n = this._buffer32, i = this._bufferLength, s, o = 0;
-      for (; ; ) {
-        for (s = Math.min(e.length - o, 64 - i); s--; ) t[i++] = e.charCodeAt(o++);
-        if (i < 64) break;
-        this._dataLength += 64, U2._md5cycle(this._state, n), i = 0;
-      }
-      return this._bufferLength = i, this;
-    }
-    appendByteArray(e) {
-      let t = this._buffer8, n = this._buffer32, i = this._bufferLength, s, o = 0;
-      for (; ; ) {
-        for (s = Math.min(e.length - o, 64 - i); s--; ) t[i++] = e[o++];
-        if (i < 64) break;
-        this._dataLength += 64, U2._md5cycle(this._state, n), i = 0;
-      }
-      return this._bufferLength = i, this;
-    }
-    getState() {
-      let e = this._state;
-      return { buffer: String.fromCharCode.apply(null, Array.from(this._buffer8)), buflen: this._bufferLength, length: this._dataLength, state: [e[0], e[1], e[2], e[3]] };
-    }
-    setState(e) {
-      let t = e.buffer, n = e.state, i = this._state, s;
-      for (this._dataLength = e.length, this._bufferLength = e.buflen, i[0] = n[0], i[1] = n[1], i[2] = n[2], i[3] = n[3], s = 0; s < t.length; s += 1) this._buffer8[s] = t.charCodeAt(s);
-    }
-    end(e = false) {
-      let t = this._bufferLength, n = this._buffer8, i = this._buffer32, s = (t >> 2) + 1;
-      this._dataLength += t;
-      let o = this._dataLength * 8;
-      if (n[t] = 128, n[t + 1] = n[t + 2] = n[t + 3] = 0, i.set(U2.buffer32Identity.subarray(s), s), t > 55 && (U2._md5cycle(this._state, i), i.set(U2.buffer32Identity)), o <= 4294967295) i[14] = o;
-      else {
-        let u = o.toString(16).match(/(.*?)(.{0,8})$/);
-        if (u === null) return;
-        let c = parseInt(
-          u[2],
-          16
-        ), l = parseInt(u[1], 16) || 0;
-        i[14] = c, i[15] = l;
-      }
-      return U2._md5cycle(this._state, i), e ? this._state : U2._hex(
-        this._state
-      );
-    }
-  };
-  a(U, "Md5"), E(U, "stateIdentity", new Int32Array([1732584193, -271733879, -1732584194, 271733878])), E(U, "buffer32Identity", new Int32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])), E(U, "hexChars", "0123456789abcdef"), E(U, "hexOut", []), E(U, "onePassHasher", new U());
-  et = U;
-});
-var lr = {};
-ie(lr, { createHash: /* @__PURE__ */ __name(() => bu, "createHash"), createHmac: /* @__PURE__ */ __name(() => vu, "createHmac"), randomBytes: /* @__PURE__ */ __name(() => gu, "randomBytes") });
-function gu(r) {
-  return crypto.getRandomValues(d.alloc(r));
-}
-__name(gu, "gu");
-function bu(r) {
-  if (r === "sha256") return { update: a(function(e) {
-    return { digest: a(
-      function() {
-        return d.from(Xe(e));
-      },
-      "digest"
-    ) };
-  }, "update") };
-  if (r === "md5") return { update: a(function(e) {
-    return {
-      digest: a(function() {
-        return typeof e == "string" ? et.hashStr(e) : et.hashByteArray(e);
-      }, "digest")
-    };
-  }, "update") };
-  throw new Error(`Hash type '${r}' not supported`);
-}
-__name(bu, "bu");
-function vu(r, e) {
-  if (r !== "sha256") throw new Error(`Only sha256 is supported (requested: '${r}')`);
-  return { update: a(function(t) {
-    return { digest: a(
-      function() {
-        typeof e == "string" && (e = new TextEncoder().encode(e)), typeof t == "string" && (t = new TextEncoder().encode(
-          t
-        ));
-        let n = e.length;
-        if (n > 64) e = Xe(e);
-        else if (n < 64) {
-          let c = new Uint8Array(64);
-          c.set(e), e = c;
-        }
-        let i = new Uint8Array(
-          64
-        ), s = new Uint8Array(64);
-        for (let c = 0; c < 64; c++) i[c] = 54 ^ e[c], s[c] = 92 ^ e[c];
-        let o = new Uint8Array(t.length + 64);
-        o.set(i, 0), o.set(t, 64);
-        let u = new Uint8Array(96);
-        return u.set(s, 0), u.set(Xe(o), 64), d.from(Xe(u));
-      },
-      "digest"
-    ) };
-  }, "update") };
-}
-__name(vu, "vu");
-var fr = G(() => {
-  "use strict";
-  p();
-  es();
-  ts();
-  a(gu, "randomBytes");
-  a(bu, "createHash");
-  a(vu, "createHmac");
-});
-var tt = T((Qf, hr) => {
-  "use strict";
-  p();
-  hr.exports = {
-    host: "localhost",
-    user: m.platform === "win32" ? m.env.USERNAME : m.env.USER,
-    database: void 0,
-    password: null,
-    connectionString: void 0,
-    port: 5432,
-    rows: 0,
-    binary: false,
-    max: 10,
-    idleTimeoutMillis: 3e4,
-    client_encoding: "",
-    ssl: false,
-    application_name: void 0,
-    fallback_application_name: void 0,
-    options: void 0,
-    parseInputDatesAsUTC: false,
-    statement_timeout: false,
-    lock_timeout: false,
-    idle_in_transaction_session_timeout: false,
-    query_timeout: false,
-    connect_timeout: 0,
-    keepalives: 1,
-    keepalives_idle: 0
-  };
-  var Me = Je(), xu = Me.getTypeParser(20, "text"), Su = Me.getTypeParser(
-    1016,
-    "text"
-  );
-  hr.exports.__defineSetter__("parseInt8", function(r) {
-    Me.setTypeParser(20, "text", r ? Me.getTypeParser(
-      23,
-      "text"
-    ) : xu), Me.setTypeParser(1016, "text", r ? Me.getTypeParser(1007, "text") : Su);
-  });
-});
-var rt = T((Wf, ns) => {
-  "use strict";
-  p();
-  var Eu = (fr(), O(lr)), Au = tt();
-  function Cu(r) {
-    var e = r.replace(
-      /\\/g,
-      "\\\\"
-    ).replace(/"/g, '\\"');
-    return '"' + e + '"';
-  }
-  __name(Cu, "Cu");
-  a(Cu, "escapeElement");
-  function rs(r) {
-    for (var e = "{", t = 0; t < r.length; t++) t > 0 && (e = e + ","), r[t] === null || typeof r[t] > "u" ? e = e + "NULL" : Array.isArray(r[t]) ? e = e + rs(r[t]) : r[t] instanceof d ? e += "\\\\x" + r[t].toString("hex") : e += Cu(Ct(r[t]));
-    return e = e + "}", e;
-  }
-  __name(rs, "rs");
-  a(rs, "arrayString");
-  var Ct = a(function(r, e) {
-    if (r == null) return null;
-    if (r instanceof d) return r;
-    if (ArrayBuffer.isView(r)) {
-      var t = d.from(r.buffer, r.byteOffset, r.byteLength);
-      return t.length === r.byteLength ? t : t.slice(r.byteOffset, r.byteOffset + r.byteLength);
-    }
-    return r instanceof Date ? Au.parseInputDatesAsUTC ? Tu(r) : Iu(r) : Array.isArray(r) ? rs(r) : typeof r == "object" ? _u(r, e) : r.toString();
-  }, "prepareValue");
-  function _u(r, e) {
-    if (r && typeof r.toPostgres == "function") {
-      if (e = e || [], e.indexOf(r) !== -1) throw new Error('circular reference detected while preparing "' + r + '" for query');
-      return e.push(r), Ct(r.toPostgres(Ct), e);
-    }
-    return JSON.stringify(r);
-  }
-  __name(_u, "_u");
-  a(_u, "prepareObject");
-  function N(r, e) {
-    for (r = "" + r; r.length < e; ) r = "0" + r;
-    return r;
-  }
-  __name(N, "N");
-  a(N, "pad");
-  function Iu(r) {
-    var e = -r.getTimezoneOffset(), t = r.getFullYear(), n = t < 1;
-    n && (t = Math.abs(t) + 1);
-    var i = N(t, 4) + "-" + N(r.getMonth() + 1, 2) + "-" + N(r.getDate(), 2) + "T" + N(
-      r.getHours(),
-      2
-    ) + ":" + N(r.getMinutes(), 2) + ":" + N(r.getSeconds(), 2) + "." + N(r.getMilliseconds(), 3);
-    return e < 0 ? (i += "-", e *= -1) : i += "+", i += N(Math.floor(e / 60), 2) + ":" + N(e % 60, 2), n && (i += " BC"), i;
-  }
-  __name(Iu, "Iu");
-  a(Iu, "dateToString");
-  function Tu(r) {
-    var e = r.getUTCFullYear(), t = e < 1;
-    t && (e = Math.abs(e) + 1);
-    var n = N(e, 4) + "-" + N(r.getUTCMonth() + 1, 2) + "-" + N(r.getUTCDate(), 2) + "T" + N(r.getUTCHours(), 2) + ":" + N(r.getUTCMinutes(), 2) + ":" + N(r.getUTCSeconds(), 2) + "." + N(
-      r.getUTCMilliseconds(),
-      3
-    );
-    return n += "+00:00", t && (n += " BC"), n;
-  }
-  __name(Tu, "Tu");
-  a(Tu, "dateToStringUTC");
-  function Pu(r, e, t) {
-    return r = typeof r == "string" ? { text: r } : r, e && (typeof e == "function" ? r.callback = e : r.values = e), t && (r.callback = t), r;
-  }
-  __name(Pu, "Pu");
-  a(Pu, "normalizeQueryConfig");
-  var pr = a(function(r) {
-    return Eu.createHash("md5").update(r, "utf-8").digest("hex");
-  }, "md5"), Ru = a(
-    function(r, e, t) {
-      var n = pr(e + r), i = pr(d.concat([d.from(n), t]));
-      return "md5" + i;
-    },
-    "postgresMd5PasswordHash"
-  );
-  ns.exports = {
-    prepareValue: a(function(e) {
-      return Ct(e);
-    }, "prepareValueWrapper"),
-    normalizeQueryConfig: Pu,
-    postgresMd5PasswordHash: Ru,
-    md5: pr
-  };
-});
-var nt = {};
-ie(nt, { default: /* @__PURE__ */ __name(() => ku, "default") });
-var ku;
-var it = G(() => {
-  "use strict";
-  p();
-  ku = {};
-});
-var ds = T((th, ps) => {
-  "use strict";
-  p();
-  var yr = (fr(), O(lr));
-  function Mu(r) {
-    if (r.indexOf("SCRAM-SHA-256") === -1) throw new Error("SASL: Only mechanism SCRAM-SHA-256 is currently supported");
-    let e = yr.randomBytes(
-      18
-    ).toString("base64");
-    return { mechanism: "SCRAM-SHA-256", clientNonce: e, response: "n,,n=*,r=" + e, message: "SASLInitialResponse" };
-  }
-  __name(Mu, "Mu");
-  a(Mu, "startSession");
-  function Uu(r, e, t) {
-    if (r.message !== "SASLInitialResponse") throw new Error(
-      "SASL: Last message was not SASLInitialResponse"
-    );
-    if (typeof e != "string") throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string");
-    if (typeof t != "string") throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: serverData must be a string");
-    let n = qu(t);
-    if (n.nonce.startsWith(r.clientNonce)) {
-      if (n.nonce.length === r.clientNonce.length) throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: server nonce is too short");
-    } else throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: server nonce does not start with client nonce");
-    var i = d.from(n.salt, "base64"), s = Wu(e, i, n.iteration), o = Ue(s, "Client Key"), u = Nu(
-      o
-    ), c = "n=*,r=" + r.clientNonce, l = "r=" + n.nonce + ",s=" + n.salt + ",i=" + n.iteration, f = "c=biws,r=" + n.nonce, y = c + "," + l + "," + f, g = Ue(u, y), A = hs(o, g), C = A.toString("base64"), D = Ue(s, "Server Key"), Y = Ue(D, y);
-    r.message = "SASLResponse", r.serverSignature = Y.toString("base64"), r.response = f + ",p=" + C;
-  }
-  __name(Uu, "Uu");
-  a(Uu, "continueSession");
-  function Du(r, e) {
-    if (r.message !== "SASLResponse") throw new Error("SASL: Last message was not SASLResponse");
-    if (typeof e != "string") throw new Error("SASL: SCRAM-SERVER-FINAL-MESSAGE: serverData must be a string");
-    let { serverSignature: t } = Qu(
-      e
-    );
-    if (t !== r.serverSignature) throw new Error("SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature does not match");
-  }
-  __name(Du, "Du");
-  a(Du, "finalizeSession");
-  function Ou(r) {
-    if (typeof r != "string") throw new TypeError("SASL: text must be a string");
-    return r.split("").map((e, t) => r.charCodeAt(t)).every((e) => e >= 33 && e <= 43 || e >= 45 && e <= 126);
-  }
-  __name(Ou, "Ou");
-  a(Ou, "isPrintableChars");
-  function ls(r) {
-    return /^(?:[a-zA-Z0-9+/]{4})*(?:[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)?$/.test(r);
-  }
-  __name(ls, "ls");
-  a(ls, "isBase64");
-  function fs(r) {
-    if (typeof r != "string") throw new TypeError("SASL: attribute pairs text must be a string");
-    return new Map(r.split(",").map((e) => {
-      if (!/^.=/.test(e)) throw new Error("SASL: Invalid attribute pair entry");
-      let t = e[0], n = e.substring(2);
-      return [t, n];
-    }));
-  }
-  __name(fs, "fs");
-  a(fs, "parseAttributePairs");
-  function qu(r) {
-    let e = fs(r), t = e.get("r");
-    if (t) {
-      if (!Ou(t)) throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: nonce must only contain printable characters");
-    } else throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: nonce missing");
-    let n = e.get("s");
-    if (n) {
-      if (!ls(n)) throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: salt must be base64");
-    } else throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: salt missing");
-    let i = e.get("i");
-    if (i) {
-      if (!/^[1-9][0-9]*$/.test(i)) throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: invalid iteration count");
-    } else throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: iteration missing");
-    let s = parseInt(i, 10);
-    return { nonce: t, salt: n, iteration: s };
-  }
-  __name(qu, "qu");
-  a(qu, "parseServerFirstMessage");
-  function Qu(r) {
-    let t = fs(r).get("v");
-    if (t) {
-      if (!ls(t)) throw new Error("SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature must be base64");
-    } else throw new Error("SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature is missing");
-    return { serverSignature: t };
-  }
-  __name(Qu, "Qu");
-  a(Qu, "parseServerFinalMessage");
-  function hs(r, e) {
-    if (!d.isBuffer(r)) throw new TypeError("first argument must be a Buffer");
-    if (!d.isBuffer(e)) throw new TypeError(
-      "second argument must be a Buffer"
-    );
-    if (r.length !== e.length) throw new Error("Buffer lengths must match");
-    if (r.length === 0) throw new Error("Buffers cannot be empty");
-    return d.from(r.map((t, n) => r[n] ^ e[n]));
-  }
-  __name(hs, "hs");
-  a(hs, "xorBuffers");
-  function Nu(r) {
-    return yr.createHash("sha256").update(r).digest();
-  }
-  __name(Nu, "Nu");
-  a(Nu, "sha256");
-  function Ue(r, e) {
-    return yr.createHmac("sha256", r).update(e).digest();
-  }
-  __name(Ue, "Ue");
-  a(Ue, "hmacSha256");
-  function Wu(r, e, t) {
-    for (var n = Ue(
-      r,
-      d.concat([e, d.from([0, 0, 0, 1])])
-    ), i = n, s = 0; s < t - 1; s++) n = Ue(r, n), i = hs(i, n);
-    return i;
-  }
-  __name(Wu, "Wu");
-  a(Wu, "Hi");
-  ps.exports = { startSession: Mu, continueSession: Uu, finalizeSession: Du };
-});
-var mr = {};
-ie(mr, { join: /* @__PURE__ */ __name(() => ju, "join") });
-function ju(...r) {
-  return r.join("/");
-}
-__name(ju, "ju");
-var wr = G(() => {
-  "use strict";
-  p();
-  a(
-    ju,
-    "join"
-  );
-});
-var gr = {};
-ie(gr, { stat: /* @__PURE__ */ __name(() => Hu, "stat") });
-function Hu(r, e) {
-  e(new Error("No filesystem"));
-}
-__name(Hu, "Hu");
-var br = G(() => {
-  "use strict";
-  p();
-  a(Hu, "stat");
-});
-var vr = {};
-ie(vr, { default: /* @__PURE__ */ __name(() => $u, "default") });
-var $u;
-var xr = G(() => {
-  "use strict";
-  p();
-  $u = {};
-});
-var ys = {};
-ie(ys, { StringDecoder: /* @__PURE__ */ __name(() => Sr, "StringDecoder") });
-var Er;
-var Sr;
-var ms = G(() => {
-  "use strict";
-  p();
-  Er = class Er {
-    static {
-      __name(this, "Er");
-    }
-    constructor(e) {
-      E(this, "td");
-      this.td = new TextDecoder(e);
-    }
-    write(e) {
-      return this.td.decode(e, { stream: true });
-    }
-    end(e) {
-      return this.td.decode(e);
-    }
-  };
-  a(Er, "StringDecoder");
-  Sr = Er;
-});
-var vs = T((fh, bs) => {
-  "use strict";
-  p();
-  var { Transform: Gu } = (xr(), O(vr)), { StringDecoder: Vu } = (ms(), O(ys)), ve = /* @__PURE__ */ Symbol(
-    "last"
-  ), It = /* @__PURE__ */ Symbol("decoder");
-  function zu(r, e, t) {
-    let n;
-    if (this.overflow) {
-      if (n = this[It].write(r).split(
-        this.matcher
-      ), n.length === 1) return t();
-      n.shift(), this.overflow = false;
-    } else this[ve] += this[It].write(r), n = this[ve].split(this.matcher);
-    this[ve] = n.pop();
-    for (let i = 0; i < n.length; i++) try {
-      gs(this, this.mapper(n[i]));
-    } catch (s) {
-      return t(s);
-    }
-    if (this.overflow = this[ve].length > this.maxLength, this.overflow && !this.skipOverflow) {
-      t(new Error(
-        "maximum buffer reached"
-      ));
-      return;
-    }
-    t();
-  }
-  __name(zu, "zu");
-  a(zu, "transform");
-  function Ku(r) {
-    if (this[ve] += this[It].end(), this[ve])
-      try {
-        gs(this, this.mapper(this[ve]));
-      } catch (e) {
-        return r(e);
-      }
-    r();
-  }
-  __name(Ku, "Ku");
-  a(Ku, "flush");
-  function gs(r, e) {
-    e !== void 0 && r.push(e);
-  }
-  __name(gs, "gs");
-  a(gs, "push");
-  function ws(r) {
-    return r;
-  }
-  __name(ws, "ws");
-  a(ws, "noop");
-  function Yu(r, e, t) {
-    switch (r = r || /\r?\n/, e = e || ws, t = t || {}, arguments.length) {
-      case 1:
-        typeof r == "function" ? (e = r, r = /\r?\n/) : typeof r == "object" && !(r instanceof RegExp) && !r[Symbol.split] && (t = r, r = /\r?\n/);
-        break;
-      case 2:
-        typeof r == "function" ? (t = e, e = r, r = /\r?\n/) : typeof e == "object" && (t = e, e = ws);
-    }
-    t = Object.assign({}, t), t.autoDestroy = true, t.transform = zu, t.flush = Ku, t.readableObjectMode = true;
-    let n = new Gu(t);
-    return n[ve] = "", n[It] = new Vu("utf8"), n.matcher = r, n.mapper = e, n.maxLength = t.maxLength, n.skipOverflow = t.skipOverflow || false, n.overflow = false, n._destroy = function(i, s) {
-      this._writableState.errorEmitted = false, s(i);
-    }, n;
-  }
-  __name(Yu, "Yu");
-  a(Yu, "split");
-  bs.exports = Yu;
-});
-var Es = T((dh, pe) => {
-  "use strict";
-  p();
-  var xs = (wr(), O(mr)), Zu = (xr(), O(vr)).Stream, Ju = vs(), Ss = (it(), O(nt)), Xu = 5432, Tt = m.platform === "win32", st = m.stderr, ec = 56, tc = 7, rc = 61440, nc = 32768;
-  function ic(r) {
-    return (r & rc) == nc;
-  }
-  __name(ic, "ic");
-  a(ic, "isRegFile");
-  var De = ["host", "port", "database", "user", "password"], Ar = De.length, sc = De[Ar - 1];
-  function Cr() {
-    var r = st instanceof Zu && st.writable === true;
-    if (r) {
-      var e = Array.prototype.slice.call(arguments).concat(`
-`);
-      st.write(Ss.format.apply(Ss, e));
-    }
-  }
-  __name(Cr, "Cr");
-  a(Cr, "warn");
-  Object.defineProperty(pe.exports, "isWin", { get: a(function() {
-    return Tt;
-  }, "get"), set: a(function(r) {
-    Tt = r;
-  }, "set") });
-  pe.exports.warnTo = function(r) {
-    var e = st;
-    return st = r, e;
-  };
-  pe.exports.getFileName = function(r) {
-    var e = r || m.env, t = e.PGPASSFILE || (Tt ? xs.join(e.APPDATA || "./", "postgresql", "pgpass.conf") : xs.join(e.HOME || "./", ".pgpass"));
-    return t;
-  };
-  pe.exports.usePgPass = function(r, e) {
-    return Object.prototype.hasOwnProperty.call(m.env, "PGPASSWORD") ? false : Tt ? true : (e = e || "<unkn>", ic(r.mode) ? r.mode & (ec | tc) ? (Cr('WARNING: password file "%s" has group or world access; permissions should be u=rw (0600) or less', e), false) : true : (Cr('WARNING: password file "%s" is not a plain file', e), false));
-  };
-  var oc = pe.exports.match = function(r, e) {
-    return De.slice(0, -1).reduce(function(t, n, i) {
-      return i == 1 && Number(r[n] || Xu) === Number(
-        e[n]
-      ) ? t && true : t && (e[n] === "*" || e[n] === r[n]);
-    }, true);
-  };
-  pe.exports.getPassword = function(r, e, t) {
-    var n, i = e.pipe(
-      Ju()
-    );
-    function s(c) {
-      var l = ac(c);
-      l && uc(l) && oc(r, l) && (n = l[sc], i.end());
-    }
-    __name(s, "s");
-    a(s, "onLine");
-    var o = a(function() {
-      e.destroy(), t(n);
-    }, "onEnd"), u = a(function(c) {
-      e.destroy(), Cr("WARNING: error on reading file: %s", c), t(
-        void 0
-      );
-    }, "onErr");
-    e.on("error", u), i.on("data", s).on("end", o).on("error", u);
-  };
-  var ac = pe.exports.parseLine = function(r) {
-    if (r.length < 11 || r.match(/^\s+#/)) return null;
-    for (var e = "", t = "", n = 0, i = 0, s = 0, o = {}, u = false, c = a(
-      function(f, y, g) {
-        var A = r.substring(y, g);
-        Object.hasOwnProperty.call(m.env, "PGPASS_NO_DEESCAPE") || (A = A.replace(/\\([:\\])/g, "$1")), o[De[f]] = A;
-      },
-      "addToObj"
-    ), l = 0; l < r.length - 1; l += 1) {
-      if (e = r.charAt(l + 1), t = r.charAt(
-        l
-      ), u = n == Ar - 1, u) {
-        c(n, i);
-        break;
-      }
-      l >= 0 && e == ":" && t !== "\\" && (c(n, i, l + 1), i = l + 2, n += 1);
-    }
-    return o = Object.keys(o).length === Ar ? o : null, o;
-  }, uc = pe.exports.isValidEntry = function(r) {
-    for (var e = { 0: function(o) {
-      return o.length > 0;
-    }, 1: function(o) {
-      return o === "*" ? true : (o = Number(o), isFinite(o) && o > 0 && o < 9007199254740992 && Math.floor(o) === o);
-    }, 2: function(o) {
-      return o.length > 0;
-    }, 3: function(o) {
-      return o.length > 0;
-    }, 4: function(o) {
-      return o.length > 0;
-    } }, t = 0; t < De.length; t += 1) {
-      var n = e[t], i = r[De[t]] || "", s = n(i);
-      if (!s) return false;
-    }
-    return true;
-  };
-});
-var Cs = T((gh, _r) => {
-  "use strict";
-  p();
-  var wh = (wr(), O(mr)), As = (br(), O(gr)), Pt = Es();
-  _r.exports = function(r, e) {
-    var t = Pt.getFileName();
-    As.stat(t, function(n, i) {
-      if (n || !Pt.usePgPass(i, t)) return e(void 0);
-      var s = As.createReadStream(
-        t
-      );
-      Pt.getPassword(r, s, e);
-    });
-  };
-  _r.exports.warnTo = Pt.warnTo;
-});
-var _s = {};
-ie(_s, { default: /* @__PURE__ */ __name(() => cc, "default") });
-var cc;
-var Is = G(() => {
-  "use strict";
-  p();
-  cc = {};
-});
-var Ps = T((xh, Ts) => {
-  "use strict";
-  p();
-  var lc = (Zt(), O(gi)), Ir = (br(), O(gr));
-  function Tr(r) {
-    if (r.charAt(0) === "/") {
-      var t = r.split(" ");
-      return { host: t[0], database: t[1] };
-    }
-    var e = lc.parse(/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(r) ? encodeURI(r).replace(/\%25(\d\d)/g, "%$1") : r, true), t = e.query;
-    for (var n in t) Array.isArray(t[n]) && (t[n] = t[n][t[n].length - 1]);
-    var i = (e.auth || ":").split(":");
-    if (t.user = i[0], t.password = i.splice(1).join(
-      ":"
-    ), t.port = e.port, e.protocol == "socket:") return t.host = decodeURI(e.pathname), t.database = e.query.db, t.client_encoding = e.query.encoding, t;
-    t.host || (t.host = e.hostname);
-    var s = e.pathname;
-    if (!t.host && s && /^%2f/i.test(s)) {
-      var o = s.split("/");
-      t.host = decodeURIComponent(o[0]), s = o.splice(1).join("/");
-    }
-    switch (s && s.charAt(
-      0
-    ) === "/" && (s = s.slice(1) || null), t.database = s && decodeURI(s), (t.ssl === "true" || t.ssl === "1") && (t.ssl = true), t.ssl === "0" && (t.ssl = false), (t.sslcert || t.sslkey || t.sslrootcert || t.sslmode) && (t.ssl = {}), t.sslcert && (t.ssl.cert = Ir.readFileSync(t.sslcert).toString()), t.sslkey && (t.ssl.key = Ir.readFileSync(t.sslkey).toString()), t.sslrootcert && (t.ssl.ca = Ir.readFileSync(t.sslrootcert).toString()), t.sslmode) {
-      case "disable": {
-        t.ssl = false;
-        break;
-      }
-      case "prefer":
-      case "require":
-      case "verify-ca":
-      case "verify-full":
-        break;
-      case "no-verify": {
-        t.ssl.rejectUnauthorized = false;
-        break;
-      }
-    }
-    return t;
-  }
-  __name(Tr, "Tr");
-  a(Tr, "parse");
-  Ts.exports = Tr;
-  Tr.parse = Tr;
-});
-var Rt = T((Ah, Ls) => {
-  "use strict";
-  p();
-  var fc = (Is(), O(_s)), Bs = tt(), Rs = Ps().parse, H = a(function(r, e, t) {
-    return t === void 0 ? t = m.env["PG" + r.toUpperCase()] : t === false || (t = m.env[t]), e[r] || t || Bs[r];
-  }, "val"), hc = a(function() {
-    switch (m.env.PGSSLMODE) {
-      case "disable":
-        return false;
-      case "prefer":
-      case "require":
-      case "verify-ca":
-      case "verify-full":
-        return true;
-      case "no-verify":
-        return { rejectUnauthorized: false };
-    }
-    return Bs.ssl;
-  }, "readSSLConfigFromEnvironment"), Oe = a(function(r) {
-    return "'" + ("" + r).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
-  }, "quoteParamValue"), ne2 = a(function(r, e, t) {
-    var n = e[t];
-    n != null && r.push(t + "=" + Oe(n));
-  }, "add"), Rr = class Rr {
-    static {
-      __name(this, "Rr");
-    }
-    constructor(e) {
-      e = typeof e == "string" ? Rs(e) : e || {}, e.connectionString && (e = Object.assign({}, e, Rs(e.connectionString))), this.user = H("user", e), this.database = H("database", e), this.database === void 0 && (this.database = this.user), this.port = parseInt(H("port", e), 10), this.host = H("host", e), Object.defineProperty(this, "password", {
-        configurable: true,
-        enumerable: false,
-        writable: true,
-        value: H("password", e)
-      }), this.binary = H("binary", e), this.options = H("options", e), this.ssl = typeof e.ssl > "u" ? hc() : e.ssl, typeof this.ssl == "string" && this.ssl === "true" && (this.ssl = true), this.ssl === "no-verify" && (this.ssl = { rejectUnauthorized: false }), this.ssl && this.ssl.key && Object.defineProperty(this.ssl, "key", { enumerable: false }), this.client_encoding = H("client_encoding", e), this.replication = H("replication", e), this.isDomainSocket = !(this.host || "").indexOf("/"), this.application_name = H("application_name", e, "PGAPPNAME"), this.fallback_application_name = H("fallback_application_name", e, false), this.statement_timeout = H("statement_timeout", e, false), this.lock_timeout = H("lock_timeout", e, false), this.idle_in_transaction_session_timeout = H("idle_in_transaction_session_timeout", e, false), this.query_timeout = H("query_timeout", e, false), e.connectionTimeoutMillis === void 0 ? this.connect_timeout = m.env.PGCONNECT_TIMEOUT || 0 : this.connect_timeout = Math.floor(e.connectionTimeoutMillis / 1e3), e.keepAlive === false ? this.keepalives = 0 : e.keepAlive === true && (this.keepalives = 1), typeof e.keepAliveInitialDelayMillis == "number" && (this.keepalives_idle = Math.floor(e.keepAliveInitialDelayMillis / 1e3));
-    }
-    getLibpqConnectionString(e) {
-      var t = [];
-      ne2(t, this, "user"), ne2(t, this, "password"), ne2(t, this, "port"), ne2(t, this, "application_name"), ne2(
-        t,
-        this,
-        "fallback_application_name"
-      ), ne2(t, this, "connect_timeout"), ne2(t, this, "options");
-      var n = typeof this.ssl == "object" ? this.ssl : this.ssl ? { sslmode: this.ssl } : {};
-      if (ne2(t, n, "sslmode"), ne2(t, n, "sslca"), ne2(t, n, "sslkey"), ne2(t, n, "sslcert"), ne2(t, n, "sslrootcert"), this.database && t.push("dbname=" + Oe(this.database)), this.replication && t.push("replication=" + Oe(this.replication)), this.host && t.push("host=" + Oe(this.host)), this.isDomainSocket) return e(null, t.join(" "));
-      this.client_encoding && t.push("client_encoding=" + Oe(this.client_encoding)), fc.lookup(this.host, function(i, s) {
-        return i ? e(i, null) : (t.push("hostaddr=" + Oe(s)), e(null, t.join(" ")));
-      });
-    }
-  };
-  a(Rr, "ConnectionParameters");
-  var Pr = Rr;
-  Ls.exports = Pr;
-});
-var Ms = T((Ih, ks) => {
-  "use strict";
-  p();
-  var pc = Je(), Fs = /^([A-Za-z]+)(?: (\d+))?(?: (\d+))?/, Lr = class Lr {
-    static {
-      __name(this, "Lr");
-    }
-    constructor(e, t) {
-      this.command = null, this.rowCount = null, this.oid = null, this.rows = [], this.fields = [], this._parsers = void 0, this._types = t, this.RowCtor = null, this.rowAsArray = e === "array", this.rowAsArray && (this.parseRow = this._parseRowAsArray);
-    }
-    addCommandComplete(e) {
-      var t;
-      e.text ? t = Fs.exec(e.text) : t = Fs.exec(e.command), t && (this.command = t[1], t[3] ? (this.oid = parseInt(
-        t[2],
-        10
-      ), this.rowCount = parseInt(t[3], 10)) : t[2] && (this.rowCount = parseInt(t[2], 10)));
-    }
-    _parseRowAsArray(e) {
-      for (var t = new Array(
-        e.length
-      ), n = 0, i = e.length; n < i; n++) {
-        var s = e[n];
-        s !== null ? t[n] = this._parsers[n](s) : t[n] = null;
-      }
-      return t;
-    }
-    parseRow(e) {
-      for (var t = {}, n = 0, i = e.length; n < i; n++) {
-        var s = e[n], o = this.fields[n].name;
-        s !== null ? t[o] = this._parsers[n](
-          s
-        ) : t[o] = null;
-      }
-      return t;
-    }
-    addRow(e) {
-      this.rows.push(e);
-    }
-    addFields(e) {
-      this.fields = e, this.fields.length && (this._parsers = new Array(e.length));
-      for (var t = 0; t < e.length; t++) {
-        var n = e[t];
-        this._types ? this._parsers[t] = this._types.getTypeParser(n.dataTypeID, n.format || "text") : this._parsers[t] = pc.getTypeParser(n.dataTypeID, n.format || "text");
-      }
-    }
-  };
-  a(Lr, "Result");
-  var Br = Lr;
-  ks.exports = Br;
-});
-var qs = T((Rh, Os) => {
-  "use strict";
-  p();
-  var { EventEmitter: dc } = ge(), Us = Ms(), Ds = rt(), kr = class kr extends dc {
-    static {
-      __name(this, "kr");
-    }
-    constructor(e, t, n) {
-      super(), e = Ds.normalizeQueryConfig(e, t, n), this.text = e.text, this.values = e.values, this.rows = e.rows, this.types = e.types, this.name = e.name, this.binary = e.binary, this.portal = e.portal || "", this.callback = e.callback, this._rowMode = e.rowMode, m.domain && e.callback && (this.callback = m.domain.bind(e.callback)), this._result = new Us(this._rowMode, this.types), this._results = this._result, this.isPreparedStatement = false, this._canceledDueToError = false, this._promise = null;
-    }
-    requiresPreparation() {
-      return this.name || this.rows ? true : !this.text || !this.values ? false : this.values.length > 0;
-    }
-    _checkForMultirow() {
-      this._result.command && (Array.isArray(this._results) || (this._results = [this._result]), this._result = new Us(this._rowMode, this.types), this._results.push(this._result));
-    }
-    handleRowDescription(e) {
-      this._checkForMultirow(), this._result.addFields(e.fields), this._accumulateRows = this.callback || !this.listeners("row").length;
-    }
-    handleDataRow(e) {
-      let t;
-      if (!this._canceledDueToError) {
-        try {
-          t = this._result.parseRow(
-            e.fields
-          );
-        } catch (n) {
-          this._canceledDueToError = n;
-          return;
-        }
-        this.emit("row", t, this._result), this._accumulateRows && this._result.addRow(t);
-      }
-    }
-    handleCommandComplete(e, t) {
-      this._checkForMultirow(), this._result.addCommandComplete(
-        e
-      ), this.rows && t.sync();
-    }
-    handleEmptyQuery(e) {
-      this.rows && e.sync();
-    }
-    handleError(e, t) {
-      if (this._canceledDueToError && (e = this._canceledDueToError, this._canceledDueToError = false), this.callback) return this.callback(e);
-      this.emit("error", e);
-    }
-    handleReadyForQuery(e) {
-      if (this._canceledDueToError) return this.handleError(
-        this._canceledDueToError,
-        e
-      );
-      if (this.callback) try {
-        this.callback(null, this._results);
-      } catch (t) {
-        m.nextTick(() => {
-          throw t;
-        });
-      }
-      this.emit(
-        "end",
-        this._results
-      );
-    }
-    submit(e) {
-      if (typeof this.text != "string" && typeof this.name != "string") return new Error(
-        "A query must have either text or a name. Supplying neither is unsupported."
-      );
-      let t = e.parsedStatements[this.name];
-      return this.text && t && this.text !== t ? new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`) : this.values && !Array.isArray(this.values) ? new Error("Query values must be an array") : (this.requiresPreparation() ? this.prepare(e) : e.query(this.text), null);
-    }
-    hasBeenParsed(e) {
-      return this.name && e.parsedStatements[this.name];
-    }
-    handlePortalSuspended(e) {
-      this._getRows(e, this.rows);
-    }
-    _getRows(e, t) {
-      e.execute({ portal: this.portal, rows: t }), t ? e.flush() : e.sync();
-    }
-    prepare(e) {
-      this.isPreparedStatement = true, this.hasBeenParsed(e) || e.parse({ text: this.text, name: this.name, types: this.types });
-      try {
-        e.bind({ portal: this.portal, statement: this.name, values: this.values, binary: this.binary, valueMapper: Ds.prepareValue });
-      } catch (t) {
-        this.handleError(t, e);
-        return;
-      }
-      e.describe({ type: "P", name: this.portal || "" }), this._getRows(e, this.rows);
-    }
-    handleCopyInResponse(e) {
-      e.sendCopyFail("No source stream defined");
-    }
-    handleCopyData(e, t) {
-    }
-  };
-  a(kr, "Query");
-  var Fr = kr;
-  Os.exports = Fr;
-});
-var ln = T((_) => {
-  "use strict";
-  p();
-  Object.defineProperty(_, "__esModule", { value: true });
-  _.NoticeMessage = _.DataRowMessage = _.CommandCompleteMessage = _.ReadyForQueryMessage = _.NotificationResponseMessage = _.BackendKeyDataMessage = _.AuthenticationMD5Password = _.ParameterStatusMessage = _.ParameterDescriptionMessage = _.RowDescriptionMessage = _.Field = _.CopyResponse = _.CopyDataMessage = _.DatabaseError = _.copyDone = _.emptyQuery = _.replicationStart = _.portalSuspended = _.noData = _.closeComplete = _.bindComplete = _.parseComplete = void 0;
-  _.parseComplete = { name: "parseComplete", length: 5 };
-  _.bindComplete = { name: "bindComplete", length: 5 };
-  _.closeComplete = { name: "closeComplete", length: 5 };
-  _.noData = { name: "noData", length: 5 };
-  _.portalSuspended = { name: "portalSuspended", length: 5 };
-  _.replicationStart = { name: "replicationStart", length: 4 };
-  _.emptyQuery = { name: "emptyQuery", length: 4 };
-  _.copyDone = { name: "copyDone", length: 4 };
-  var Kr = class Kr extends Error {
-    static {
-      __name(this, "Kr");
-    }
-    constructor(e, t, n) {
-      super(e), this.length = t, this.name = n;
-    }
-  };
-  a(Kr, "DatabaseError");
-  var Mr = Kr;
-  _.DatabaseError = Mr;
-  var Yr = class Yr {
-    static {
-      __name(this, "Yr");
-    }
-    constructor(e, t) {
-      this.length = e, this.chunk = t, this.name = "copyData";
-    }
-  };
-  a(Yr, "CopyDataMessage");
-  var Ur = Yr;
-  _.CopyDataMessage = Ur;
-  var Zr = class Zr {
-    static {
-      __name(this, "Zr");
-    }
-    constructor(e, t, n, i) {
-      this.length = e, this.name = t, this.binary = n, this.columnTypes = new Array(i);
-    }
-  };
-  a(Zr, "CopyResponse");
-  var Dr = Zr;
-  _.CopyResponse = Dr;
-  var Jr = class Jr {
-    static {
-      __name(this, "Jr");
-    }
-    constructor(e, t, n, i, s, o, u) {
-      this.name = e, this.tableID = t, this.columnID = n, this.dataTypeID = i, this.dataTypeSize = s, this.dataTypeModifier = o, this.format = u;
-    }
-  };
-  a(Jr, "Field");
-  var Or = Jr;
-  _.Field = Or;
-  var Xr = class Xr {
-    static {
-      __name(this, "Xr");
-    }
-    constructor(e, t) {
-      this.length = e, this.fieldCount = t, this.name = "rowDescription", this.fields = new Array(this.fieldCount);
-    }
-  };
-  a(Xr, "RowDescriptionMessage");
-  var qr = Xr;
-  _.RowDescriptionMessage = qr;
-  var en = class en {
-    static {
-      __name(this, "en");
-    }
-    constructor(e, t) {
-      this.length = e, this.parameterCount = t, this.name = "parameterDescription", this.dataTypeIDs = new Array(this.parameterCount);
-    }
-  };
-  a(en, "ParameterDescriptionMessage");
-  var Qr = en;
-  _.ParameterDescriptionMessage = Qr;
-  var tn = class tn {
-    static {
-      __name(this, "tn");
-    }
-    constructor(e, t, n) {
-      this.length = e, this.parameterName = t, this.parameterValue = n, this.name = "parameterStatus";
-    }
-  };
-  a(tn, "ParameterStatusMessage");
-  var Nr = tn;
-  _.ParameterStatusMessage = Nr;
-  var rn = class rn {
-    static {
-      __name(this, "rn");
-    }
-    constructor(e, t) {
-      this.length = e, this.salt = t, this.name = "authenticationMD5Password";
-    }
-  };
-  a(rn, "AuthenticationMD5Password");
-  var Wr = rn;
-  _.AuthenticationMD5Password = Wr;
-  var nn = class nn {
-    static {
-      __name(this, "nn");
-    }
-    constructor(e, t, n) {
-      this.length = e, this.processID = t, this.secretKey = n, this.name = "backendKeyData";
-    }
-  };
-  a(nn, "BackendKeyDataMessage");
-  var jr = nn;
-  _.BackendKeyDataMessage = jr;
-  var sn = class sn {
-    static {
-      __name(this, "sn");
-    }
-    constructor(e, t, n, i) {
-      this.length = e, this.processId = t, this.channel = n, this.payload = i, this.name = "notification";
-    }
-  };
-  a(sn, "NotificationResponseMessage");
-  var Hr = sn;
-  _.NotificationResponseMessage = Hr;
-  var on = class on {
-    static {
-      __name(this, "on");
-    }
-    constructor(e, t) {
-      this.length = e, this.status = t, this.name = "readyForQuery";
-    }
-  };
-  a(on, "ReadyForQueryMessage");
-  var $r = on;
-  _.ReadyForQueryMessage = $r;
-  var an = class an {
-    static {
-      __name(this, "an");
-    }
-    constructor(e, t) {
-      this.length = e, this.text = t, this.name = "commandComplete";
-    }
-  };
-  a(an, "CommandCompleteMessage");
-  var Gr = an;
-  _.CommandCompleteMessage = Gr;
-  var un = class un {
-    static {
-      __name(this, "un");
-    }
-    constructor(e, t) {
-      this.length = e, this.fields = t, this.name = "dataRow", this.fieldCount = t.length;
-    }
-  };
-  a(un, "DataRowMessage");
-  var Vr = un;
-  _.DataRowMessage = Vr;
-  var cn = class cn {
-    static {
-      __name(this, "cn");
-    }
-    constructor(e, t) {
-      this.length = e, this.message = t, this.name = "notice";
-    }
-  };
-  a(cn, "NoticeMessage");
-  var zr = cn;
-  _.NoticeMessage = zr;
-});
-var Qs = T((Bt) => {
-  "use strict";
-  p();
-  Object.defineProperty(Bt, "__esModule", { value: true });
-  Bt.Writer = void 0;
-  var hn = class hn {
-    static {
-      __name(this, "hn");
-    }
-    constructor(e = 256) {
-      this.size = e, this.offset = 5, this.headerPosition = 0, this.buffer = d.allocUnsafe(e);
-    }
-    ensure(e) {
-      if (this.buffer.length - this.offset < e) {
-        let n = this.buffer, i = n.length + (n.length >> 1) + e;
-        this.buffer = d.allocUnsafe(i), n.copy(
-          this.buffer
-        );
-      }
-    }
-    addInt32(e) {
-      return this.ensure(4), this.buffer[this.offset++] = e >>> 24 & 255, this.buffer[this.offset++] = e >>> 16 & 255, this.buffer[this.offset++] = e >>> 8 & 255, this.buffer[this.offset++] = e >>> 0 & 255, this;
-    }
-    addInt16(e) {
-      return this.ensure(2), this.buffer[this.offset++] = e >>> 8 & 255, this.buffer[this.offset++] = e >>> 0 & 255, this;
-    }
-    addCString(e) {
-      if (!e) this.ensure(1);
-      else {
-        let t = d.byteLength(e);
-        this.ensure(t + 1), this.buffer.write(e, this.offset, "utf-8"), this.offset += t;
-      }
-      return this.buffer[this.offset++] = 0, this;
-    }
-    addString(e = "") {
-      let t = d.byteLength(e);
-      return this.ensure(t), this.buffer.write(e, this.offset), this.offset += t, this;
-    }
-    add(e) {
-      return this.ensure(
-        e.length
-      ), e.copy(this.buffer, this.offset), this.offset += e.length, this;
-    }
-    join(e) {
-      if (e) {
-        this.buffer[this.headerPosition] = e;
-        let t = this.offset - (this.headerPosition + 1);
-        this.buffer.writeInt32BE(t, this.headerPosition + 1);
-      }
-      return this.buffer.slice(e ? 0 : 5, this.offset);
-    }
-    flush(e) {
-      let t = this.join(e);
-      return this.offset = 5, this.headerPosition = 0, this.buffer = d.allocUnsafe(this.size), t;
-    }
-  };
-  a(hn, "Writer");
-  var fn = hn;
-  Bt.Writer = fn;
-});
-var Ws = T((Ft) => {
-  "use strict";
-  p();
-  Object.defineProperty(Ft, "__esModule", { value: true });
-  Ft.serialize = void 0;
-  var pn = Qs(), F = new pn.Writer(), yc = a((r) => {
-    F.addInt16(3).addInt16(0);
-    for (let n of Object.keys(r)) F.addCString(
-      n
-    ).addCString(r[n]);
-    F.addCString("client_encoding").addCString("UTF8");
-    let e = F.addCString("").flush(), t = e.length + 4;
-    return new pn.Writer().addInt32(t).add(e).flush();
-  }, "startup"), mc = a(() => {
-    let r = d.allocUnsafe(
-      8
-    );
-    return r.writeInt32BE(8, 0), r.writeInt32BE(80877103, 4), r;
-  }, "requestSsl"), wc = a((r) => F.addCString(r).flush(
-    112
-  ), "password"), gc = a(function(r, e) {
-    return F.addCString(r).addInt32(d.byteLength(e)).addString(e), F.flush(112);
-  }, "sendSASLInitialResponseMessage"), bc = a(function(r) {
-    return F.addString(r).flush(112);
-  }, "sendSCRAMClientFinalMessage"), vc = a((r) => F.addCString(r).flush(81), "query"), Ns = [], xc = a((r) => {
-    let e = r.name || "";
-    e.length > 63 && (console.error("Warning! Postgres only supports 63 characters for query names."), console.error("You supplied %s (%s)", e, e.length), console.error("This can cause conflicts and silent errors executing queries"));
-    let t = r.types || Ns, n = t.length, i = F.addCString(e).addCString(r.text).addInt16(n);
-    for (let s = 0; s < n; s++) i.addInt32(t[s]);
-    return F.flush(80);
-  }, "parse"), qe = new pn.Writer(), Sc = a(function(r, e) {
-    for (let t = 0; t < r.length; t++) {
-      let n = e ? e(r[t], t) : r[t];
-      n == null ? (F.addInt16(0), qe.addInt32(-1)) : n instanceof d ? (F.addInt16(
-        1
-      ), qe.addInt32(n.length), qe.add(n)) : (F.addInt16(0), qe.addInt32(d.byteLength(n)), qe.addString(n));
-    }
-  }, "writeValues"), Ec = a((r = {}) => {
-    let e = r.portal || "", t = r.statement || "", n = r.binary || false, i = r.values || Ns, s = i.length;
-    return F.addCString(e).addCString(t), F.addInt16(s), Sc(i, r.valueMapper), F.addInt16(s), F.add(qe.flush()), F.addInt16(n ? 1 : 0), F.flush(66);
-  }, "bind"), Ac = d.from([69, 0, 0, 0, 9, 0, 0, 0, 0, 0]), Cc = a((r) => {
-    if (!r || !r.portal && !r.rows) return Ac;
-    let e = r.portal || "", t = r.rows || 0, n = d.byteLength(e), i = 4 + n + 1 + 4, s = d.allocUnsafe(1 + i);
-    return s[0] = 69, s.writeInt32BE(i, 1), s.write(e, 5, "utf-8"), s[n + 5] = 0, s.writeUInt32BE(t, s.length - 4), s;
-  }, "execute"), _c = a(
-    (r, e) => {
-      let t = d.allocUnsafe(16);
-      return t.writeInt32BE(16, 0), t.writeInt16BE(1234, 4), t.writeInt16BE(
-        5678,
-        6
-      ), t.writeInt32BE(r, 8), t.writeInt32BE(e, 12), t;
-    },
-    "cancel"
-  ), dn = a((r, e) => {
-    let n = 4 + d.byteLength(e) + 1, i = d.allocUnsafe(1 + n);
-    return i[0] = r, i.writeInt32BE(n, 1), i.write(e, 5, "utf-8"), i[n] = 0, i;
-  }, "cstringMessage"), Ic = F.addCString("P").flush(68), Tc = F.addCString("S").flush(68), Pc = a((r) => r.name ? dn(68, `${r.type}${r.name || ""}`) : r.type === "P" ? Ic : Tc, "describe"), Rc = a((r) => {
-    let e = `${r.type}${r.name || ""}`;
-    return dn(67, e);
-  }, "close"), Bc = a((r) => F.add(r).flush(100), "copyData"), Lc = a((r) => dn(102, r), "copyFail"), Lt = a((r) => d.from([r, 0, 0, 0, 4]), "codeOnlyBuffer"), Fc = Lt(72), kc = Lt(83), Mc = Lt(88), Uc = Lt(99), Dc = {
-    startup: yc,
-    password: wc,
-    requestSsl: mc,
-    sendSASLInitialResponseMessage: gc,
-    sendSCRAMClientFinalMessage: bc,
-    query: vc,
-    parse: xc,
-    bind: Ec,
-    execute: Cc,
-    describe: Pc,
-    close: Rc,
-    flush: a(
-      () => Fc,
-      "flush"
-    ),
-    sync: a(() => kc, "sync"),
-    end: a(() => Mc, "end"),
-    copyData: Bc,
-    copyDone: a(() => Uc, "copyDone"),
-    copyFail: Lc,
-    cancel: _c
-  };
-  Ft.serialize = Dc;
-});
-var js = T((kt) => {
-  "use strict";
-  p();
-  Object.defineProperty(kt, "__esModule", { value: true });
-  kt.BufferReader = void 0;
-  var Oc = d.allocUnsafe(0), mn = class mn {
-    static {
-      __name(this, "mn");
-    }
-    constructor(e = 0) {
-      this.offset = e, this.buffer = Oc, this.encoding = "utf-8";
-    }
-    setBuffer(e, t) {
-      this.offset = e, this.buffer = t;
-    }
-    int16() {
-      let e = this.buffer.readInt16BE(this.offset);
-      return this.offset += 2, e;
-    }
-    byte() {
-      let e = this.buffer[this.offset];
-      return this.offset++, e;
-    }
-    int32() {
-      let e = this.buffer.readInt32BE(
-        this.offset
-      );
-      return this.offset += 4, e;
-    }
-    uint32() {
-      let e = this.buffer.readUInt32BE(this.offset);
-      return this.offset += 4, e;
-    }
-    string(e) {
-      let t = this.buffer.toString(this.encoding, this.offset, this.offset + e);
-      return this.offset += e, t;
-    }
-    cstring() {
-      let e = this.offset, t = e;
-      for (; this.buffer[t++] !== 0; ) ;
-      return this.offset = t, this.buffer.toString(this.encoding, e, t - 1);
-    }
-    bytes(e) {
-      let t = this.buffer.slice(this.offset, this.offset + e);
-      return this.offset += e, t;
-    }
-  };
-  a(mn, "BufferReader");
-  var yn = mn;
-  kt.BufferReader = yn;
-});
-var Gs = T((Mt) => {
-  "use strict";
-  p();
-  Object.defineProperty(Mt, "__esModule", { value: true });
-  Mt.Parser = void 0;
-  var k = ln(), qc = js(), wn = 1, Qc = 4, Hs = wn + Qc, $s = d.allocUnsafe(0), bn = class bn {
-    static {
-      __name(this, "bn");
-    }
-    constructor(e) {
-      if (this.buffer = $s, this.bufferLength = 0, this.bufferOffset = 0, this.reader = new qc.BufferReader(), e?.mode === "binary") throw new Error("Binary mode not supported yet");
-      this.mode = e?.mode || "text";
-    }
-    parse(e, t) {
-      this.mergeBuffer(e);
-      let n = this.bufferOffset + this.bufferLength, i = this.bufferOffset;
-      for (; i + Hs <= n; ) {
-        let s = this.buffer[i], o = this.buffer.readUInt32BE(
-          i + wn
-        ), u = wn + o;
-        if (u + i <= n) {
-          let c = this.handlePacket(i + Hs, s, o, this.buffer);
-          t(c), i += u;
-        } else break;
-      }
-      i === n ? (this.buffer = $s, this.bufferLength = 0, this.bufferOffset = 0) : (this.bufferLength = n - i, this.bufferOffset = i);
-    }
-    mergeBuffer(e) {
-      if (this.bufferLength > 0) {
-        let t = this.bufferLength + e.byteLength;
-        if (t + this.bufferOffset > this.buffer.byteLength) {
-          let i;
-          if (t <= this.buffer.byteLength && this.bufferOffset >= this.bufferLength) i = this.buffer;
-          else {
-            let s = this.buffer.byteLength * 2;
-            for (; t >= s; ) s *= 2;
-            i = d.allocUnsafe(s);
-          }
-          this.buffer.copy(i, 0, this.bufferOffset, this.bufferOffset + this.bufferLength), this.buffer = i, this.bufferOffset = 0;
-        }
-        e.copy(this.buffer, this.bufferOffset + this.bufferLength), this.bufferLength = t;
-      } else this.buffer = e, this.bufferOffset = 0, this.bufferLength = e.byteLength;
-    }
-    handlePacket(e, t, n, i) {
-      switch (t) {
-        case 50:
-          return k.bindComplete;
-        case 49:
-          return k.parseComplete;
-        case 51:
-          return k.closeComplete;
-        case 110:
-          return k.noData;
-        case 115:
-          return k.portalSuspended;
-        case 99:
-          return k.copyDone;
-        case 87:
-          return k.replicationStart;
-        case 73:
-          return k.emptyQuery;
-        case 68:
-          return this.parseDataRowMessage(e, n, i);
-        case 67:
-          return this.parseCommandCompleteMessage(
-            e,
-            n,
-            i
-          );
-        case 90:
-          return this.parseReadyForQueryMessage(e, n, i);
-        case 65:
-          return this.parseNotificationMessage(
-            e,
-            n,
-            i
-          );
-        case 82:
-          return this.parseAuthenticationResponse(e, n, i);
-        case 83:
-          return this.parseParameterStatusMessage(
-            e,
-            n,
-            i
-          );
-        case 75:
-          return this.parseBackendKeyData(e, n, i);
-        case 69:
-          return this.parseErrorMessage(e, n, i, "error");
-        case 78:
-          return this.parseErrorMessage(e, n, i, "notice");
-        case 84:
-          return this.parseRowDescriptionMessage(
-            e,
-            n,
-            i
-          );
-        case 116:
-          return this.parseParameterDescriptionMessage(e, n, i);
-        case 71:
-          return this.parseCopyInMessage(
-            e,
-            n,
-            i
-          );
-        case 72:
-          return this.parseCopyOutMessage(e, n, i);
-        case 100:
-          return this.parseCopyData(e, n, i);
-        default:
-          return new k.DatabaseError("received invalid response: " + t.toString(16), n, "error");
-      }
-    }
-    parseReadyForQueryMessage(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.string(1);
-      return new k.ReadyForQueryMessage(t, i);
-    }
-    parseCommandCompleteMessage(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.cstring();
-      return new k.CommandCompleteMessage(t, i);
-    }
-    parseCopyData(e, t, n) {
-      let i = n.slice(e, e + (t - 4));
-      return new k.CopyDataMessage(t, i);
-    }
-    parseCopyInMessage(e, t, n) {
-      return this.parseCopyMessage(
-        e,
-        t,
-        n,
-        "copyInResponse"
-      );
-    }
-    parseCopyOutMessage(e, t, n) {
-      return this.parseCopyMessage(e, t, n, "copyOutResponse");
-    }
-    parseCopyMessage(e, t, n, i) {
-      this.reader.setBuffer(e, n);
-      let s = this.reader.byte() !== 0, o = this.reader.int16(), u = new k.CopyResponse(t, i, s, o);
-      for (let c = 0; c < o; c++) u.columnTypes[c] = this.reader.int16();
-      return u;
-    }
-    parseNotificationMessage(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.int32(), s = this.reader.cstring(), o = this.reader.cstring();
-      return new k.NotificationResponseMessage(t, i, s, o);
-    }
-    parseRowDescriptionMessage(e, t, n) {
-      this.reader.setBuffer(
-        e,
-        n
-      );
-      let i = this.reader.int16(), s = new k.RowDescriptionMessage(t, i);
-      for (let o = 0; o < i; o++) s.fields[o] = this.parseField();
-      return s;
-    }
-    parseField() {
-      let e = this.reader.cstring(), t = this.reader.uint32(), n = this.reader.int16(), i = this.reader.uint32(), s = this.reader.int16(), o = this.reader.int32(), u = this.reader.int16() === 0 ? "text" : "binary";
-      return new k.Field(e, t, n, i, s, o, u);
-    }
-    parseParameterDescriptionMessage(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.int16(), s = new k.ParameterDescriptionMessage(t, i);
-      for (let o = 0; o < i; o++)
-        s.dataTypeIDs[o] = this.reader.int32();
-      return s;
-    }
-    parseDataRowMessage(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.int16(), s = new Array(i);
-      for (let o = 0; o < i; o++) {
-        let u = this.reader.int32();
-        s[o] = u === -1 ? null : this.reader.string(u);
-      }
-      return new k.DataRowMessage(t, s);
-    }
-    parseParameterStatusMessage(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.cstring(), s = this.reader.cstring();
-      return new k.ParameterStatusMessage(
-        t,
-        i,
-        s
-      );
-    }
-    parseBackendKeyData(e, t, n) {
-      this.reader.setBuffer(e, n);
-      let i = this.reader.int32(), s = this.reader.int32();
-      return new k.BackendKeyDataMessage(t, i, s);
-    }
-    parseAuthenticationResponse(e, t, n) {
-      this.reader.setBuffer(
-        e,
-        n
-      );
-      let i = this.reader.int32(), s = { name: "authenticationOk", length: t };
-      switch (i) {
-        case 0:
-          break;
-        case 3:
-          s.length === 8 && (s.name = "authenticationCleartextPassword");
-          break;
-        case 5:
-          if (s.length === 12) {
-            s.name = "authenticationMD5Password";
-            let o = this.reader.bytes(4);
-            return new k.AuthenticationMD5Password(t, o);
-          }
-          break;
-        case 10:
-          {
-            s.name = "authenticationSASL", s.mechanisms = [];
-            let o;
-            do
-              o = this.reader.cstring(), o && s.mechanisms.push(o);
-            while (o);
-          }
-          break;
-        case 11:
-          s.name = "authenticationSASLContinue", s.data = this.reader.string(t - 8);
-          break;
-        case 12:
-          s.name = "authenticationSASLFinal", s.data = this.reader.string(t - 8);
-          break;
-        default:
-          throw new Error("Unknown authenticationOk message type " + i);
-      }
-      return s;
-    }
-    parseErrorMessage(e, t, n, i) {
-      this.reader.setBuffer(e, n);
-      let s = {}, o = this.reader.string(1);
-      for (; o !== "\0"; ) s[o] = this.reader.cstring(), o = this.reader.string(1);
-      let u = s.M, c = i === "notice" ? new k.NoticeMessage(t, u) : new k.DatabaseError(u, t, i);
-      return c.severity = s.S, c.code = s.C, c.detail = s.D, c.hint = s.H, c.position = s.P, c.internalPosition = s.p, c.internalQuery = s.q, c.where = s.W, c.schema = s.s, c.table = s.t, c.column = s.c, c.dataType = s.d, c.constraint = s.n, c.file = s.F, c.line = s.L, c.routine = s.R, c;
-    }
-  };
-  a(bn, "Parser");
-  var gn = bn;
-  Mt.Parser = gn;
-});
-var vn = T((xe) => {
-  "use strict";
-  p();
-  Object.defineProperty(xe, "__esModule", { value: true });
-  xe.DatabaseError = xe.serialize = xe.parse = void 0;
-  var Nc = ln();
-  Object.defineProperty(xe, "DatabaseError", { enumerable: true, get: a(
-    function() {
-      return Nc.DatabaseError;
-    },
-    "get"
-  ) });
-  var Wc = Ws();
-  Object.defineProperty(xe, "serialize", {
-    enumerable: true,
-    get: a(function() {
-      return Wc.serialize;
-    }, "get")
-  });
-  var jc = Gs();
-  function Hc(r, e) {
-    let t = new jc.Parser();
-    return r.on("data", (n) => t.parse(n, e)), new Promise((n) => r.on("end", () => n()));
-  }
-  __name(Hc, "Hc");
-  a(Hc, "parse");
-  xe.parse = Hc;
-});
-var Vs = {};
-ie(Vs, { connect: /* @__PURE__ */ __name(() => $c, "connect") });
-function $c({ socket: r, servername: e }) {
-  return r.startTls(e), r;
-}
-__name($c, "$c");
-var zs = G(
-  () => {
-    "use strict";
-    p();
-    a($c, "connect");
-  }
-);
-var En = T((Xh, Zs) => {
-  "use strict";
-  p();
-  var Ks = (Fe(), O(wi)), Gc = ge().EventEmitter, { parse: Vc, serialize: Q } = vn(), Ys = Q.flush(), zc = Q.sync(), Kc = Q.end(), Sn = class Sn extends Gc {
-    static {
-      __name(this, "Sn");
-    }
-    constructor(e) {
-      super(), e = e || {}, this.stream = e.stream || new Ks.Socket(), this._keepAlive = e.keepAlive, this._keepAliveInitialDelayMillis = e.keepAliveInitialDelayMillis, this.lastBuffer = false, this.parsedStatements = {}, this.ssl = e.ssl || false, this._ending = false, this._emitMessage = false;
-      var t = this;
-      this.on("newListener", function(n) {
-        n === "message" && (t._emitMessage = true);
-      });
-    }
-    connect(e, t) {
-      var n = this;
-      this._connecting = true, this.stream.setNoDelay(true), this.stream.connect(e, t), this.stream.once("connect", function() {
-        n._keepAlive && n.stream.setKeepAlive(true, n._keepAliveInitialDelayMillis), n.emit("connect");
-      });
-      let i = a(function(s) {
-        n._ending && (s.code === "ECONNRESET" || s.code === "EPIPE") || n.emit("error", s);
-      }, "reportStreamError");
-      if (this.stream.on("error", i), this.stream.on("close", function() {
-        n.emit("end");
-      }), !this.ssl) return this.attachListeners(
-        this.stream
-      );
-      this.stream.once("data", function(s) {
-        var o = s.toString("utf8");
-        switch (o) {
-          case "S":
-            break;
-          case "N":
-            return n.stream.end(), n.emit("error", new Error("The server does not support SSL connections"));
-          default:
-            return n.stream.end(), n.emit("error", new Error("There was an error establishing an SSL connection"));
-        }
-        var u = (zs(), O(Vs));
-        let c = { socket: n.stream };
-        n.ssl !== true && (Object.assign(c, n.ssl), "key" in n.ssl && (c.key = n.ssl.key)), Ks.isIP(t) === 0 && (c.servername = t);
-        try {
-          n.stream = u.connect(c);
-        } catch (l) {
-          return n.emit(
-            "error",
-            l
-          );
-        }
-        n.attachListeners(n.stream), n.stream.on("error", i), n.emit("sslconnect");
-      });
-    }
-    attachListeners(e) {
-      e.on(
-        "end",
-        () => {
-          this.emit("end");
-        }
-      ), Vc(e, (t) => {
-        var n = t.name === "error" ? "errorMessage" : t.name;
-        this._emitMessage && this.emit("message", t), this.emit(n, t);
-      });
-    }
-    requestSsl() {
-      this.stream.write(Q.requestSsl());
-    }
-    startup(e) {
-      this.stream.write(Q.startup(e));
-    }
-    cancel(e, t) {
-      this._send(Q.cancel(e, t));
-    }
-    password(e) {
-      this._send(Q.password(e));
-    }
-    sendSASLInitialResponseMessage(e, t) {
-      this._send(Q.sendSASLInitialResponseMessage(e, t));
-    }
-    sendSCRAMClientFinalMessage(e) {
-      this._send(Q.sendSCRAMClientFinalMessage(
-        e
-      ));
-    }
-    _send(e) {
-      return this.stream.writable ? this.stream.write(e) : false;
-    }
-    query(e) {
-      this._send(Q.query(e));
-    }
-    parse(e) {
-      this._send(Q.parse(e));
-    }
-    bind(e) {
-      this._send(Q.bind(e));
-    }
-    execute(e) {
-      this._send(Q.execute(e));
-    }
-    flush() {
-      this.stream.writable && this.stream.write(Ys);
-    }
-    sync() {
-      this._ending = true, this._send(Ys), this._send(zc);
-    }
-    ref() {
-      this.stream.ref();
-    }
-    unref() {
-      this.stream.unref();
-    }
-    end() {
-      if (this._ending = true, !this._connecting || !this.stream.writable) {
-        this.stream.end();
-        return;
-      }
-      return this.stream.write(Kc, () => {
-        this.stream.end();
-      });
-    }
-    close(e) {
-      this._send(Q.close(e));
-    }
-    describe(e) {
-      this._send(Q.describe(e));
-    }
-    sendCopyFromChunk(e) {
-      this._send(Q.copyData(e));
-    }
-    endCopyFrom() {
-      this._send(Q.copyDone());
-    }
-    sendCopyFail(e) {
-      this._send(Q.copyFail(e));
-    }
-  };
-  a(Sn, "Connection");
-  var xn = Sn;
-  Zs.exports = xn;
-});
-var eo = T((np, Xs) => {
-  "use strict";
-  p();
-  var Yc = ge().EventEmitter, rp = (it(), O(nt)), Zc = rt(), An = ds(), Jc = Cs(), Xc = At(), el = Rt(), Js = qs(), tl = tt(), rl = En(), Cn = class Cn extends Yc {
-    static {
-      __name(this, "Cn");
-    }
-    constructor(e) {
-      super(), this.connectionParameters = new el(e), this.user = this.connectionParameters.user, this.database = this.connectionParameters.database, this.port = this.connectionParameters.port, this.host = this.connectionParameters.host, Object.defineProperty(
-        this,
-        "password",
-        { configurable: true, enumerable: false, writable: true, value: this.connectionParameters.password }
-      ), this.replication = this.connectionParameters.replication;
-      var t = e || {};
-      this._Promise = t.Promise || b.Promise, this._types = new Xc(t.types), this._ending = false, this._connecting = false, this._connected = false, this._connectionError = false, this._queryable = true, this.connection = t.connection || new rl({ stream: t.stream, ssl: this.connectionParameters.ssl, keepAlive: t.keepAlive || false, keepAliveInitialDelayMillis: t.keepAliveInitialDelayMillis || 0, encoding: this.connectionParameters.client_encoding || "utf8" }), this.queryQueue = [], this.binary = t.binary || tl.binary, this.processID = null, this.secretKey = null, this.ssl = this.connectionParameters.ssl || false, this.ssl && this.ssl.key && Object.defineProperty(this.ssl, "key", { enumerable: false }), this._connectionTimeoutMillis = t.connectionTimeoutMillis || 0;
-    }
-    _errorAllQueries(e) {
-      let t = a((n) => {
-        m.nextTick(() => {
-          n.handleError(e, this.connection);
-        });
-      }, "enqueueError");
-      this.activeQuery && (t(this.activeQuery), this.activeQuery = null), this.queryQueue.forEach(t), this.queryQueue.length = 0;
-    }
-    _connect(e) {
-      var t = this, n = this.connection;
-      if (this._connectionCallback = e, this._connecting || this._connected) {
-        let i = new Error("Client has already been connected. You cannot reuse a client.");
-        m.nextTick(
-          () => {
-            e(i);
-          }
-        );
-        return;
-      }
-      this._connecting = true, this.connectionTimeoutHandle, this._connectionTimeoutMillis > 0 && (this.connectionTimeoutHandle = setTimeout(() => {
-        n._ending = true, n.stream.destroy(new Error("timeout expired"));
-      }, this._connectionTimeoutMillis)), this.host && this.host.indexOf("/") === 0 ? n.connect(this.host + "/.s.PGSQL." + this.port) : n.connect(this.port, this.host), n.on("connect", function() {
-        t.ssl ? n.requestSsl() : n.startup(t.getStartupConf());
-      }), n.on("sslconnect", function() {
-        n.startup(t.getStartupConf());
-      }), this._attachListeners(
-        n
-      ), n.once("end", () => {
-        let i = this._ending ? new Error("Connection terminated") : new Error("Connection terminated unexpectedly");
-        clearTimeout(this.connectionTimeoutHandle), this._errorAllQueries(i), this._ending || (this._connecting && !this._connectionError ? this._connectionCallback ? this._connectionCallback(i) : this._handleErrorEvent(i) : this._connectionError || this._handleErrorEvent(i)), m.nextTick(() => {
-          this.emit("end");
-        });
-      });
-    }
-    connect(e) {
-      if (e) {
-        this._connect(e);
-        return;
-      }
-      return new this._Promise((t, n) => {
-        this._connect((i) => {
-          i ? n(i) : t();
-        });
-      });
-    }
-    _attachListeners(e) {
-      e.on("authenticationCleartextPassword", this._handleAuthCleartextPassword.bind(this)), e.on("authenticationMD5Password", this._handleAuthMD5Password.bind(this)), e.on("authenticationSASL", this._handleAuthSASL.bind(this)), e.on("authenticationSASLContinue", this._handleAuthSASLContinue.bind(this)), e.on("authenticationSASLFinal", this._handleAuthSASLFinal.bind(this)), e.on("backendKeyData", this._handleBackendKeyData.bind(this)), e.on("error", this._handleErrorEvent.bind(this)), e.on("errorMessage", this._handleErrorMessage.bind(this)), e.on("readyForQuery", this._handleReadyForQuery.bind(this)), e.on("notice", this._handleNotice.bind(this)), e.on("rowDescription", this._handleRowDescription.bind(this)), e.on("dataRow", this._handleDataRow.bind(this)), e.on("portalSuspended", this._handlePortalSuspended.bind(
-        this
-      )), e.on("emptyQuery", this._handleEmptyQuery.bind(this)), e.on("commandComplete", this._handleCommandComplete.bind(this)), e.on("parseComplete", this._handleParseComplete.bind(this)), e.on("copyInResponse", this._handleCopyInResponse.bind(this)), e.on("copyData", this._handleCopyData.bind(this)), e.on("notification", this._handleNotification.bind(this));
-    }
-    _checkPgPass(e) {
-      let t = this.connection;
-      typeof this.password == "function" ? this._Promise.resolve().then(() => this.password()).then((n) => {
-        if (n !== void 0) {
-          if (typeof n != "string") {
-            t.emit("error", new TypeError(
-              "Password must be a string"
-            ));
-            return;
-          }
-          this.connectionParameters.password = this.password = n;
-        } else this.connectionParameters.password = this.password = null;
-        e();
-      }).catch((n) => {
-        t.emit("error", n);
-      }) : this.password !== null ? e() : Jc(
-        this.connectionParameters,
-        (n) => {
-          n !== void 0 && (this.connectionParameters.password = this.password = n), e();
-        }
-      );
-    }
-    _handleAuthCleartextPassword(e) {
-      this._checkPgPass(() => {
-        this.connection.password(this.password);
-      });
-    }
-    _handleAuthMD5Password(e) {
-      this._checkPgPass(
-        () => {
-          let t = Zc.postgresMd5PasswordHash(this.user, this.password, e.salt);
-          this.connection.password(t);
-        }
-      );
-    }
-    _handleAuthSASL(e) {
-      this._checkPgPass(() => {
-        this.saslSession = An.startSession(e.mechanisms), this.connection.sendSASLInitialResponseMessage(
-          this.saslSession.mechanism,
-          this.saslSession.response
-        );
-      });
-    }
-    _handleAuthSASLContinue(e) {
-      An.continueSession(
-        this.saslSession,
-        this.password,
-        e.data
-      ), this.connection.sendSCRAMClientFinalMessage(this.saslSession.response);
-    }
-    _handleAuthSASLFinal(e) {
-      An.finalizeSession(this.saslSession, e.data), this.saslSession = null;
-    }
-    _handleBackendKeyData(e) {
-      this.processID = e.processID, this.secretKey = e.secretKey;
-    }
-    _handleReadyForQuery(e) {
-      this._connecting && (this._connecting = false, this._connected = true, clearTimeout(this.connectionTimeoutHandle), this._connectionCallback && (this._connectionCallback(null, this), this._connectionCallback = null), this.emit("connect"));
-      let { activeQuery: t } = this;
-      this.activeQuery = null, this.readyForQuery = true, t && t.handleReadyForQuery(this.connection), this._pulseQueryQueue();
-    }
-    _handleErrorWhileConnecting(e) {
-      if (!this._connectionError) {
-        if (this._connectionError = true, clearTimeout(this.connectionTimeoutHandle), this._connectionCallback) return this._connectionCallback(e);
-        this.emit("error", e);
-      }
-    }
-    _handleErrorEvent(e) {
-      if (this._connecting) return this._handleErrorWhileConnecting(e);
-      this._queryable = false, this._errorAllQueries(e), this.emit("error", e);
-    }
-    _handleErrorMessage(e) {
-      if (this._connecting) return this._handleErrorWhileConnecting(e);
-      let t = this.activeQuery;
-      if (!t) {
-        this._handleErrorEvent(e);
-        return;
-      }
-      this.activeQuery = null, t.handleError(
-        e,
-        this.connection
-      );
-    }
-    _handleRowDescription(e) {
-      this.activeQuery.handleRowDescription(e);
-    }
-    _handleDataRow(e) {
-      this.activeQuery.handleDataRow(e);
-    }
-    _handlePortalSuspended(e) {
-      this.activeQuery.handlePortalSuspended(this.connection);
-    }
-    _handleEmptyQuery(e) {
-      this.activeQuery.handleEmptyQuery(this.connection);
-    }
-    _handleCommandComplete(e) {
-      this.activeQuery.handleCommandComplete(e, this.connection);
-    }
-    _handleParseComplete(e) {
-      this.activeQuery.name && (this.connection.parsedStatements[this.activeQuery.name] = this.activeQuery.text);
-    }
-    _handleCopyInResponse(e) {
-      this.activeQuery.handleCopyInResponse(this.connection);
-    }
-    _handleCopyData(e) {
-      this.activeQuery.handleCopyData(
-        e,
-        this.connection
-      );
-    }
-    _handleNotification(e) {
-      this.emit("notification", e);
-    }
-    _handleNotice(e) {
-      this.emit("notice", e);
-    }
-    getStartupConf() {
-      var e = this.connectionParameters, t = { user: e.user, database: e.database }, n = e.application_name || e.fallback_application_name;
-      return n && (t.application_name = n), e.replication && (t.replication = "" + e.replication), e.statement_timeout && (t.statement_timeout = String(parseInt(e.statement_timeout, 10))), e.lock_timeout && (t.lock_timeout = String(parseInt(e.lock_timeout, 10))), e.idle_in_transaction_session_timeout && (t.idle_in_transaction_session_timeout = String(parseInt(e.idle_in_transaction_session_timeout, 10))), e.options && (t.options = e.options), t;
-    }
-    cancel(e, t) {
-      if (e.activeQuery === t) {
-        var n = this.connection;
-        this.host && this.host.indexOf("/") === 0 ? n.connect(this.host + "/.s.PGSQL." + this.port) : n.connect(this.port, this.host), n.on("connect", function() {
-          n.cancel(
-            e.processID,
-            e.secretKey
-          );
-        });
-      } else e.queryQueue.indexOf(t) !== -1 && e.queryQueue.splice(e.queryQueue.indexOf(t), 1);
-    }
-    setTypeParser(e, t, n) {
-      return this._types.setTypeParser(e, t, n);
-    }
-    getTypeParser(e, t) {
-      return this._types.getTypeParser(e, t);
-    }
-    escapeIdentifier(e) {
-      return '"' + e.replace(/"/g, '""') + '"';
-    }
-    escapeLiteral(e) {
-      for (var t = false, n = "'", i = 0; i < e.length; i++) {
-        var s = e[i];
-        s === "'" ? n += s + s : s === "\\" ? (n += s + s, t = true) : n += s;
-      }
-      return n += "'", t === true && (n = " E" + n), n;
-    }
-    _pulseQueryQueue() {
-      if (this.readyForQuery === true) if (this.activeQuery = this.queryQueue.shift(), this.activeQuery) {
-        this.readyForQuery = false, this.hasExecuted = true;
-        let e = this.activeQuery.submit(this.connection);
-        e && m.nextTick(() => {
-          this.activeQuery.handleError(e, this.connection), this.readyForQuery = true, this._pulseQueryQueue();
-        });
-      } else this.hasExecuted && (this.activeQuery = null, this.emit("drain"));
-    }
-    query(e, t, n) {
-      var i, s, o, u, c;
-      if (e == null) throw new TypeError(
-        "Client was passed a null or undefined query"
-      );
-      return typeof e.submit == "function" ? (o = e.query_timeout || this.connectionParameters.query_timeout, s = i = e, typeof t == "function" && (i.callback = i.callback || t)) : (o = this.connectionParameters.query_timeout, i = new Js(e, t, n), i.callback || (s = new this._Promise((l, f) => {
-        i.callback = (y, g) => y ? f(y) : l(g);
-      }))), o && (c = i.callback, u = setTimeout(() => {
-        var l = new Error("Query read timeout");
-        m.nextTick(
-          () => {
-            i.handleError(l, this.connection);
-          }
-        ), c(l), i.callback = () => {
-        };
-        var f = this.queryQueue.indexOf(i);
-        f > -1 && this.queryQueue.splice(f, 1), this._pulseQueryQueue();
-      }, o), i.callback = (l, f) => {
-        clearTimeout(u), c(l, f);
-      }), this.binary && !i.binary && (i.binary = true), i._result && !i._result._types && (i._result._types = this._types), this._queryable ? this._ending ? (m.nextTick(() => {
-        i.handleError(new Error("Client was closed and is not queryable"), this.connection);
-      }), s) : (this.queryQueue.push(i), this._pulseQueryQueue(), s) : (m.nextTick(() => {
-        i.handleError(new Error("Client has encountered a connection error and is not queryable"), this.connection);
-      }), s);
-    }
-    ref() {
-      this.connection.ref();
-    }
-    unref() {
-      this.connection.unref();
-    }
-    end(e) {
-      if (this._ending = true, !this.connection._connecting) if (e) e();
-      else return this._Promise.resolve();
-      if (this.activeQuery || !this._queryable ? this.connection.stream.destroy() : this.connection.end(), e) this.connection.once("end", e);
-      else return new this._Promise((t) => {
-        this.connection.once("end", t);
-      });
-    }
-  };
-  a(Cn, "Client");
-  var Ut = Cn;
-  Ut.Query = Js;
-  Xs.exports = Ut;
-});
-var io = T((op, no) => {
-  "use strict";
-  p();
-  var nl = ge().EventEmitter, to = a(function() {
-  }, "NOOP"), ro = a((r, e) => {
-    let t = r.findIndex(e);
-    return t === -1 ? void 0 : r.splice(t, 1)[0];
-  }, "removeWhere"), Tn = class Tn {
-    static {
-      __name(this, "Tn");
-    }
-    constructor(e, t, n) {
-      this.client = e, this.idleListener = t, this.timeoutId = n;
-    }
-  };
-  a(Tn, "IdleItem");
-  var _n = Tn, Pn = class Pn {
-    static {
-      __name(this, "Pn");
-    }
-    constructor(e) {
-      this.callback = e;
-    }
-  };
-  a(Pn, "PendingItem");
-  var Qe = Pn;
-  function il() {
-    throw new Error("Release called on client which has already been released to the pool.");
-  }
-  __name(il, "il");
-  a(il, "throwOnDoubleRelease");
-  function Dt(r, e) {
-    if (e)
-      return { callback: e, result: void 0 };
-    let t, n, i = a(function(o, u) {
-      o ? t(o) : n(u);
-    }, "cb"), s = new r(function(o, u) {
-      n = o, t = u;
-    }).catch((o) => {
-      throw Error.captureStackTrace(o), o;
-    });
-    return { callback: i, result: s };
-  }
-  __name(Dt, "Dt");
-  a(Dt, "promisify");
-  function sl(r, e) {
-    return a(/* @__PURE__ */ __name(function t(n) {
-      n.client = e, e.removeListener("error", t), e.on("error", () => {
-        r.log(
-          "additional client error after disconnection due to error",
-          n
-        );
-      }), r._remove(e), r.emit("error", n, e);
-    }, "t"), "idleListener");
-  }
-  __name(sl, "sl");
-  a(sl, "makeIdleListener");
-  var Rn = class Rn extends nl {
-    static {
-      __name(this, "Rn");
-    }
-    constructor(e, t) {
-      super(), this.options = Object.assign({}, e), e != null && "password" in e && Object.defineProperty(this.options, "password", {
-        configurable: true,
-        enumerable: false,
-        writable: true,
-        value: e.password
-      }), e != null && e.ssl && e.ssl.key && Object.defineProperty(this.options.ssl, "key", { enumerable: false }), this.options.max = this.options.max || this.options.poolSize || 10, this.options.min = this.options.min || 0, this.options.maxUses = this.options.maxUses || 1 / 0, this.options.allowExitOnIdle = this.options.allowExitOnIdle || false, this.options.maxLifetimeSeconds = this.options.maxLifetimeSeconds || 0, this.log = this.options.log || function() {
-      }, this.Client = this.options.Client || t || ot().Client, this.Promise = this.options.Promise || b.Promise, typeof this.options.idleTimeoutMillis > "u" && (this.options.idleTimeoutMillis = 1e4), this._clients = [], this._idle = [], this._expired = /* @__PURE__ */ new WeakSet(), this._pendingQueue = [], this._endCallback = void 0, this.ending = false, this.ended = false;
-    }
-    _isFull() {
-      return this._clients.length >= this.options.max;
-    }
-    _isAboveMin() {
-      return this._clients.length > this.options.min;
-    }
-    _pulseQueue() {
-      if (this.log("pulse queue"), this.ended) {
-        this.log("pulse queue ended");
-        return;
-      }
-      if (this.ending) {
-        this.log("pulse queue on ending"), this._idle.length && this._idle.slice().map((t) => {
-          this._remove(t.client);
-        }), this._clients.length || (this.ended = true, this._endCallback());
-        return;
-      }
-      if (!this._pendingQueue.length) {
-        this.log("no queued requests");
-        return;
-      }
-      if (!this._idle.length && this._isFull()) return;
-      let e = this._pendingQueue.shift();
-      if (this._idle.length) {
-        let t = this._idle.pop();
-        clearTimeout(
-          t.timeoutId
-        );
-        let n = t.client;
-        n.ref && n.ref();
-        let i = t.idleListener;
-        return this._acquireClient(n, e, i, false);
-      }
-      if (!this._isFull()) return this.newClient(e);
-      throw new Error("unexpected condition");
-    }
-    _remove(e) {
-      let t = ro(
-        this._idle,
-        (n) => n.client === e
-      );
-      t !== void 0 && clearTimeout(t.timeoutId), this._clients = this._clients.filter(
-        (n) => n !== e
-      ), e.end(), this.emit("remove", e);
-    }
-    connect(e) {
-      if (this.ending) {
-        let i = new Error("Cannot use a pool after calling end on the pool");
-        return e ? e(i) : this.Promise.reject(i);
-      }
-      let t = Dt(this.Promise, e), n = t.result;
-      if (this._isFull() || this._idle.length) {
-        if (this._idle.length && m.nextTick(() => this._pulseQueue()), !this.options.connectionTimeoutMillis) return this._pendingQueue.push(new Qe(t.callback)), n;
-        let i = a((u, c, l) => {
-          clearTimeout(o), t.callback(u, c, l);
-        }, "queueCallback"), s = new Qe(i), o = setTimeout(() => {
-          ro(
-            this._pendingQueue,
-            (u) => u.callback === i
-          ), s.timedOut = true, t.callback(new Error("timeout exceeded when trying to connect"));
-        }, this.options.connectionTimeoutMillis);
-        return o.unref && o.unref(), this._pendingQueue.push(s), n;
-      }
-      return this.newClient(new Qe(t.callback)), n;
-    }
-    newClient(e) {
-      let t = new this.Client(this.options);
-      this._clients.push(
-        t
-      );
-      let n = sl(this, t);
-      this.log("checking client timeout");
-      let i, s = false;
-      this.options.connectionTimeoutMillis && (i = setTimeout(() => {
-        this.log("ending client due to timeout"), s = true, t.connection ? t.connection.stream.destroy() : t.end();
-      }, this.options.connectionTimeoutMillis)), this.log("connecting new client"), t.connect((o) => {
-        if (i && clearTimeout(i), t.on("error", n), o) this.log("client failed to connect", o), this._clients = this._clients.filter((u) => u !== t), s && (o = new Error("Connection terminated due to connection timeout", { cause: o })), this._pulseQueue(), e.timedOut || e.callback(o, void 0, to);
-        else {
-          if (this.log("new client connected"), this.options.maxLifetimeSeconds !== 0) {
-            let u = setTimeout(() => {
-              this.log("ending client due to expired lifetime"), this._expired.add(t), this._idle.findIndex((l) => l.client === t) !== -1 && this._acquireClient(
-                t,
-                new Qe((l, f, y) => y()),
-                n,
-                false
-              );
-            }, this.options.maxLifetimeSeconds * 1e3);
-            u.unref(), t.once("end", () => clearTimeout(u));
-          }
-          return this._acquireClient(t, e, n, true);
-        }
-      });
-    }
-    _acquireClient(e, t, n, i) {
-      i && this.emit("connect", e), this.emit("acquire", e), e.release = this._releaseOnce(e, n), e.removeListener("error", n), t.timedOut ? i && this.options.verify ? this.options.verify(e, e.release) : e.release() : i && this.options.verify ? this.options.verify(e, (s) => {
-        if (s) return e.release(s), t.callback(s, void 0, to);
-        t.callback(void 0, e, e.release);
-      }) : t.callback(void 0, e, e.release);
-    }
-    _releaseOnce(e, t) {
-      let n = false;
-      return (i) => {
-        n && il(), n = true, this._release(e, t, i);
-      };
-    }
-    _release(e, t, n) {
-      if (e.on("error", t), e._poolUseCount = (e._poolUseCount || 0) + 1, this.emit("release", n, e), n || this.ending || !e._queryable || e._ending || e._poolUseCount >= this.options.maxUses) {
-        e._poolUseCount >= this.options.maxUses && this.log("remove expended client"), this._remove(e), this._pulseQueue();
-        return;
-      }
-      if (this._expired.has(e)) {
-        this.log("remove expired client"), this._expired.delete(e), this._remove(e), this._pulseQueue();
-        return;
-      }
-      let s;
-      this.options.idleTimeoutMillis && this._isAboveMin() && (s = setTimeout(() => {
-        this.log("remove idle client"), this._remove(e);
-      }, this.options.idleTimeoutMillis), this.options.allowExitOnIdle && s.unref()), this.options.allowExitOnIdle && e.unref(), this._idle.push(new _n(
-        e,
-        t,
-        s
-      )), this._pulseQueue();
-    }
-    query(e, t, n) {
-      if (typeof e == "function") {
-        let s = Dt(this.Promise, e);
-        return v(function() {
-          return s.callback(new Error("Passing a function as the first parameter to pool.query is not supported"));
-        }), s.result;
-      }
-      typeof t == "function" && (n = t, t = void 0);
-      let i = Dt(this.Promise, n);
-      return n = i.callback, this.connect((s, o) => {
-        if (s) return n(s);
-        let u = false, c = a((l) => {
-          u || (u = true, o.release(l), n(l));
-        }, "onError");
-        o.once("error", c), this.log("dispatching query");
-        try {
-          o.query(e, t, (l, f) => {
-            if (this.log("query dispatched"), o.removeListener(
-              "error",
-              c
-            ), !u) return u = true, o.release(l), l ? n(l) : n(void 0, f);
-          });
-        } catch (l) {
-          return o.release(l), n(l);
-        }
-      }), i.result;
-    }
-    end(e) {
-      if (this.log("ending"), this.ending) {
-        let n = new Error("Called end on pool more than once");
-        return e ? e(n) : this.Promise.reject(n);
-      }
-      this.ending = true;
-      let t = Dt(this.Promise, e);
-      return this._endCallback = t.callback, this._pulseQueue(), t.result;
-    }
-    get waitingCount() {
-      return this._pendingQueue.length;
-    }
-    get idleCount() {
-      return this._idle.length;
-    }
-    get expiredCount() {
-      return this._clients.reduce((e, t) => e + (this._expired.has(t) ? 1 : 0), 0);
-    }
-    get totalCount() {
-      return this._clients.length;
-    }
-  };
-  a(Rn, "Pool");
-  var In = Rn;
-  no.exports = In;
-});
-var so = {};
-ie(so, { default: /* @__PURE__ */ __name(() => ol, "default") });
-var ol;
-var oo = G(() => {
-  "use strict";
-  p();
-  ol = {};
-});
-var ao = T((lp, al) => {
-  al.exports = { name: "pg", version: "8.8.0", description: "PostgreSQL client - pure javascript & libpq with the same API", keywords: [
-    "database",
-    "libpq",
-    "pg",
-    "postgre",
-    "postgres",
-    "postgresql",
-    "rdbms"
-  ], homepage: "https://github.com/brianc/node-postgres", repository: { type: "git", url: "git://github.com/brianc/node-postgres.git", directory: "packages/pg" }, author: "Brian Carlson <brian.m.carlson@gmail.com>", main: "./lib", dependencies: { "buffer-writer": "2.0.0", "packet-reader": "1.0.0", "pg-connection-string": "^2.5.0", "pg-pool": "^3.5.2", "pg-protocol": "^1.5.0", "pg-types": "^2.1.0", pgpass: "1.x" }, devDependencies: {
-    async: "2.6.4",
-    bluebird: "3.5.2",
-    co: "4.6.0",
-    "pg-copy-streams": "0.3.0"
-  }, peerDependencies: { "pg-native": ">=3.0.1" }, peerDependenciesMeta: { "pg-native": { optional: true } }, scripts: { test: "make test-all" }, files: ["lib", "SPONSORS.md"], license: "MIT", engines: { node: ">= 8.0.0" }, gitHead: "c99fb2c127ddf8d712500db2c7b9a5491a178655" };
-});
-var lo = T((fp, co) => {
-  "use strict";
-  p();
-  var uo = ge().EventEmitter, ul = (it(), O(nt)), Bn = rt(), Ne = co.exports = function(r, e, t) {
-    uo.call(this), r = Bn.normalizeQueryConfig(r, e, t), this.text = r.text, this.values = r.values, this.name = r.name, this.callback = r.callback, this.state = "new", this._arrayMode = r.rowMode === "array", this._emitRowEvents = false, this.on("newListener", function(n) {
-      n === "row" && (this._emitRowEvents = true);
-    }.bind(this));
-  };
-  ul.inherits(Ne, uo);
-  var cl = { sqlState: "code", statementPosition: "position", messagePrimary: "message", context: "where", schemaName: "schema", tableName: "table", columnName: "column", dataTypeName: "dataType", constraintName: "constraint", sourceFile: "file", sourceLine: "line", sourceFunction: "routine" };
-  Ne.prototype.handleError = function(r) {
-    var e = this.native.pq.resultErrorFields();
-    if (e) for (var t in e) {
-      var n = cl[t] || t;
-      r[n] = e[t];
-    }
-    this.callback ? this.callback(r) : this.emit("error", r), this.state = "error";
-  };
-  Ne.prototype.then = function(r, e) {
-    return this._getPromise().then(
-      r,
-      e
-    );
-  };
-  Ne.prototype.catch = function(r) {
-    return this._getPromise().catch(r);
-  };
-  Ne.prototype._getPromise = function() {
-    return this._promise ? this._promise : (this._promise = new Promise(function(r, e) {
-      this._once("end", r), this._once("error", e);
-    }.bind(this)), this._promise);
-  };
-  Ne.prototype.submit = function(r) {
-    this.state = "running";
-    var e = this;
-    this.native = r.native, r.native.arrayMode = this._arrayMode;
-    var t = a(function(s, o, u) {
-      if (r.native.arrayMode = false, v(function() {
-        e.emit("_done");
-      }), s) return e.handleError(s);
-      e._emitRowEvents && (u.length > 1 ? o.forEach(
-        (c, l) => {
-          c.forEach((f) => {
-            e.emit("row", f, u[l]);
-          });
-        }
-      ) : o.forEach(function(c) {
-        e.emit("row", c, u);
-      })), e.state = "end", e.emit("end", u), e.callback && e.callback(null, u);
-    }, "after");
-    if (m.domain && (t = m.domain.bind(t)), this.name) {
-      this.name.length > 63 && (console.error("Warning! Postgres only supports 63 characters for query names."), console.error("You supplied %s (%s)", this.name, this.name.length), console.error("This can cause conflicts and silent errors executing queries"));
-      var n = (this.values || []).map(Bn.prepareValue);
-      if (r.namedQueries[this.name]) {
-        if (this.text && r.namedQueries[this.name] !== this.text) {
-          let s = new Error(`Prepared statements must be unique - '${this.name}' was used for a different statement`);
-          return t(s);
-        }
-        return r.native.execute(this.name, n, t);
-      }
-      return r.native.prepare(this.name, this.text, n.length, function(s) {
-        return s ? t(s) : (r.namedQueries[e.name] = e.text, e.native.execute(e.name, n, t));
-      });
-    } else if (this.values) {
-      if (!Array.isArray(
-        this.values
-      )) {
-        let s = new Error("Query values must be an array");
-        return t(s);
-      }
-      var i = this.values.map(Bn.prepareValue);
-      r.native.query(this.text, i, t);
-    } else r.native.query(this.text, t);
-  };
-});
-var yo = T((yp, po) => {
-  "use strict";
-  p();
-  var ll = (oo(), O(so)), fl = At(), dp = ao(), fo = ge().EventEmitter, hl = (it(), O(nt)), pl = Rt(), ho = lo(), K = po.exports = function(r) {
-    fo.call(this), r = r || {}, this._Promise = r.Promise || b.Promise, this._types = new fl(r.types), this.native = new ll({ types: this._types }), this._queryQueue = [], this._ending = false, this._connecting = false, this._connected = false, this._queryable = true;
-    var e = this.connectionParameters = new pl(r);
-    this.user = e.user, Object.defineProperty(this, "password", { configurable: true, enumerable: false, writable: true, value: e.password }), this.database = e.database, this.host = e.host, this.port = e.port, this.namedQueries = {};
-  };
-  K.Query = ho;
-  hl.inherits(K, fo);
-  K.prototype._errorAllQueries = function(r) {
-    let e = a((t) => {
-      m.nextTick(() => {
-        t.native = this.native, t.handleError(r);
-      });
-    }, "enqueueError");
-    this._hasActiveQuery() && (e(this._activeQuery), this._activeQuery = null), this._queryQueue.forEach(e), this._queryQueue.length = 0;
-  };
-  K.prototype._connect = function(r) {
-    var e = this;
-    if (this._connecting) {
-      m.nextTick(() => r(new Error("Client has already been connected. You cannot reuse a client.")));
-      return;
-    }
-    this._connecting = true, this.connectionParameters.getLibpqConnectionString(function(t, n) {
-      if (t) return r(t);
-      e.native.connect(n, function(i) {
-        if (i) return e.native.end(), r(i);
-        e._connected = true, e.native.on("error", function(s) {
-          e._queryable = false, e._errorAllQueries(s), e.emit("error", s);
-        }), e.native.on("notification", function(s) {
-          e.emit("notification", { channel: s.relname, payload: s.extra });
-        }), e.emit("connect"), e._pulseQueryQueue(true), r();
-      });
-    });
-  };
-  K.prototype.connect = function(r) {
-    if (r) {
-      this._connect(r);
-      return;
-    }
-    return new this._Promise((e, t) => {
-      this._connect((n) => {
-        n ? t(n) : e();
-      });
-    });
-  };
-  K.prototype.query = function(r, e, t) {
-    var n, i, s, o, u;
-    if (r == null) throw new TypeError("Client was passed a null or undefined query");
-    if (typeof r.submit == "function") s = r.query_timeout || this.connectionParameters.query_timeout, i = n = r, typeof e == "function" && (r.callback = e);
-    else if (s = this.connectionParameters.query_timeout, n = new ho(r, e, t), !n.callback) {
-      let c, l;
-      i = new this._Promise((f, y) => {
-        c = f, l = y;
-      }), n.callback = (f, y) => f ? l(f) : c(y);
-    }
-    return s && (u = n.callback, o = setTimeout(() => {
-      var c = new Error(
-        "Query read timeout"
-      );
-      m.nextTick(() => {
-        n.handleError(c, this.connection);
-      }), u(c), n.callback = () => {
-      };
-      var l = this._queryQueue.indexOf(n);
-      l > -1 && this._queryQueue.splice(l, 1), this._pulseQueryQueue();
-    }, s), n.callback = (c, l) => {
-      clearTimeout(o), u(c, l);
-    }), this._queryable ? this._ending ? (n.native = this.native, m.nextTick(() => {
-      n.handleError(
-        new Error("Client was closed and is not queryable")
-      );
-    }), i) : (this._queryQueue.push(n), this._pulseQueryQueue(), i) : (n.native = this.native, m.nextTick(() => {
-      n.handleError(new Error("Client has encountered a connection error and is not queryable"));
-    }), i);
-  };
-  K.prototype.end = function(r) {
-    var e = this;
-    this._ending = true, this._connected || this.once("connect", this.end.bind(this, r));
-    var t;
-    return r || (t = new this._Promise(function(n, i) {
-      r = a((s) => s ? i(s) : n(), "cb");
-    })), this.native.end(function() {
-      e._errorAllQueries(new Error("Connection terminated")), m.nextTick(() => {
-        e.emit("end"), r && r();
-      });
-    }), t;
-  };
-  K.prototype._hasActiveQuery = function() {
-    return this._activeQuery && this._activeQuery.state !== "error" && this._activeQuery.state !== "end";
-  };
-  K.prototype._pulseQueryQueue = function(r) {
-    if (this._connected && !this._hasActiveQuery()) {
-      var e = this._queryQueue.shift();
-      if (!e) {
-        r || this.emit("drain");
-        return;
-      }
-      this._activeQuery = e, e.submit(this);
-      var t = this;
-      e.once("_done", function() {
-        t._pulseQueryQueue();
-      });
-    }
-  };
-  K.prototype.cancel = function(r) {
-    this._activeQuery === r ? this.native.cancel(function() {
-    }) : this._queryQueue.indexOf(r) !== -1 && this._queryQueue.splice(this._queryQueue.indexOf(r), 1);
-  };
-  K.prototype.ref = function() {
-  };
-  K.prototype.unref = function() {
-  };
-  K.prototype.setTypeParser = function(r, e, t) {
-    return this._types.setTypeParser(
-      r,
-      e,
-      t
-    );
-  };
-  K.prototype.getTypeParser = function(r, e) {
-    return this._types.getTypeParser(r, e);
-  };
-});
-var Ln = T((gp, mo) => {
-  "use strict";
-  p();
-  mo.exports = yo();
-});
-var ot = T((vp, at) => {
-  "use strict";
-  p();
-  var dl = eo(), yl = tt(), ml = En(), wl = io(), { DatabaseError: gl } = vn(), bl = a(
-    (r) => {
-      var e;
-      return e = class extends wl {
-        static {
-          __name(this, "e");
-        }
-        constructor(n) {
-          super(n, r);
-        }
-      }, a(e, "BoundPool"), e;
-    },
-    "poolFactory"
-  ), Fn = a(
-    function(r) {
-      this.defaults = yl, this.Client = r, this.Query = this.Client.Query, this.Pool = bl(this.Client), this._pools = [], this.Connection = ml, this.types = Je(), this.DatabaseError = gl;
-    },
-    "PG"
-  );
-  typeof m.env.NODE_PG_FORCE_NATIVE < "u" ? at.exports = new Fn(Ln()) : (at.exports = new Fn(dl), Object.defineProperty(at.exports, "native", {
-    configurable: true,
-    enumerable: false,
-    get() {
-      var r = null;
-      try {
-        r = new Fn(Ln());
-      } catch (e) {
-        if (e.code !== "MODULE_NOT_FOUND") throw e;
-      }
-      return Object.defineProperty(at.exports, "native", { value: r }), r;
-    }
-  }));
-});
-p();
-p();
-Fe();
-Zt();
-p();
-var pa = Object.defineProperty;
-var da = Object.defineProperties;
-var ya = Object.getOwnPropertyDescriptors;
-var bi = Object.getOwnPropertySymbols;
-var ma = Object.prototype.hasOwnProperty;
-var wa = Object.prototype.propertyIsEnumerable;
-var vi = a(
-  (r, e, t) => e in r ? pa(r, e, { enumerable: true, configurable: true, writable: true, value: t }) : r[e] = t,
-  "__defNormalProp"
-);
-var ga = a((r, e) => {
-  for (var t in e || (e = {})) ma.call(e, t) && vi(r, t, e[t]);
-  if (bi) for (var t of bi(e)) wa.call(e, t) && vi(r, t, e[t]);
-  return r;
-}, "__spreadValues");
-var ba = a((r, e) => da(r, ya(e)), "__spreadProps");
-var va = 1008e3;
-var xi = new Uint8Array(
-  new Uint16Array([258]).buffer
-)[0] === 2;
-var xa = new TextDecoder();
-var Jt = new TextEncoder();
-var yt = Jt.encode("0123456789abcdef");
-var mt = Jt.encode("0123456789ABCDEF");
-var Sa = Jt.encode("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
-var Si = Sa.slice();
-Si[62] = 45;
-Si[63] = 95;
-var He;
-var wt;
-function Ea(r, { alphabet: e, scratchArr: t } = {}) {
-  if (!He) if (He = new Uint16Array(256), wt = new Uint16Array(256), xi) for (let C = 0; C < 256; C++) He[C] = yt[C & 15] << 8 | yt[C >>> 4], wt[C] = mt[C & 15] << 8 | mt[C >>> 4];
-  else for (let C = 0; C < 256; C++) He[C] = yt[C & 15] | yt[C >>> 4] << 8, wt[C] = mt[C & 15] | mt[C >>> 4] << 8;
-  r.byteOffset % 4 !== 0 && (r = new Uint8Array(r));
-  let n = r.length, i = n >>> 1, s = n >>> 2, o = t || new Uint16Array(n), u = new Uint32Array(
-    r.buffer,
-    r.byteOffset,
-    s
-  ), c = new Uint32Array(o.buffer, o.byteOffset, i), l = e === "upper" ? wt : He, f = 0, y = 0, g;
-  if (xi)
-    for (; f < s; ) g = u[f++], c[y++] = l[g >>> 8 & 255] << 16 | l[g & 255], c[y++] = l[g >>> 24] << 16 | l[g >>> 16 & 255];
-  else for (; f < s; )
-    g = u[f++], c[y++] = l[g >>> 24] << 16 | l[g >>> 16 & 255], c[y++] = l[g >>> 8 & 255] << 16 | l[g & 255];
-  for (f <<= 2; f < n; ) o[f] = l[r[f++]];
-  return xa.decode(o.subarray(0, n));
-}
-__name(Ea, "Ea");
-a(Ea, "_toHex");
-function Aa(r, e = {}) {
-  let t = "", n = r.length, i = va >>> 1, s = Math.ceil(n / i), o = new Uint16Array(s > 1 ? i : n);
-  for (let u = 0; u < s; u++) {
-    let c = u * i, l = c + i;
-    t += Ea(r.subarray(c, l), ba(ga(
-      {},
-      e
-    ), { scratchArr: o }));
-  }
-  return t;
-}
-__name(Aa, "Aa");
-a(Aa, "_toHexChunked");
-function Ei(r, e = {}) {
-  return e.alphabet !== "upper" && typeof r.toHex == "function" ? r.toHex() : Aa(r, e);
-}
-__name(Ei, "Ei");
-a(Ei, "toHex");
-p();
-var gt2 = class gt3 {
-  static {
-    __name(this, "gt");
-  }
-  constructor(e, t) {
-    this.strings = e;
-    this.values = t;
-  }
-  toParameterizedQuery(e = { query: "", params: [] }) {
-    let { strings: t, values: n } = this;
-    for (let i = 0, s = t.length; i < s; i++) if (e.query += t[i], i < n.length) {
-      let o = n[i];
-      if (o instanceof Ge) e.query += o.sql;
-      else if (o instanceof Ce) if (o.queryData instanceof gt3) o.queryData.toParameterizedQuery(
-        e
-      );
-      else {
-        if (o.queryData.params?.length) throw new Error("This query is not composable");
-        e.query += o.queryData.query;
-      }
-      else {
-        let { params: u } = e;
-        u.push(o), e.query += "$" + u.length, (o instanceof d || ArrayBuffer.isView(o)) && (e.query += "::bytea");
-      }
-    }
-    return e;
-  }
-};
-a(gt2, "SqlTemplate");
-var $e = gt2;
-var Xt = class Xt2 {
-  static {
-    __name(this, "Xt");
-  }
-  constructor(e) {
-    this.sql = e;
-  }
-};
-a(Xt, "UnsafeRawSql");
-var Ge = Xt;
-p();
-function bt() {
-  typeof window < "u" && typeof document < "u" && typeof console < "u" && typeof console.warn == "function" && console.warn(`          
-        ************************************************************
-        *                                                          *
-        *  WARNING: Running SQL directly from the browser can have *
-        *  security implications. Even if your database is         *
-        *  protected by Row-Level Security (RLS), use it at your   *
-        *  own risk. This approach is great for fast prototyping,  *
-        *  but ensure proper safeguards are in place to prevent    *
-        *  misuse or execution of expensive SQL queries by your    *
-        *  end users.                                              *
-        *                                                          *
-        *  If you've assessed the risks, suppress this message     *
-        *  using the disableWarningInBrowsers configuration        *
-        *  parameter.                                              *
-        *                                                          *
-        ************************************************************`);
-}
-__name(bt, "bt");
-a(bt, "warnIfBrowser");
-Fe();
-var as = Se(At());
-var us = Se(rt());
-var _t = class _t2 extends Error {
-  static {
-    __name(this, "_t");
-  }
-  constructor(t) {
-    super(t);
-    E(this, "name", "NeonDbError");
-    E(this, "severity");
-    E(this, "code");
-    E(this, "detail");
-    E(this, "hint");
-    E(this, "position");
-    E(this, "internalPosition");
-    E(
-      this,
-      "internalQuery"
-    );
-    E(this, "where");
-    E(this, "schema");
-    E(this, "table");
-    E(this, "column");
-    E(this, "dataType");
-    E(this, "constraint");
-    E(this, "file");
-    E(this, "line");
-    E(this, "routine");
-    E(this, "sourceError");
-    "captureStackTrace" in Error && typeof Error.captureStackTrace == "function" && Error.captureStackTrace(this, _t2);
-  }
-};
-a(
-  _t,
-  "NeonDbError"
-);
-var be = _t;
-var is2 = "transaction() expects an array of queries, or a function returning an array of queries";
-var Bu = ["severity", "code", "detail", "hint", "position", "internalPosition", "internalQuery", "where", "schema", "table", "column", "dataType", "constraint", "file", "line", "routine"];
-function Lu(r) {
-  return r instanceof d ? "\\x" + Ei(r) : r;
-}
-__name(Lu, "Lu");
-a(Lu, "encodeBuffersAsBytea");
-function ss(r) {
-  let { query: e, params: t } = r instanceof $e ? r.toParameterizedQuery() : r;
-  return { query: e, params: t.map((n) => Lu((0, us.prepareValue)(n))) };
-}
-__name(ss, "ss");
-a(ss, "prepareQuery");
-function cs(r, {
-  arrayMode: e,
-  fullResults: t,
-  fetchOptions: n,
-  isolationLevel: i,
-  readOnly: s,
-  deferrable: o,
-  authToken: u,
-  disableWarningInBrowsers: c
-} = {}) {
-  if (!r) throw new Error("No database connection string was provided to `neon()`. Perhaps an environment variable has not been set?");
-  let l;
-  try {
-    l = Yt(r);
-  } catch {
-    throw new Error(
-      "Database connection string provided to `neon()` is not a valid URL. Connection string: " + String(r)
-    );
-  }
-  let { protocol: f, username: y, hostname: g, port: A, pathname: C } = l;
-  if (f !== "postgres:" && f !== "postgresql:" || !y || !g || !C) throw new Error("Database connection string format for `neon()` should be: postgresql://user:password@host.tld/dbname?option=value");
-  function D(P, ...I) {
-    if (!(Array.isArray(P) && Array.isArray(P.raw) && Array.isArray(I))) throw new Error('This function can now be called only as a tagged-template function: sql`SELECT ${value}`, not sql("SELECT $1", [value], options). For a conventional function call with value placeholders ($1, $2, etc.), use sql.query("SELECT $1", [value], options).');
-    return new Ce(
-      Y,
-      new $e(P, I)
-    );
-  }
-  __name(D, "D");
-  a(D, "templateFn"), D.query = (P, I, w) => new Ce(Y, { query: P, params: I ?? [] }, w), D.unsafe = (P) => new Ge(
-    P
-  ), D.transaction = async (P, I) => {
-    if (typeof P == "function" && (P = P(D)), !Array.isArray(P)) throw new Error(is2);
-    P.forEach((W) => {
-      if (!(W instanceof Ce)) throw new Error(is2);
-    });
-    let w = P.map((W) => W.queryData), Z = P.map((W) => W.opts ?? {});
-    return Y(w, Z, I);
-  };
-  async function Y(P, I, w) {
-    let { fetchEndpoint: Z, fetchFunction: W } = ce, J = Array.isArray(
-      P
-    ) ? { queries: P.map((ee) => ss(ee)) } : ss(P), X = n ?? {}, se = e ?? false, oe = t ?? false, B = i, j = s, le = o;
-    w !== void 0 && (w.fetchOptions !== void 0 && (X = { ...X, ...w.fetchOptions }), w.arrayMode !== void 0 && (se = w.arrayMode), w.fullResults !== void 0 && (oe = w.fullResults), w.isolationLevel !== void 0 && (B = w.isolationLevel), w.readOnly !== void 0 && (j = w.readOnly), w.deferrable !== void 0 && (le = w.deferrable)), I !== void 0 && !Array.isArray(I) && I.fetchOptions !== void 0 && (X = { ...X, ...I.fetchOptions });
-    let de = u;
-    !Array.isArray(I) && I?.authToken !== void 0 && (de = I.authToken);
-    let We = typeof Z == "function" ? Z(g, A, { jwtAuth: de !== void 0 }) : Z, fe = { "Neon-Connection-String": r, "Neon-Raw-Text-Output": "true", "Neon-Array-Mode": "true" }, _e = await Fu(de);
-    _e && (fe.Authorization = `Bearer ${_e}`), Array.isArray(P) && (B !== void 0 && (fe["Neon-Batch-Isolation-Level"] = B), j !== void 0 && (fe["Neon-Batch-Read-Only"] = String(j)), le !== void 0 && (fe["Neon-Batch-Deferrable"] = String(le))), c || ce.disableWarningInBrowsers || bt();
-    let ye;
-    try {
-      ye = await (W ?? fetch)(We, { method: "POST", body: JSON.stringify(J), headers: fe, ...X });
-    } catch (ee) {
-      let M = new be(
-        `Error connecting to database: ${ee}`
-      );
-      throw M.sourceError = ee, M;
-    }
-    if (ye.ok) {
-      let ee = await ye.json();
-      if (Array.isArray(P)) {
-        let M = ee.results;
-        if (!Array.isArray(M)) throw new be("Neon internal error: unexpected result format");
-        return M.map(($, me) => {
-          let Ot = I[me] ?? {}, vo = Ot.arrayMode ?? se, xo = Ot.fullResults ?? oe;
-          return os(
-            $,
-            { arrayMode: vo, fullResults: xo, types: Ot.types }
-          );
-        });
-      } else {
-        let M = I ?? {}, $ = M.arrayMode ?? se, me = M.fullResults ?? oe;
-        return os(ee, { arrayMode: $, fullResults: me, types: M.types });
-      }
-    } else {
-      let { status: ee } = ye;
-      if (ee === 400) {
-        let M = await ye.json(), $ = new be(M.message);
-        for (let me of Bu) $[me] = M[me] ?? void 0;
-        throw $;
-      } else {
-        let M = await ye.text();
-        throw new be(
-          `Server error (HTTP status ${ee}): ${M}`
-        );
-      }
-    }
-  }
-  __name(Y, "Y");
-  return a(Y, "execute"), D;
-}
-__name(cs, "cs");
-a(cs, "neon");
-var dr = class dr2 {
-  static {
-    __name(this, "dr");
-  }
-  constructor(e, t, n) {
-    this.execute = e;
-    this.queryData = t;
-    this.opts = n;
-  }
-  then(e, t) {
-    return this.execute(this.queryData, this.opts).then(e, t);
-  }
-  catch(e) {
-    return this.execute(this.queryData, this.opts).catch(e);
-  }
-  finally(e) {
-    return this.execute(
-      this.queryData,
-      this.opts
-    ).finally(e);
-  }
-};
-a(dr, "NeonQueryPromise");
-var Ce = dr;
-function os(r, {
-  arrayMode: e,
-  fullResults: t,
-  types: n
-}) {
-  let i = new as.default(n), s = r.fields.map((c) => c.name), o = r.fields.map((c) => i.getTypeParser(
-    c.dataTypeID
-  )), u = e === true ? r.rows.map((c) => c.map((l, f) => l === null ? null : o[f](l))) : r.rows.map((c) => Object.fromEntries(
-    c.map((l, f) => [s[f], l === null ? null : o[f](l)])
-  ));
-  return t ? (r.viaNeonFetch = true, r.rowAsArray = e, r.rows = u, r._parsers = o, r._types = i, r) : u;
-}
-__name(os, "os");
-a(os, "processQueryResult");
-async function Fu(r) {
-  if (typeof r == "string") return r;
-  if (typeof r == "function") try {
-    return await Promise.resolve(r());
-  } catch (e) {
-    let t = new be("Error getting auth token.");
-    throw e instanceof Error && (t = new be(`Error getting auth token: ${e.message}`)), t;
-  }
-}
-__name(Fu, "Fu");
-a(Fu, "getAuthToken");
-p();
-var go = Se(ot());
-p();
-var wo = Se(ot());
-var kn = class kn2 extends wo.Client {
-  static {
-    __name(this, "kn");
-  }
-  constructor(t) {
-    super(t);
-    this.config = t;
-  }
-  get neonConfig() {
-    return this.connection.stream;
-  }
-  connect(t) {
-    let { neonConfig: n } = this;
-    n.forceDisablePgSSL && (this.ssl = this.connection.ssl = false), this.ssl && n.useSecureWebSocket && console.warn("SSL is enabled for both Postgres (e.g. ?sslmode=require in the connection string + forceDisablePgSSL = false) and the WebSocket tunnel (useSecureWebSocket = true). Double encryption will increase latency and CPU usage. It may be appropriate to disable SSL in the Postgres connection parameters or set forceDisablePgSSL = true.");
-    let i = typeof this.config != "string" && this.config?.host !== void 0 || typeof this.config != "string" && this.config?.connectionString !== void 0 || m.env.PGHOST !== void 0, s = m.env.USER ?? m.env.USERNAME;
-    if (!i && this.host === "localhost" && this.user === s && this.database === s && this.password === null) throw new Error(`No database host or connection string was set, and key parameters have default values (host: localhost, user: ${s}, db: ${s}, password: null). Is an environment variable missing? Alternatively, if you intended to connect with these parameters, please set the host to 'localhost' explicitly.`);
-    let o = super.connect(t), u = n.pipelineTLS && this.ssl, c = n.pipelineConnect === "password";
-    if (!u && !n.pipelineConnect) return o;
-    let l = this.connection;
-    if (u && l.on(
-      "connect",
-      () => l.stream.emit("data", "S")
-    ), c) {
-      l.removeAllListeners("authenticationCleartextPassword"), l.removeAllListeners("readyForQuery"), l.once("readyForQuery", () => l.on("readyForQuery", this._handleReadyForQuery.bind(this)));
-      let f = this.ssl ? "sslconnect" : "connect";
-      l.on(f, () => {
-        this.neonConfig.disableWarningInBrowsers || bt(), this._handleAuthCleartextPassword(), this._handleReadyForQuery();
-      });
-    }
-    return o;
-  }
-  async _handleAuthSASLContinue(t) {
-    if (typeof crypto > "u" || crypto.subtle === void 0 || crypto.subtle.importKey === void 0) throw new Error("Cannot use SASL auth when `crypto.subtle` is not defined");
-    let n = crypto.subtle, i = this.saslSession, s = this.password, o = t.data;
-    if (i.message !== "SASLInitialResponse" || typeof s != "string" || typeof o != "string") throw new Error(
-      "SASL: protocol error"
-    );
-    let u = Object.fromEntries(o.split(",").map((M) => {
-      if (!/^.=/.test(M)) throw new Error(
-        "SASL: Invalid attribute pair entry"
-      );
-      let $ = M[0], me = M.substring(2);
-      return [$, me];
-    })), c = u.r, l = u.s, f = u.i;
-    if (!c || !/^[!-+--~]+$/.test(c)) throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: nonce missing/unprintable");
-    if (!l || !/^(?:[a-zA-Z0-9+/]{4})*(?:[a-zA-Z0-9+/]{2}==|[a-zA-Z0-9+/]{3}=)?$/.test(l)) throw new Error(
-      "SASL: SCRAM-SERVER-FIRST-MESSAGE: salt missing/not base64"
-    );
-    if (!f || !/^[1-9][0-9]*$/.test(f)) throw new Error(
-      "SASL: SCRAM-SERVER-FIRST-MESSAGE: missing/invalid iteration count"
-    );
-    if (!c.startsWith(i.clientNonce))
-      throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: server nonce does not start with client nonce");
-    if (c.length === i.clientNonce.length) throw new Error("SASL: SCRAM-SERVER-FIRST-MESSAGE: server nonce is too short");
-    let y = parseInt(f, 10), g = d.from(l, "base64"), A = new TextEncoder(), C = A.encode(s), D = await n.importKey(
-      "raw",
-      C,
-      { name: "HMAC", hash: { name: "SHA-256" } },
-      false,
-      ["sign"]
-    ), Y = new Uint8Array(await n.sign("HMAC", D, d.concat(
-      [g, d.from([0, 0, 0, 1])]
-    ))), P = Y;
-    for (var I = 0; I < y - 1; I++) Y = new Uint8Array(await n.sign("HMAC", D, Y)), P = d.from(
-      P.map((M, $) => P[$] ^ Y[$])
-    );
-    let w = P, Z = await n.importKey(
-      "raw",
-      w,
-      { name: "HMAC", hash: { name: "SHA-256" } },
-      false,
-      ["sign"]
-    ), W = new Uint8Array(await n.sign("HMAC", Z, A.encode("Client Key"))), J = await n.digest(
-      "SHA-256",
-      W
-    ), X = "n=*,r=" + i.clientNonce, se = "r=" + c + ",s=" + l + ",i=" + y, oe = "c=biws,r=" + c, B = X + "," + se + "," + oe, j = await n.importKey(
-      "raw",
-      J,
-      { name: "HMAC", hash: { name: "SHA-256" } },
-      false,
-      ["sign"]
-    );
-    var le = new Uint8Array(await n.sign(
-      "HMAC",
-      j,
-      A.encode(B)
-    )), de = d.from(W.map((M, $) => W[$] ^ le[$])), We = de.toString("base64");
-    let fe = await n.importKey(
-      "raw",
-      w,
-      { name: "HMAC", hash: { name: "SHA-256" } },
-      false,
-      ["sign"]
-    ), _e = await n.sign("HMAC", fe, A.encode("Server Key")), ye = await n.importKey("raw", _e, { name: "HMAC", hash: { name: "SHA-256" } }, false, ["sign"]);
-    var ee = d.from(
-      await n.sign("HMAC", ye, A.encode(B))
-    );
-    i.message = "SASLResponse", i.serverSignature = ee.toString("base64"), i.response = oe + ",p=" + We, this.connection.sendSCRAMClientFinalMessage(this.saslSession.response);
-  }
-};
-a(
-  kn,
-  "NeonClient"
-);
-var ut = kn;
-Fe();
-var bo = Se(Rt());
-function vl(r, e) {
-  if (e) return { callback: e, result: void 0 };
-  let t, n, i = a(function(o, u) {
-    o ? t(o) : n(u);
-  }, "cb"), s = new r(function(o, u) {
-    n = o, t = u;
-  });
-  return { callback: i, result: s };
-}
-__name(vl, "vl");
-a(vl, "promisify");
-var Un = class Un2 extends go.Pool {
-  static {
-    __name(this, "Un");
-  }
-  constructor() {
-    super(...arguments);
-    E(this, "Client", ut);
-    E(this, "hasFetchUnsupportedListeners", false);
-    E(this, "addListener", this.on);
-  }
-  on(t, n) {
-    return t !== "error" && (this.hasFetchUnsupportedListeners = true), super.on(t, n);
-  }
-  query(t, n, i) {
-    if (!ce.poolQueryViaFetch || this.hasFetchUnsupportedListeners || typeof t == "function") return super.query(
-      t,
-      n,
-      i
-    );
-    typeof n == "function" && (i = n, n = void 0);
-    let s = vl(this.Promise, i);
-    i = s.callback;
-    try {
-      let o = new bo.default(
-        this.options
-      ), u = encodeURIComponent, c = encodeURI, l = `postgresql://${u(o.user)}:${u(o.password)}@${u(o.host)}/${c(o.database)}`, f = typeof t == "string" ? t : t.text, y = n ?? t.values ?? [];
-      cs(l, { fullResults: true, arrayMode: t.rowMode === "array" }).query(f, y, { types: t.types ?? this.options?.types }).then((A) => i(void 0, A)).catch((A) => i(
-        A
-      ));
-    } catch (o) {
-      i(o);
-    }
-    return s.result;
-  }
-};
-a(Un, "NeonPool");
-Fe();
-var ct = Se(ot());
-var export_DatabaseError = ct.DatabaseError;
-var export_defaults = ct.defaults;
-var export_escapeIdentifier = ct.escapeIdentifier;
-var export_escapeLiteral = ct.escapeLiteral;
-var export_types = ct.types;
 
 // ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/selection-proxy.js
 var SelectionProxyHandler = class _SelectionProxyHandler {
@@ -10279,6 +3057,901 @@ var SelectionProxyHandler = class _SelectionProxyHandler {
   }
 };
 
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/foreign-keys.js
+var ForeignKeyBuilder2 = class {
+  static {
+    __name(this, "ForeignKeyBuilder");
+  }
+  static [entityKind] = "SQLiteForeignKeyBuilder";
+  /** @internal */
+  reference;
+  /** @internal */
+  _onUpdate;
+  /** @internal */
+  _onDelete;
+  constructor(config, actions) {
+    this.reference = () => {
+      const { name, columns, foreignColumns } = config();
+      return { name, columns, foreignTable: foreignColumns[0].table, foreignColumns };
+    };
+    if (actions) {
+      this._onUpdate = actions.onUpdate;
+      this._onDelete = actions.onDelete;
+    }
+  }
+  onUpdate(action) {
+    this._onUpdate = action;
+    return this;
+  }
+  onDelete(action) {
+    this._onDelete = action;
+    return this;
+  }
+  /** @internal */
+  build(table) {
+    return new ForeignKey2(table, this);
+  }
+};
+var ForeignKey2 = class {
+  static {
+    __name(this, "ForeignKey");
+  }
+  constructor(table, builder) {
+    this.table = table;
+    this.reference = builder.reference;
+    this.onUpdate = builder._onUpdate;
+    this.onDelete = builder._onDelete;
+  }
+  static [entityKind] = "SQLiteForeignKey";
+  reference;
+  onUpdate;
+  onDelete;
+  getName() {
+    const { name, columns, foreignColumns } = this.reference();
+    const columnNames = columns.map((column) => column.name);
+    const foreignColumnNames = foreignColumns.map((column) => column.name);
+    const chunks = [
+      this.table[TableName],
+      ...columnNames,
+      foreignColumns[0].table[TableName],
+      ...foreignColumnNames
+    ];
+    return name ?? `${chunks.join("_")}_fk`;
+  }
+};
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/unique-constraint.js
+function uniqueKeyName2(table, columns) {
+  return `${table[TableName]}_${columns.join("_")}_unique`;
+}
+__name(uniqueKeyName2, "uniqueKeyName");
+var UniqueConstraintBuilder2 = class {
+  static {
+    __name(this, "UniqueConstraintBuilder");
+  }
+  constructor(columns, name) {
+    this.name = name;
+    this.columns = columns;
+  }
+  static [entityKind] = "SQLiteUniqueConstraintBuilder";
+  /** @internal */
+  columns;
+  /** @internal */
+  build(table) {
+    return new UniqueConstraint2(table, this.columns, this.name);
+  }
+};
+var UniqueOnConstraintBuilder2 = class {
+  static {
+    __name(this, "UniqueOnConstraintBuilder");
+  }
+  static [entityKind] = "SQLiteUniqueOnConstraintBuilder";
+  /** @internal */
+  name;
+  constructor(name) {
+    this.name = name;
+  }
+  on(...columns) {
+    return new UniqueConstraintBuilder2(columns, this.name);
+  }
+};
+var UniqueConstraint2 = class {
+  static {
+    __name(this, "UniqueConstraint");
+  }
+  constructor(table, columns, name) {
+    this.table = table;
+    this.columns = columns;
+    this.name = name ?? uniqueKeyName2(this.table, this.columns.map((column) => column.name));
+  }
+  static [entityKind] = "SQLiteUniqueConstraint";
+  columns;
+  name;
+  getName() {
+    return this.name;
+  }
+};
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/common.js
+var SQLiteColumnBuilder = class extends ColumnBuilder {
+  static {
+    __name(this, "SQLiteColumnBuilder");
+  }
+  static [entityKind] = "SQLiteColumnBuilder";
+  foreignKeyConfigs = [];
+  references(ref, actions = {}) {
+    this.foreignKeyConfigs.push({ ref, actions });
+    return this;
+  }
+  unique(name) {
+    this.config.isUnique = true;
+    this.config.uniqueName = name;
+    return this;
+  }
+  generatedAlwaysAs(as, config) {
+    this.config.generated = {
+      as,
+      type: "always",
+      mode: config?.mode ?? "virtual"
+    };
+    return this;
+  }
+  /** @internal */
+  buildForeignKeys(column, table) {
+    return this.foreignKeyConfigs.map(({ ref, actions }) => {
+      return ((ref2, actions2) => {
+        const builder = new ForeignKeyBuilder2(() => {
+          const foreignColumn = ref2();
+          return { columns: [column], foreignColumns: [foreignColumn] };
+        });
+        if (actions2.onUpdate) {
+          builder.onUpdate(actions2.onUpdate);
+        }
+        if (actions2.onDelete) {
+          builder.onDelete(actions2.onDelete);
+        }
+        return builder.build(table);
+      })(ref, actions);
+    });
+  }
+};
+var SQLiteColumn = class extends Column {
+  static {
+    __name(this, "SQLiteColumn");
+  }
+  constructor(table, config) {
+    if (!config.uniqueName) {
+      config.uniqueName = uniqueKeyName2(table, [config.name]);
+    }
+    super(table, config);
+    this.table = table;
+  }
+  static [entityKind] = "SQLiteColumn";
+};
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/blob.js
+var SQLiteBigIntBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteBigIntBuilder");
+  }
+  static [entityKind] = "SQLiteBigIntBuilder";
+  constructor(name) {
+    super(name, "bigint", "SQLiteBigInt");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteBigInt(table, this.config);
+  }
+};
+var SQLiteBigInt = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteBigInt");
+  }
+  static [entityKind] = "SQLiteBigInt";
+  getSQLType() {
+    return "blob";
+  }
+  mapFromDriverValue(value) {
+    if (typeof Buffer !== "undefined" && Buffer.from) {
+      const buf = Buffer.isBuffer(value) ? value : value instanceof ArrayBuffer ? Buffer.from(value) : value.buffer ? Buffer.from(value.buffer, value.byteOffset, value.byteLength) : Buffer.from(value);
+      return BigInt(buf.toString("utf8"));
+    }
+    return BigInt(textDecoder.decode(value));
+  }
+  mapToDriverValue(value) {
+    return Buffer.from(value.toString());
+  }
+};
+var SQLiteBlobJsonBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteBlobJsonBuilder");
+  }
+  static [entityKind] = "SQLiteBlobJsonBuilder";
+  constructor(name) {
+    super(name, "json", "SQLiteBlobJson");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteBlobJson(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteBlobJson = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteBlobJson");
+  }
+  static [entityKind] = "SQLiteBlobJson";
+  getSQLType() {
+    return "blob";
+  }
+  mapFromDriverValue(value) {
+    if (typeof Buffer !== "undefined" && Buffer.from) {
+      const buf = Buffer.isBuffer(value) ? value : value instanceof ArrayBuffer ? Buffer.from(value) : value.buffer ? Buffer.from(value.buffer, value.byteOffset, value.byteLength) : Buffer.from(value);
+      return JSON.parse(buf.toString("utf8"));
+    }
+    return JSON.parse(textDecoder.decode(value));
+  }
+  mapToDriverValue(value) {
+    return Buffer.from(JSON.stringify(value));
+  }
+};
+var SQLiteBlobBufferBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteBlobBufferBuilder");
+  }
+  static [entityKind] = "SQLiteBlobBufferBuilder";
+  constructor(name) {
+    super(name, "buffer", "SQLiteBlobBuffer");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteBlobBuffer(table, this.config);
+  }
+};
+var SQLiteBlobBuffer = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteBlobBuffer");
+  }
+  static [entityKind] = "SQLiteBlobBuffer";
+  mapFromDriverValue(value) {
+    if (Buffer.isBuffer(value)) {
+      return value;
+    }
+    return Buffer.from(value);
+  }
+  getSQLType() {
+    return "blob";
+  }
+};
+function blob(a, b) {
+  const { name, config } = getColumnNameAndConfig(a, b);
+  if (config?.mode === "json") {
+    return new SQLiteBlobJsonBuilder(name);
+  }
+  if (config?.mode === "bigint") {
+    return new SQLiteBigIntBuilder(name);
+  }
+  return new SQLiteBlobBufferBuilder(name);
+}
+__name(blob, "blob");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/custom.js
+var SQLiteCustomColumnBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteCustomColumnBuilder");
+  }
+  static [entityKind] = "SQLiteCustomColumnBuilder";
+  constructor(name, fieldConfig, customTypeParams) {
+    super(name, "custom", "SQLiteCustomColumn");
+    this.config.fieldConfig = fieldConfig;
+    this.config.customTypeParams = customTypeParams;
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteCustomColumn(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteCustomColumn = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteCustomColumn");
+  }
+  static [entityKind] = "SQLiteCustomColumn";
+  sqlName;
+  mapTo;
+  mapFrom;
+  constructor(table, config) {
+    super(table, config);
+    this.sqlName = config.customTypeParams.dataType(config.fieldConfig);
+    this.mapTo = config.customTypeParams.toDriver;
+    this.mapFrom = config.customTypeParams.fromDriver;
+  }
+  getSQLType() {
+    return this.sqlName;
+  }
+  mapFromDriverValue(value) {
+    return typeof this.mapFrom === "function" ? this.mapFrom(value) : value;
+  }
+  mapToDriverValue(value) {
+    return typeof this.mapTo === "function" ? this.mapTo(value) : value;
+  }
+};
+function customType(customTypeParams) {
+  return (a, b) => {
+    const { name, config } = getColumnNameAndConfig(a, b);
+    return new SQLiteCustomColumnBuilder(
+      name,
+      config,
+      customTypeParams
+    );
+  };
+}
+__name(customType, "customType");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/integer.js
+var SQLiteBaseIntegerBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteBaseIntegerBuilder");
+  }
+  static [entityKind] = "SQLiteBaseIntegerBuilder";
+  constructor(name, dataType, columnType) {
+    super(name, dataType, columnType);
+    this.config.autoIncrement = false;
+  }
+  primaryKey(config) {
+    if (config?.autoIncrement) {
+      this.config.autoIncrement = true;
+    }
+    this.config.hasDefault = true;
+    return super.primaryKey();
+  }
+};
+var SQLiteBaseInteger = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteBaseInteger");
+  }
+  static [entityKind] = "SQLiteBaseInteger";
+  autoIncrement = this.config.autoIncrement;
+  getSQLType() {
+    return "integer";
+  }
+};
+var SQLiteIntegerBuilder = class extends SQLiteBaseIntegerBuilder {
+  static {
+    __name(this, "SQLiteIntegerBuilder");
+  }
+  static [entityKind] = "SQLiteIntegerBuilder";
+  constructor(name) {
+    super(name, "number", "SQLiteInteger");
+  }
+  build(table) {
+    return new SQLiteInteger(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteInteger = class extends SQLiteBaseInteger {
+  static {
+    __name(this, "SQLiteInteger");
+  }
+  static [entityKind] = "SQLiteInteger";
+};
+var SQLiteTimestampBuilder = class extends SQLiteBaseIntegerBuilder {
+  static {
+    __name(this, "SQLiteTimestampBuilder");
+  }
+  static [entityKind] = "SQLiteTimestampBuilder";
+  constructor(name, mode) {
+    super(name, "date", "SQLiteTimestamp");
+    this.config.mode = mode;
+  }
+  /**
+   * @deprecated Use `default()` with your own expression instead.
+   *
+   * Adds `DEFAULT (cast((julianday('now') - 2440587.5)*86400000 as integer))` to the column, which is the current epoch timestamp in milliseconds.
+   */
+  defaultNow() {
+    return this.default(sql`(cast((julianday('now') - 2440587.5)*86400000 as integer))`);
+  }
+  build(table) {
+    return new SQLiteTimestamp(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteTimestamp = class extends SQLiteBaseInteger {
+  static {
+    __name(this, "SQLiteTimestamp");
+  }
+  static [entityKind] = "SQLiteTimestamp";
+  mode = this.config.mode;
+  mapFromDriverValue(value) {
+    if (this.config.mode === "timestamp") {
+      return new Date(value * 1e3);
+    }
+    return new Date(value);
+  }
+  mapToDriverValue(value) {
+    const unix = value.getTime();
+    if (this.config.mode === "timestamp") {
+      return Math.floor(unix / 1e3);
+    }
+    return unix;
+  }
+};
+var SQLiteBooleanBuilder = class extends SQLiteBaseIntegerBuilder {
+  static {
+    __name(this, "SQLiteBooleanBuilder");
+  }
+  static [entityKind] = "SQLiteBooleanBuilder";
+  constructor(name, mode) {
+    super(name, "boolean", "SQLiteBoolean");
+    this.config.mode = mode;
+  }
+  build(table) {
+    return new SQLiteBoolean(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteBoolean = class extends SQLiteBaseInteger {
+  static {
+    __name(this, "SQLiteBoolean");
+  }
+  static [entityKind] = "SQLiteBoolean";
+  mode = this.config.mode;
+  mapFromDriverValue(value) {
+    return Number(value) === 1;
+  }
+  mapToDriverValue(value) {
+    return value ? 1 : 0;
+  }
+};
+function integer(a, b) {
+  const { name, config } = getColumnNameAndConfig(a, b);
+  if (config?.mode === "timestamp" || config?.mode === "timestamp_ms") {
+    return new SQLiteTimestampBuilder(name, config.mode);
+  }
+  if (config?.mode === "boolean") {
+    return new SQLiteBooleanBuilder(name, config.mode);
+  }
+  return new SQLiteIntegerBuilder(name);
+}
+__name(integer, "integer");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/numeric.js
+var SQLiteNumericBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteNumericBuilder");
+  }
+  static [entityKind] = "SQLiteNumericBuilder";
+  constructor(name) {
+    super(name, "string", "SQLiteNumeric");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteNumeric(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteNumeric = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteNumeric");
+  }
+  static [entityKind] = "SQLiteNumeric";
+  mapFromDriverValue(value) {
+    if (typeof value === "string") return value;
+    return String(value);
+  }
+  getSQLType() {
+    return "numeric";
+  }
+};
+var SQLiteNumericNumberBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteNumericNumberBuilder");
+  }
+  static [entityKind] = "SQLiteNumericNumberBuilder";
+  constructor(name) {
+    super(name, "number", "SQLiteNumericNumber");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteNumericNumber(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteNumericNumber = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteNumericNumber");
+  }
+  static [entityKind] = "SQLiteNumericNumber";
+  mapFromDriverValue(value) {
+    if (typeof value === "number") return value;
+    return Number(value);
+  }
+  mapToDriverValue = String;
+  getSQLType() {
+    return "numeric";
+  }
+};
+var SQLiteNumericBigIntBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteNumericBigIntBuilder");
+  }
+  static [entityKind] = "SQLiteNumericBigIntBuilder";
+  constructor(name) {
+    super(name, "bigint", "SQLiteNumericBigInt");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteNumericBigInt(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteNumericBigInt = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteNumericBigInt");
+  }
+  static [entityKind] = "SQLiteNumericBigInt";
+  mapFromDriverValue = BigInt;
+  mapToDriverValue = String;
+  getSQLType() {
+    return "numeric";
+  }
+};
+function numeric(a, b) {
+  const { name, config } = getColumnNameAndConfig(a, b);
+  const mode = config?.mode;
+  return mode === "number" ? new SQLiteNumericNumberBuilder(name) : mode === "bigint" ? new SQLiteNumericBigIntBuilder(name) : new SQLiteNumericBuilder(name);
+}
+__name(numeric, "numeric");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/real.js
+var SQLiteRealBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteRealBuilder");
+  }
+  static [entityKind] = "SQLiteRealBuilder";
+  constructor(name) {
+    super(name, "number", "SQLiteReal");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteReal(table, this.config);
+  }
+};
+var SQLiteReal = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteReal");
+  }
+  static [entityKind] = "SQLiteReal";
+  getSQLType() {
+    return "real";
+  }
+};
+function real(name) {
+  return new SQLiteRealBuilder(name ?? "");
+}
+__name(real, "real");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/text.js
+var SQLiteTextBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteTextBuilder");
+  }
+  static [entityKind] = "SQLiteTextBuilder";
+  constructor(name, config) {
+    super(name, "string", "SQLiteText");
+    this.config.enumValues = config.enum;
+    this.config.length = config.length;
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteText(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteText = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteText");
+  }
+  static [entityKind] = "SQLiteText";
+  enumValues = this.config.enumValues;
+  length = this.config.length;
+  constructor(table, config) {
+    super(table, config);
+  }
+  getSQLType() {
+    return `text${this.config.length ? `(${this.config.length})` : ""}`;
+  }
+};
+var SQLiteTextJsonBuilder = class extends SQLiteColumnBuilder {
+  static {
+    __name(this, "SQLiteTextJsonBuilder");
+  }
+  static [entityKind] = "SQLiteTextJsonBuilder";
+  constructor(name) {
+    super(name, "json", "SQLiteTextJson");
+  }
+  /** @internal */
+  build(table) {
+    return new SQLiteTextJson(
+      table,
+      this.config
+    );
+  }
+};
+var SQLiteTextJson = class extends SQLiteColumn {
+  static {
+    __name(this, "SQLiteTextJson");
+  }
+  static [entityKind] = "SQLiteTextJson";
+  getSQLType() {
+    return "text";
+  }
+  mapFromDriverValue(value) {
+    return JSON.parse(value);
+  }
+  mapToDriverValue(value) {
+    return JSON.stringify(value);
+  }
+};
+function text(a, b = {}) {
+  const { name, config } = getColumnNameAndConfig(a, b);
+  if (config.mode === "json") {
+    return new SQLiteTextJsonBuilder(name);
+  }
+  return new SQLiteTextBuilder(name, config);
+}
+__name(text, "text");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/columns/all.js
+function getSQLiteColumnBuilders() {
+  return {
+    blob,
+    customType,
+    integer,
+    numeric,
+    real,
+    text
+  };
+}
+__name(getSQLiteColumnBuilders, "getSQLiteColumnBuilders");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/table.js
+var InlineForeignKeys2 = /* @__PURE__ */ Symbol.for("drizzle:SQLiteInlineForeignKeys");
+var SQLiteTable = class extends Table {
+  static {
+    __name(this, "SQLiteTable");
+  }
+  static [entityKind] = "SQLiteTable";
+  /** @internal */
+  static Symbol = Object.assign({}, Table.Symbol, {
+    InlineForeignKeys: InlineForeignKeys2
+  });
+  /** @internal */
+  [Table.Symbol.Columns];
+  /** @internal */
+  [InlineForeignKeys2] = [];
+  /** @internal */
+  [Table.Symbol.ExtraConfigBuilder] = void 0;
+};
+function sqliteTableBase(name, columns, extraConfig, schema, baseName = name) {
+  const rawTable = new SQLiteTable(name, schema, baseName);
+  const parsedColumns = typeof columns === "function" ? columns(getSQLiteColumnBuilders()) : columns;
+  const builtColumns = Object.fromEntries(
+    Object.entries(parsedColumns).map(([name2, colBuilderBase]) => {
+      const colBuilder = colBuilderBase;
+      colBuilder.setName(name2);
+      const column = colBuilder.build(rawTable);
+      rawTable[InlineForeignKeys2].push(...colBuilder.buildForeignKeys(column, rawTable));
+      return [name2, column];
+    })
+  );
+  const table = Object.assign(rawTable, builtColumns);
+  table[Table.Symbol.Columns] = builtColumns;
+  table[Table.Symbol.ExtraConfigColumns] = builtColumns;
+  if (extraConfig) {
+    table[SQLiteTable.Symbol.ExtraConfigBuilder] = extraConfig;
+  }
+  return table;
+}
+__name(sqliteTableBase, "sqliteTableBase");
+var sqliteTable = /* @__PURE__ */ __name((name, columns, extraConfig) => {
+  return sqliteTableBase(name, columns, extraConfig);
+}, "sqliteTable");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/primary-keys.js
+function primaryKey(...config) {
+  if (config[0].columns) {
+    return new PrimaryKeyBuilder2(config[0].columns, config[0].name);
+  }
+  return new PrimaryKeyBuilder2(config);
+}
+__name(primaryKey, "primaryKey");
+var PrimaryKeyBuilder2 = class {
+  static {
+    __name(this, "PrimaryKeyBuilder");
+  }
+  static [entityKind] = "SQLitePrimaryKeyBuilder";
+  /** @internal */
+  columns;
+  /** @internal */
+  name;
+  constructor(columns, name) {
+    this.columns = columns;
+    this.name = name;
+  }
+  /** @internal */
+  build(table) {
+    return new PrimaryKey2(table, this.columns, this.name);
+  }
+};
+var PrimaryKey2 = class {
+  static {
+    __name(this, "PrimaryKey");
+  }
+  constructor(table, columns, name) {
+    this.table = table;
+    this.columns = columns;
+    this.name = name;
+  }
+  static [entityKind] = "SQLitePrimaryKey";
+  columns;
+  name;
+  getName() {
+    return this.name ?? `${this.table[SQLiteTable.Symbol.Name]}_${this.columns.map((column) => column.name).join("_")}_pk`;
+  }
+};
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/utils.js
+function extractUsedTable(table) {
+  if (is(table, SQLiteTable)) {
+    return [`${table[Table.Symbol.BaseName]}`];
+  }
+  if (is(table, Subquery)) {
+    return table._.usedTables ?? [];
+  }
+  if (is(table, SQL)) {
+    return table.usedTables ?? [];
+  }
+  return [];
+}
+__name(extractUsedTable, "extractUsedTable");
+
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/delete.js
+var SQLiteDeleteBase = class extends QueryPromise {
+  static {
+    __name(this, "SQLiteDeleteBase");
+  }
+  constructor(table, session, dialect, withList) {
+    super();
+    this.table = table;
+    this.session = session;
+    this.dialect = dialect;
+    this.config = { table, withList };
+  }
+  static [entityKind] = "SQLiteDelete";
+  /** @internal */
+  config;
+  /**
+   * Adds a `where` clause to the query.
+   *
+   * Calling this method will delete only those rows that fulfill a specified condition.
+   *
+   * See docs: {@link https://orm.drizzle.team/docs/delete}
+   *
+   * @param where the `where` clause.
+   *
+   * @example
+   * You can use conditional operators and `sql function` to filter the rows to be deleted.
+   *
+   * ```ts
+   * // Delete all cars with green color
+   * db.delete(cars).where(eq(cars.color, 'green'));
+   * // or
+   * db.delete(cars).where(sql`${cars.color} = 'green'`)
+   * ```
+   *
+   * You can logically combine conditional operators with `and()` and `or()` operators:
+   *
+   * ```ts
+   * // Delete all BMW cars with a green color
+   * db.delete(cars).where(and(eq(cars.color, 'green'), eq(cars.brand, 'BMW')));
+   *
+   * // Delete all cars with the green or blue color
+   * db.delete(cars).where(or(eq(cars.color, 'green'), eq(cars.color, 'blue')));
+   * ```
+   */
+  where(where) {
+    this.config.where = where;
+    return this;
+  }
+  orderBy(...columns) {
+    if (typeof columns[0] === "function") {
+      const orderBy = columns[0](
+        new Proxy(
+          this.config.table[Table.Symbol.Columns],
+          new SelectionProxyHandler({ sqlAliasedBehavior: "alias", sqlBehavior: "sql" })
+        )
+      );
+      const orderByArray = Array.isArray(orderBy) ? orderBy : [orderBy];
+      this.config.orderBy = orderByArray;
+    } else {
+      const orderByArray = columns;
+      this.config.orderBy = orderByArray;
+    }
+    return this;
+  }
+  limit(limit) {
+    this.config.limit = limit;
+    return this;
+  }
+  returning(fields = this.table[SQLiteTable.Symbol.Columns]) {
+    this.config.returning = orderSelectedFields(fields);
+    return this;
+  }
+  /** @internal */
+  getSQL() {
+    return this.dialect.buildDeleteQuery(this.config);
+  }
+  toSQL() {
+    const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
+    return rest;
+  }
+  /** @internal */
+  _prepare(isOneTimeQuery = true) {
+    return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](
+      this.dialect.sqlToQuery(this.getSQL()),
+      this.config.returning,
+      this.config.returning ? "all" : "run",
+      true,
+      void 0,
+      {
+        type: "delete",
+        tables: extractUsedTable(this.config.table)
+      }
+    );
+  }
+  prepare() {
+    return this._prepare(false);
+  }
+  run = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().run(placeholderValues);
+  }, "run");
+  all = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().all(placeholderValues);
+  }, "all");
+  get = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().get(placeholderValues);
+  }, "get");
+  values = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().values(placeholderValues);
+  }, "values");
+  async execute(placeholderValues) {
+    return this._prepare().execute(placeholderValues);
+  }
+  $dynamic() {
+    return this;
+  }
+};
+
 // ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/casing.js
 function toSnakeCase(input) {
   const words = input.replace(/['\u2019]/g, "").match(/[\da-z]+|[A-Z]+(?![a-z])|[A-Z][\da-z]+/g) ?? [];
@@ -10337,59 +4010,30 @@ var CasingCache = class {
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/view-base.js
-var PgViewBase = class extends View {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/view-base.js
+var SQLiteViewBase = class extends View {
   static {
-    __name(this, "PgViewBase");
+    __name(this, "SQLiteViewBase");
   }
-  static [entityKind] = "PgViewBase";
+  static [entityKind] = "SQLiteViewBase";
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/dialect.js
-var PgDialect = class {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/dialect.js
+var SQLiteDialect = class {
   static {
-    __name(this, "PgDialect");
+    __name(this, "SQLiteDialect");
   }
-  static [entityKind] = "PgDialect";
+  static [entityKind] = "SQLiteDialect";
   /** @internal */
   casing;
   constructor(config) {
     this.casing = new CasingCache(config?.casing);
   }
-  async migrate(migrations, session, config) {
-    const migrationsTable = typeof config === "string" ? "__drizzle_migrations" : config.migrationsTable ?? "__drizzle_migrations";
-    const migrationsSchema = typeof config === "string" ? "drizzle" : config.migrationsSchema ?? "drizzle";
-    const migrationTableCreate = sql`
-			CREATE TABLE IF NOT EXISTS ${sql.identifier(migrationsSchema)}.${sql.identifier(migrationsTable)} (
-				id SERIAL PRIMARY KEY,
-				hash text NOT NULL,
-				created_at bigint
-			)
-		`;
-    await session.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(migrationsSchema)}`);
-    await session.execute(migrationTableCreate);
-    const dbMigrations = await session.all(
-      sql`select id, hash, created_at from ${sql.identifier(migrationsSchema)}.${sql.identifier(migrationsTable)} order by created_at desc limit 1`
-    );
-    const lastDbMigration = dbMigrations[0];
-    await session.transaction(async (tx) => {
-      for await (const migration of migrations) {
-        if (!lastDbMigration || Number(lastDbMigration.created_at) < migration.folderMillis) {
-          for (const stmt of migration.sql) {
-            await tx.execute(sql.raw(stmt));
-          }
-          await tx.execute(
-            sql`insert into ${sql.identifier(migrationsSchema)}.${sql.identifier(migrationsTable)} ("hash", "created_at") values(${migration.hash}, ${migration.folderMillis})`
-          );
-        }
-      }
-    });
-  }
   escapeName(name) {
     return `"${name.replace(/"/g, '""')}"`;
   }
-  escapeParam(num) {
-    return `$${num + 1}`;
+  escapeParam(_num) {
+    return "?";
   }
   escapeString(str) {
     return `'${str.replace(/'/g, "''")}'`;
@@ -10406,11 +4050,20 @@ var PgDialect = class {
     withSqlChunks.push(sql` `);
     return sql.join(withSqlChunks);
   }
-  buildDeleteQuery({ table, where, returning, withList }) {
+  buildDeleteQuery({
+    table,
+    where,
+    returning,
+    withList,
+    limit,
+    orderBy
+  }) {
     const withSql = this.buildWithCTE(withList);
     const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
     const whereSql = where ? sql` where ${where}` : void 0;
-    return sql`${withSql}delete from ${table}${whereSql}${returningSql}`;
+    const orderBySql = this.buildOrderBy(orderBy);
+    const limitSql = this.buildLimit(limit);
+    return sql`${withSql}delete from ${table}${whereSql}${returningSql}${orderBySql}${limitSql}`;
   }
   buildUpdateSet(table, set) {
     const tableColumns = table[Table.Symbol.Columns];
@@ -10418,30 +4071,39 @@ var PgDialect = class {
       (colName) => set[colName] !== void 0 || tableColumns[colName]?.onUpdateFn !== void 0
     );
     const setSize = columnNames.length;
-    return sql.join(columnNames.flatMap((colName, i) => {
-      const col = tableColumns[colName];
-      const onUpdateFnResult = col.onUpdateFn?.();
-      const value = set[colName] ?? (is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col));
-      const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value}`;
-      if (i < setSize - 1) {
-        return [res, sql.raw(", ")];
-      }
-      return [res];
-    }));
+    return sql.join(
+      columnNames.flatMap((colName, i) => {
+        const col = tableColumns[colName];
+        const onUpdateFnResult = col.onUpdateFn?.();
+        const value = set[colName] ?? (is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col));
+        const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value}`;
+        if (i < setSize - 1) {
+          return [res, sql.raw(", ")];
+        }
+        return [res];
+      })
+    );
   }
-  buildUpdateQuery({ table, set, where, returning, withList, from, joins }) {
+  buildUpdateQuery({
+    table,
+    set,
+    where,
+    returning,
+    withList,
+    joins,
+    from,
+    limit,
+    orderBy
+  }) {
     const withSql = this.buildWithCTE(withList);
-    const tableName = table[PgTable.Symbol.Name];
-    const tableSchema = table[PgTable.Symbol.Schema];
-    const origTableName = table[PgTable.Symbol.OriginalName];
-    const alias = tableName === origTableName ? void 0 : tableName;
-    const tableSql = sql`${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(origTableName)}${alias && sql` ${sql.identifier(alias)}`}`;
     const setSql = this.buildUpdateSet(table, set);
     const fromSql = from && sql.join([sql.raw(" from "), this.buildFromTable(from)]);
     const joinsSql = this.buildJoins(joins);
-    const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: !from })}` : void 0;
+    const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
     const whereSql = where ? sql` where ${where}` : void 0;
-    return sql`${withSql}update ${tableSql} set ${setSql}${fromSql}${joinsSql}${whereSql}${returningSql}`;
+    const orderBySql = this.buildOrderBy(orderBy);
+    const limitSql = this.buildLimit(limit);
+    return sql`${withSql}update ${table} set ${setSql}${fromSql}${joinsSql}${whereSql}${returningSql}${orderBySql}${limitSql}`;
   }
   /**
    * Builds selection SQL with provided fields/expressions
@@ -10466,7 +4128,7 @@ var PgDialect = class {
           chunk.push(
             new SQL(
               query.queryChunks.map((c) => {
-                if (is(c, PgColumn)) {
+                if (is(c, Column)) {
                   return sql.identifier(this.casing.getColumnCasing(c));
                 }
                 return c;
@@ -10480,19 +4142,32 @@ var PgDialect = class {
           chunk.push(sql` as ${sql.identifier(field.fieldAlias)}`);
         }
       } else if (is(field, Column)) {
-        if (isSingleTable) {
-          chunk.push(sql.identifier(this.casing.getColumnCasing(field)));
+        const tableName = field.table[Table.Symbol.Name];
+        if (field.columnType === "SQLiteNumericBigInt") {
+          if (isSingleTable) {
+            chunk.push(
+              sql`cast(${sql.identifier(this.casing.getColumnCasing(field))} as text)`
+            );
+          } else {
+            chunk.push(
+              sql`cast(${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))} as text)`
+            );
+          }
         } else {
-          chunk.push(field);
+          if (isSingleTable) {
+            chunk.push(sql.identifier(this.casing.getColumnCasing(field)));
+          } else {
+            chunk.push(
+              sql`${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))}`
+            );
+          }
         }
       } else if (is(field, Subquery)) {
         const entries = Object.entries(field._.selectedFields);
         if (entries.length === 1) {
           const entry = entries[0][1];
-          const fieldDecoder = is(entry, SQL) ? entry.decoder : is(entry, Column) ? { mapFromDriverValue: /* @__PURE__ */ __name((v2) => entry.mapFromDriverValue(v2), "mapFromDriverValue") } : entry.sql.decoder;
-          if (fieldDecoder) {
-            field._.sql.decoder = fieldDecoder;
-          }
+          const fieldDecoder = is(entry, SQL) ? entry.decoder : is(entry, Column) ? { mapFromDriverValue: /* @__PURE__ */ __name((v) => entry.mapFromDriverValue(v), "mapFromDriverValue") } : entry.sql.decoder;
+          if (fieldDecoder) field._.sql.decoder = fieldDecoder;
         }
         chunk.push(field);
       }
@@ -10508,47 +4183,55 @@ var PgDialect = class {
       return void 0;
     }
     const joinsArray = [];
-    for (const [index, joinMeta] of joins.entries()) {
-      if (index === 0) {
-        joinsArray.push(sql` `);
-      }
-      const table = joinMeta.table;
-      const lateralSql = joinMeta.lateral ? sql` lateral` : void 0;
-      const onSql = joinMeta.on ? sql` on ${joinMeta.on}` : void 0;
-      if (is(table, PgTable)) {
-        const tableName = table[PgTable.Symbol.Name];
-        const tableSchema = table[PgTable.Symbol.Schema];
-        const origTableName = table[PgTable.Symbol.OriginalName];
-        const alias = tableName === origTableName ? void 0 : joinMeta.alias;
-        joinsArray.push(
-          sql`${sql.raw(joinMeta.joinType)} join${lateralSql} ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(origTableName)}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
-        );
-      } else if (is(table, View)) {
-        const viewName = table[ViewBaseConfig].name;
-        const viewSchema = table[ViewBaseConfig].schema;
-        const origViewName = table[ViewBaseConfig].originalName;
-        const alias = viewName === origViewName ? void 0 : joinMeta.alias;
-        joinsArray.push(
-          sql`${sql.raw(joinMeta.joinType)} join${lateralSql} ${viewSchema ? sql`${sql.identifier(viewSchema)}.` : void 0}${sql.identifier(origViewName)}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
-        );
-      } else {
-        joinsArray.push(
-          sql`${sql.raw(joinMeta.joinType)} join${lateralSql} ${table}${onSql}`
-        );
-      }
-      if (index < joins.length - 1) {
-        joinsArray.push(sql` `);
+    if (joins) {
+      for (const [index, joinMeta] of joins.entries()) {
+        if (index === 0) {
+          joinsArray.push(sql` `);
+        }
+        const table = joinMeta.table;
+        const onSql = joinMeta.on ? sql` on ${joinMeta.on}` : void 0;
+        if (is(table, SQLiteTable)) {
+          const tableName = table[SQLiteTable.Symbol.Name];
+          const tableSchema = table[SQLiteTable.Symbol.Schema];
+          const origTableName = table[SQLiteTable.Symbol.OriginalName];
+          const alias = tableName === origTableName ? void 0 : joinMeta.alias;
+          joinsArray.push(
+            sql`${sql.raw(joinMeta.joinType)} join ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(
+              origTableName
+            )}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
+          );
+        } else {
+          joinsArray.push(
+            sql`${sql.raw(joinMeta.joinType)} join ${table}${onSql}`
+          );
+        }
+        if (index < joins.length - 1) {
+          joinsArray.push(sql` `);
+        }
       }
     }
     return sql.join(joinsArray);
   }
+  buildLimit(limit) {
+    return typeof limit === "object" || typeof limit === "number" && limit >= 0 ? sql` limit ${limit}` : void 0;
+  }
+  buildOrderBy(orderBy) {
+    const orderByList = [];
+    if (orderBy) {
+      for (const [index, orderByValue] of orderBy.entries()) {
+        orderByList.push(orderByValue);
+        if (index < orderBy.length - 1) {
+          orderByList.push(sql`, `);
+        }
+      }
+    }
+    return orderByList.length > 0 ? sql` order by ${sql.join(orderByList)}` : void 0;
+  }
   buildFromTable(table) {
     if (is(table, Table) && table[Table.Symbol.IsAlias]) {
-      let fullName = sql`${sql.identifier(table[Table.Symbol.OriginalName])}`;
-      if (table[Table.Symbol.Schema]) {
-        fullName = sql`${sql.identifier(table[Table.Symbol.Schema])}.${fullName}`;
-      }
-      return sql`${fullName} ${sql.identifier(table[Table.Symbol.Name])}`;
+      return sql`${sql`${sql.identifier(table[Table.Symbol.Schema] ?? "")}.`.if(table[Table.Symbol.Schema])}${sql.identifier(
+        table[Table.Symbol.OriginalName]
+      )} ${sql.identifier(table[Table.Symbol.Name])}`;
     }
     return table;
   }
@@ -10564,61 +4247,44 @@ var PgDialect = class {
     groupBy,
     limit,
     offset,
-    lockingClause,
     distinct,
     setOperators
   }) {
     const fieldsList = fieldsFlat ?? orderSelectedFields(fields);
     for (const f of fieldsList) {
-      if (is(f.field, Column) && getTableName(f.field.table) !== (is(table, Subquery) ? table._.alias : is(table, PgViewBase) ? table[ViewBaseConfig].name : is(table, SQL) ? void 0 : getTableName(table)) && !((table2) => joins?.some(
+      if (is(f.field, Column) && getTableName(f.field.table) !== (is(table, Subquery) ? table._.alias : is(table, SQLiteViewBase) ? table[ViewBaseConfig].name : is(table, SQL) ? void 0 : getTableName(table)) && !((table2) => joins?.some(
         ({ alias }) => alias === (table2[Table.Symbol.IsAlias] ? getTableName(table2) : table2[Table.Symbol.BaseName])
       ))(f.field.table)) {
         const tableName = getTableName(f.field.table);
         throw new Error(
-          `Your "${f.path.join("->")}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`
+          `Your "${f.path.join(
+            "->"
+          )}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`
         );
       }
     }
     const isSingleTable = !joins || joins.length === 0;
     const withSql = this.buildWithCTE(withList);
-    let distinctSql;
-    if (distinct) {
-      distinctSql = distinct === true ? sql` distinct` : sql` distinct on (${sql.join(distinct.on, sql`, `)})`;
-    }
+    const distinctSql = distinct ? sql` distinct` : void 0;
     const selection = this.buildSelection(fieldsList, { isSingleTable });
     const tableSql = this.buildFromTable(table);
     const joinsSql = this.buildJoins(joins);
     const whereSql = where ? sql` where ${where}` : void 0;
     const havingSql = having ? sql` having ${having}` : void 0;
-    let orderBySql;
-    if (orderBy && orderBy.length > 0) {
-      orderBySql = sql` order by ${sql.join(orderBy, sql`, `)}`;
+    const groupByList = [];
+    if (groupBy) {
+      for (const [index, groupByValue] of groupBy.entries()) {
+        groupByList.push(groupByValue);
+        if (index < groupBy.length - 1) {
+          groupByList.push(sql`, `);
+        }
+      }
     }
-    let groupBySql;
-    if (groupBy && groupBy.length > 0) {
-      groupBySql = sql` group by ${sql.join(groupBy, sql`, `)}`;
-    }
-    const limitSql = typeof limit === "object" || typeof limit === "number" && limit >= 0 ? sql` limit ${limit}` : void 0;
+    const groupBySql = groupByList.length > 0 ? sql` group by ${sql.join(groupByList)}` : void 0;
+    const orderBySql = this.buildOrderBy(orderBy);
+    const limitSql = this.buildLimit(limit);
     const offsetSql = offset ? sql` offset ${offset}` : void 0;
-    const lockingClauseSql = sql.empty();
-    if (lockingClause) {
-      const clauseSql = sql` for ${sql.raw(lockingClause.strength)}`;
-      if (lockingClause.config.of) {
-        clauseSql.append(
-          sql` of ${sql.join(
-            Array.isArray(lockingClause.config.of) ? lockingClause.config.of : [lockingClause.config.of],
-            sql`, `
-          )}`
-        );
-      }
-      if (lockingClause.config.noWait) {
-        clauseSql.append(sql` nowait`);
-      } else if (lockingClause.config.skipLocked) {
-        clauseSql.append(sql` skip locked`);
-      }
-      lockingClauseSql.append(clauseSql);
-    }
-    const finalQuery = sql`${withSql}select${distinctSql} ${selection} from ${tableSql}${joinsSql}${whereSql}${groupBySql}${havingSql}${orderBySql}${limitSql}${offsetSql}${lockingClauseSql}`;
+    const finalQuery = sql`${withSql}select${distinctSql} ${selection} from ${tableSql}${joinsSql}${whereSql}${groupBySql}${havingSql}${orderBySql}${limitSql}${offsetSql}`;
     if (setOperators.length > 0) {
       return this.buildSetOperations(finalQuery, setOperators);
     }
@@ -10641,19 +4307,21 @@ var PgDialect = class {
     leftSelect,
     setOperator: { type, isAll, rightSelect, limit, orderBy, offset }
   }) {
-    const leftChunk = sql`(${leftSelect.getSQL()}) `;
-    const rightChunk = sql`(${rightSelect.getSQL()})`;
+    const leftChunk = sql`${leftSelect.getSQL()} `;
+    const rightChunk = sql`${rightSelect.getSQL()}`;
     let orderBySql;
     if (orderBy && orderBy.length > 0) {
       const orderByValues = [];
       for (const singleOrderBy of orderBy) {
-        if (is(singleOrderBy, PgColumn)) {
+        if (is(singleOrderBy, SQLiteColumn)) {
           orderByValues.push(sql.identifier(singleOrderBy.name));
         } else if (is(singleOrderBy, SQL)) {
           for (let i = 0; i < singleOrderBy.queryChunks.length; i++) {
             const chunk = singleOrderBy.queryChunks[i];
-            if (is(chunk, PgColumn)) {
-              singleOrderBy.queryChunks[i] = sql.identifier(chunk.name);
+            if (is(chunk, SQLiteColumn)) {
+              singleOrderBy.queryChunks[i] = sql.identifier(
+                this.casing.getColumnCasing(chunk)
+              );
             }
           }
           orderByValues.push(sql`${singleOrderBy}`);
@@ -10661,20 +4329,27 @@ var PgDialect = class {
           orderByValues.push(sql`${singleOrderBy}`);
         }
       }
-      orderBySql = sql` order by ${sql.join(orderByValues, sql`, `)} `;
+      orderBySql = sql` order by ${sql.join(orderByValues, sql`, `)}`;
     }
     const limitSql = typeof limit === "object" || typeof limit === "number" && limit >= 0 ? sql` limit ${limit}` : void 0;
     const operatorChunk = sql.raw(`${type} ${isAll ? "all " : ""}`);
     const offsetSql = offset ? sql` offset ${offset}` : void 0;
     return sql`${leftChunk}${operatorChunk}${rightChunk}${orderBySql}${limitSql}${offsetSql}`;
   }
-  buildInsertQuery({ table, values: valuesOrSelect, onConflict, returning, withList, select, overridingSystemValue_ }) {
+  buildInsertQuery({
+    table,
+    values: valuesOrSelect,
+    onConflict,
+    returning,
+    withList,
+    select
+  }) {
     const valuesSqlList = [];
     const columns = table[Table.Symbol.Columns];
-    const colEntries = Object.entries(columns).filter(([_, col]) => !col.shouldDisableInsert());
-    const insertOrder = colEntries.map(
-      ([, column]) => sql.identifier(this.casing.getColumnCasing(column))
+    const colEntries = Object.entries(columns).filter(
+      ([_, col]) => !col.shouldDisableInsert()
     );
+    const insertOrder = colEntries.map(([, column]) => sql.identifier(this.casing.getColumnCasing(column)));
     if (select) {
       const select2 = valuesOrSelect;
       if (is(select2, SQL)) {
@@ -10690,17 +4365,19 @@ var PgDialect = class {
         for (const [fieldName, col] of colEntries) {
           const colValue = value[fieldName];
           if (colValue === void 0 || is(colValue, Param) && colValue.value === void 0) {
-            if (col.defaultFn !== void 0) {
+            let defaultValue;
+            if (col.default !== null && col.default !== void 0) {
+              defaultValue = is(col.default, SQL) ? col.default : sql.param(col.default, col);
+            } else if (col.defaultFn !== void 0) {
               const defaultFnResult = col.defaultFn();
-              const defaultValue = is(defaultFnResult, SQL) ? defaultFnResult : sql.param(defaultFnResult, col);
-              valueList.push(defaultValue);
+              defaultValue = is(defaultFnResult, SQL) ? defaultFnResult : sql.param(defaultFnResult, col);
             } else if (!col.default && col.onUpdateFn !== void 0) {
               const onUpdateFnResult = col.onUpdateFn();
-              const newValue = is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col);
-              valueList.push(newValue);
+              defaultValue = is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col);
             } else {
-              valueList.push(sql`default`);
+              defaultValue = sql`null`;
             }
+            valueList.push(defaultValue);
           } else {
             valueList.push(colValue);
           }
@@ -10714,31 +4391,8 @@ var PgDialect = class {
     const withSql = this.buildWithCTE(withList);
     const valuesSql = sql.join(valuesSqlList);
     const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
-    const onConflictSql = onConflict ? sql` on conflict ${onConflict}` : void 0;
-    const overridingSql = overridingSystemValue_ === true ? sql`overriding system value ` : void 0;
-    return sql`${withSql}insert into ${table} ${insertOrder} ${overridingSql}${valuesSql}${onConflictSql}${returningSql}`;
-  }
-  buildRefreshMaterializedViewQuery({ view, concurrently, withNoData }) {
-    const concurrentlySql = concurrently ? sql` concurrently` : void 0;
-    const withNoDataSql = withNoData ? sql` with no data` : void 0;
-    return sql`refresh materialized view${concurrentlySql} ${view}${withNoDataSql}`;
-  }
-  prepareTyping(encoder) {
-    if (is(encoder, PgJsonb) || is(encoder, PgJson)) {
-      return "json";
-    } else if (is(encoder, PgNumeric)) {
-      return "decimal";
-    } else if (is(encoder, PgTime)) {
-      return "time";
-    } else if (is(encoder, PgTimestamp) || is(encoder, PgTimestampString)) {
-      return "timestamp";
-    } else if (is(encoder, PgDate) || is(encoder, PgDateString)) {
-      return "date";
-    } else if (is(encoder, PgUUID)) {
-      return "uuid";
-    } else {
-      return "none";
-    }
+    const onConflictSql = onConflict?.length ? sql.join(onConflict) : void 0;
+    return sql`${withSql}insert into ${table} ${insertOrder} ${valuesSql}${onConflictSql}${returningSql}`;
   }
   sqlToQuery(sql2, invokeSource) {
     return sql2.toQuery({
@@ -10746,492 +4400,10 @@ var PgDialect = class {
       escapeName: this.escapeName,
       escapeParam: this.escapeParam,
       escapeString: this.escapeString,
-      prepareTyping: this.prepareTyping,
       invokeSource
     });
   }
-  // buildRelationalQueryWithPK({
-  // 	fullSchema,
-  // 	schema,
-  // 	tableNamesMap,
-  // 	table,
-  // 	tableConfig,
-  // 	queryConfig: config,
-  // 	tableAlias,
-  // 	isRoot = false,
-  // 	joinOn,
-  // }: {
-  // 	fullSchema: Record<string, unknown>;
-  // 	schema: TablesRelationalConfig;
-  // 	tableNamesMap: Record<string, string>;
-  // 	table: PgTable;
-  // 	tableConfig: TableRelationalConfig;
-  // 	queryConfig: true | DBQueryConfig<'many', true>;
-  // 	tableAlias: string;
-  // 	isRoot?: boolean;
-  // 	joinOn?: SQL;
-  // }): BuildRelationalQueryResult<PgTable, PgColumn> {
-  // 	// For { "<relation>": true }, return a table with selection of all columns
-  // 	if (config === true) {
-  // 		const selectionEntries = Object.entries(tableConfig.columns);
-  // 		const selection: BuildRelationalQueryResult<PgTable, PgColumn>['selection'] = selectionEntries.map((
-  // 			[key, value],
-  // 		) => ({
-  // 			dbKey: value.name,
-  // 			tsKey: key,
-  // 			field: value as PgColumn,
-  // 			relationTableTsKey: undefined,
-  // 			isJson: false,
-  // 			selection: [],
-  // 		}));
-  // 		return {
-  // 			tableTsKey: tableConfig.tsName,
-  // 			sql: table,
-  // 			selection,
-  // 		};
-  // 	}
-  // 	// let selection: BuildRelationalQueryResult<PgTable, PgColumn>['selection'] = [];
-  // 	// let selectionForBuild = selection;
-  // 	const aliasedColumns = Object.fromEntries(
-  // 		Object.entries(tableConfig.columns).map(([key, value]) => [key, aliasedTableColumn(value, tableAlias)]),
-  // 	);
-  // 	const aliasedRelations = Object.fromEntries(
-  // 		Object.entries(tableConfig.relations).map(([key, value]) => [key, aliasedRelation(value, tableAlias)]),
-  // 	);
-  // 	const aliasedFields = Object.assign({}, aliasedColumns, aliasedRelations);
-  // 	let where, hasUserDefinedWhere;
-  // 	if (config.where) {
-  // 		const whereSql = typeof config.where === 'function' ? config.where(aliasedFields, operators) : config.where;
-  // 		where = whereSql && mapColumnsInSQLToAlias(whereSql, tableAlias);
-  // 		hasUserDefinedWhere = !!where;
-  // 	}
-  // 	where = and(joinOn, where);
-  // 	// const fieldsSelection: { tsKey: string; value: PgColumn | SQL.Aliased; isExtra?: boolean }[] = [];
-  // 	let joins: Join[] = [];
-  // 	let selectedColumns: string[] = [];
-  // 	// Figure out which columns to select
-  // 	if (config.columns) {
-  // 		let isIncludeMode = false;
-  // 		for (const [field, value] of Object.entries(config.columns)) {
-  // 			if (value === undefined) {
-  // 				continue;
-  // 			}
-  // 			if (field in tableConfig.columns) {
-  // 				if (!isIncludeMode && value === true) {
-  // 					isIncludeMode = true;
-  // 				}
-  // 				selectedColumns.push(field);
-  // 			}
-  // 		}
-  // 		if (selectedColumns.length > 0) {
-  // 			selectedColumns = isIncludeMode
-  // 				? selectedColumns.filter((c) => config.columns?.[c] === true)
-  // 				: Object.keys(tableConfig.columns).filter((key) => !selectedColumns.includes(key));
-  // 		}
-  // 	} else {
-  // 		// Select all columns if selection is not specified
-  // 		selectedColumns = Object.keys(tableConfig.columns);
-  // 	}
-  // 	// for (const field of selectedColumns) {
-  // 	// 	const column = tableConfig.columns[field]! as PgColumn;
-  // 	// 	fieldsSelection.push({ tsKey: field, value: column });
-  // 	// }
-  // 	let initiallySelectedRelations: {
-  // 		tsKey: string;
-  // 		queryConfig: true | DBQueryConfig<'many', false>;
-  // 		relation: Relation;
-  // 	}[] = [];
-  // 	// let selectedRelations: BuildRelationalQueryResult<PgTable, PgColumn>['selection'] = [];
-  // 	// Figure out which relations to select
-  // 	if (config.with) {
-  // 		initiallySelectedRelations = Object.entries(config.with)
-  // 			.filter((entry): entry is [typeof entry[0], NonNullable<typeof entry[1]>] => !!entry[1])
-  // 			.map(([tsKey, queryConfig]) => ({ tsKey, queryConfig, relation: tableConfig.relations[tsKey]! }));
-  // 	}
-  // 	const manyRelations = initiallySelectedRelations.filter((r) =>
-  // 		is(r.relation, Many)
-  // 		&& (schema[tableNamesMap[r.relation.referencedTable[Table.Symbol.Name]]!]?.primaryKey.length ?? 0) > 0
-  // 	);
-  // 	// If this is the last Many relation (or there are no Many relations), we are on the innermost subquery level
-  // 	const isInnermostQuery = manyRelations.length < 2;
-  // 	const selectedExtras: {
-  // 		tsKey: string;
-  // 		value: SQL.Aliased;
-  // 	}[] = [];
-  // 	// Figure out which extras to select
-  // 	if (isInnermostQuery && config.extras) {
-  // 		const extras = typeof config.extras === 'function'
-  // 			? config.extras(aliasedFields, { sql })
-  // 			: config.extras;
-  // 		for (const [tsKey, value] of Object.entries(extras)) {
-  // 			selectedExtras.push({
-  // 				tsKey,
-  // 				value: mapColumnsInAliasedSQLToAlias(value, tableAlias),
-  // 			});
-  // 		}
-  // 	}
-  // 	// Transform `fieldsSelection` into `selection`
-  // 	// `fieldsSelection` shouldn't be used after this point
-  // 	// for (const { tsKey, value, isExtra } of fieldsSelection) {
-  // 	// 	selection.push({
-  // 	// 		dbKey: is(value, SQL.Aliased) ? value.fieldAlias : tableConfig.columns[tsKey]!.name,
-  // 	// 		tsKey,
-  // 	// 		field: is(value, Column) ? aliasedTableColumn(value, tableAlias) : value,
-  // 	// 		relationTableTsKey: undefined,
-  // 	// 		isJson: false,
-  // 	// 		isExtra,
-  // 	// 		selection: [],
-  // 	// 	});
-  // 	// }
-  // 	let orderByOrig = typeof config.orderBy === 'function'
-  // 		? config.orderBy(aliasedFields, orderByOperators)
-  // 		: config.orderBy ?? [];
-  // 	if (!Array.isArray(orderByOrig)) {
-  // 		orderByOrig = [orderByOrig];
-  // 	}
-  // 	const orderBy = orderByOrig.map((orderByValue) => {
-  // 		if (is(orderByValue, Column)) {
-  // 			return aliasedTableColumn(orderByValue, tableAlias) as PgColumn;
-  // 		}
-  // 		return mapColumnsInSQLToAlias(orderByValue, tableAlias);
-  // 	});
-  // 	const limit = isInnermostQuery ? config.limit : undefined;
-  // 	const offset = isInnermostQuery ? config.offset : undefined;
-  // 	// For non-root queries without additional config except columns, return a table with selection
-  // 	if (
-  // 		!isRoot
-  // 		&& initiallySelectedRelations.length === 0
-  // 		&& selectedExtras.length === 0
-  // 		&& !where
-  // 		&& orderBy.length === 0
-  // 		&& limit === undefined
-  // 		&& offset === undefined
-  // 	) {
-  // 		return {
-  // 			tableTsKey: tableConfig.tsName,
-  // 			sql: table,
-  // 			selection: selectedColumns.map((key) => ({
-  // 				dbKey: tableConfig.columns[key]!.name,
-  // 				tsKey: key,
-  // 				field: tableConfig.columns[key] as PgColumn,
-  // 				relationTableTsKey: undefined,
-  // 				isJson: false,
-  // 				selection: [],
-  // 			})),
-  // 		};
-  // 	}
-  // 	const selectedRelationsWithoutPK:
-  // 	// Process all relations without primary keys, because they need to be joined differently and will all be on the same query level
-  // 	for (
-  // 		const {
-  // 			tsKey: selectedRelationTsKey,
-  // 			queryConfig: selectedRelationConfigValue,
-  // 			relation,
-  // 		} of initiallySelectedRelations
-  // 	) {
-  // 		const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
-  // 		const relationTableName = relation.referencedTable[Table.Symbol.Name];
-  // 		const relationTableTsName = tableNamesMap[relationTableName]!;
-  // 		const relationTable = schema[relationTableTsName]!;
-  // 		if (relationTable.primaryKey.length > 0) {
-  // 			continue;
-  // 		}
-  // 		const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
-  // 		const joinOn = and(
-  // 			...normalizedRelation.fields.map((field, i) =>
-  // 				eq(
-  // 					aliasedTableColumn(normalizedRelation.references[i]!, relationTableAlias),
-  // 					aliasedTableColumn(field, tableAlias),
-  // 				)
-  // 			),
-  // 		);
-  // 		const builtRelation = this.buildRelationalQueryWithoutPK({
-  // 			fullSchema,
-  // 			schema,
-  // 			tableNamesMap,
-  // 			table: fullSchema[relationTableTsName] as PgTable,
-  // 			tableConfig: schema[relationTableTsName]!,
-  // 			queryConfig: selectedRelationConfigValue,
-  // 			tableAlias: relationTableAlias,
-  // 			joinOn,
-  // 			nestedQueryRelation: relation,
-  // 		});
-  // 		const field = sql`${sql.identifier(relationTableAlias)}.${sql.identifier('data')}`.as(selectedRelationTsKey);
-  // 		joins.push({
-  // 			on: sql`true`,
-  // 			table: new Subquery(builtRelation.sql as SQL, {}, relationTableAlias),
-  // 			alias: relationTableAlias,
-  // 			joinType: 'left',
-  // 			lateral: true,
-  // 		});
-  // 		selectedRelations.push({
-  // 			dbKey: selectedRelationTsKey,
-  // 			tsKey: selectedRelationTsKey,
-  // 			field,
-  // 			relationTableTsKey: relationTableTsName,
-  // 			isJson: true,
-  // 			selection: builtRelation.selection,
-  // 		});
-  // 	}
-  // 	const oneRelations = initiallySelectedRelations.filter((r): r is typeof r & { relation: One } =>
-  // 		is(r.relation, One)
-  // 	);
-  // 	// Process all One relations with PKs, because they can all be joined on the same level
-  // 	for (
-  // 		const {
-  // 			tsKey: selectedRelationTsKey,
-  // 			queryConfig: selectedRelationConfigValue,
-  // 			relation,
-  // 		} of oneRelations
-  // 	) {
-  // 		const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
-  // 		const relationTableName = relation.referencedTable[Table.Symbol.Name];
-  // 		const relationTableTsName = tableNamesMap[relationTableName]!;
-  // 		const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
-  // 		const relationTable = schema[relationTableTsName]!;
-  // 		if (relationTable.primaryKey.length === 0) {
-  // 			continue;
-  // 		}
-  // 		const joinOn = and(
-  // 			...normalizedRelation.fields.map((field, i) =>
-  // 				eq(
-  // 					aliasedTableColumn(normalizedRelation.references[i]!, relationTableAlias),
-  // 					aliasedTableColumn(field, tableAlias),
-  // 				)
-  // 			),
-  // 		);
-  // 		const builtRelation = this.buildRelationalQueryWithPK({
-  // 			fullSchema,
-  // 			schema,
-  // 			tableNamesMap,
-  // 			table: fullSchema[relationTableTsName] as PgTable,
-  // 			tableConfig: schema[relationTableTsName]!,
-  // 			queryConfig: selectedRelationConfigValue,
-  // 			tableAlias: relationTableAlias,
-  // 			joinOn,
-  // 		});
-  // 		const field = sql`case when ${sql.identifier(relationTableAlias)} is null then null else json_build_array(${
-  // 			sql.join(
-  // 				builtRelation.selection.map(({ field }) =>
-  // 					is(field, SQL.Aliased)
-  // 						? sql`${sql.identifier(relationTableAlias)}.${sql.identifier(field.fieldAlias)}`
-  // 						: is(field, Column)
-  // 						? aliasedTableColumn(field, relationTableAlias)
-  // 						: field
-  // 				),
-  // 				sql`, `,
-  // 			)
-  // 		}) end`.as(selectedRelationTsKey);
-  // 		const isLateralJoin = is(builtRelation.sql, SQL);
-  // 		joins.push({
-  // 			on: isLateralJoin ? sql`true` : joinOn,
-  // 			table: is(builtRelation.sql, SQL)
-  // 				? new Subquery(builtRelation.sql, {}, relationTableAlias)
-  // 				: aliasedTable(builtRelation.sql, relationTableAlias),
-  // 			alias: relationTableAlias,
-  // 			joinType: 'left',
-  // 			lateral: is(builtRelation.sql, SQL),
-  // 		});
-  // 		selectedRelations.push({
-  // 			dbKey: selectedRelationTsKey,
-  // 			tsKey: selectedRelationTsKey,
-  // 			field,
-  // 			relationTableTsKey: relationTableTsName,
-  // 			isJson: true,
-  // 			selection: builtRelation.selection,
-  // 		});
-  // 	}
-  // 	let distinct: PgSelectConfig['distinct'];
-  // 	let tableFrom: PgTable | Subquery = table;
-  // 	// Process first Many relation - each one requires a nested subquery
-  // 	const manyRelation = manyRelations[0];
-  // 	if (manyRelation) {
-  // 		const {
-  // 			tsKey: selectedRelationTsKey,
-  // 			queryConfig: selectedRelationQueryConfig,
-  // 			relation,
-  // 		} = manyRelation;
-  // 		distinct = {
-  // 			on: tableConfig.primaryKey.map((c) => aliasedTableColumn(c as PgColumn, tableAlias)),
-  // 		};
-  // 		const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
-  // 		const relationTableName = relation.referencedTable[Table.Symbol.Name];
-  // 		const relationTableTsName = tableNamesMap[relationTableName]!;
-  // 		const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
-  // 		const joinOn = and(
-  // 			...normalizedRelation.fields.map((field, i) =>
-  // 				eq(
-  // 					aliasedTableColumn(normalizedRelation.references[i]!, relationTableAlias),
-  // 					aliasedTableColumn(field, tableAlias),
-  // 				)
-  // 			),
-  // 		);
-  // 		const builtRelationJoin = this.buildRelationalQueryWithPK({
-  // 			fullSchema,
-  // 			schema,
-  // 			tableNamesMap,
-  // 			table: fullSchema[relationTableTsName] as PgTable,
-  // 			tableConfig: schema[relationTableTsName]!,
-  // 			queryConfig: selectedRelationQueryConfig,
-  // 			tableAlias: relationTableAlias,
-  // 			joinOn,
-  // 		});
-  // 		const builtRelationSelectionField = sql`case when ${
-  // 			sql.identifier(relationTableAlias)
-  // 		} is null then '[]' else json_agg(json_build_array(${
-  // 			sql.join(
-  // 				builtRelationJoin.selection.map(({ field }) =>
-  // 					is(field, SQL.Aliased)
-  // 						? sql`${sql.identifier(relationTableAlias)}.${sql.identifier(field.fieldAlias)}`
-  // 						: is(field, Column)
-  // 						? aliasedTableColumn(field, relationTableAlias)
-  // 						: field
-  // 				),
-  // 				sql`, `,
-  // 			)
-  // 		})) over (partition by ${sql.join(distinct.on, sql`, `)}) end`.as(selectedRelationTsKey);
-  // 		const isLateralJoin = is(builtRelationJoin.sql, SQL);
-  // 		joins.push({
-  // 			on: isLateralJoin ? sql`true` : joinOn,
-  // 			table: isLateralJoin
-  // 				? new Subquery(builtRelationJoin.sql as SQL, {}, relationTableAlias)
-  // 				: aliasedTable(builtRelationJoin.sql as PgTable, relationTableAlias),
-  // 			alias: relationTableAlias,
-  // 			joinType: 'left',
-  // 			lateral: isLateralJoin,
-  // 		});
-  // 		// Build the "from" subquery with the remaining Many relations
-  // 		const builtTableFrom = this.buildRelationalQueryWithPK({
-  // 			fullSchema,
-  // 			schema,
-  // 			tableNamesMap,
-  // 			table,
-  // 			tableConfig,
-  // 			queryConfig: {
-  // 				...config,
-  // 				where: undefined,
-  // 				orderBy: undefined,
-  // 				limit: undefined,
-  // 				offset: undefined,
-  // 				with: manyRelations.slice(1).reduce<NonNullable<typeof config['with']>>(
-  // 					(result, { tsKey, queryConfig: configValue }) => {
-  // 						result[tsKey] = configValue;
-  // 						return result;
-  // 					},
-  // 					{},
-  // 				),
-  // 			},
-  // 			tableAlias,
-  // 		});
-  // 		selectedRelations.push({
-  // 			dbKey: selectedRelationTsKey,
-  // 			tsKey: selectedRelationTsKey,
-  // 			field: builtRelationSelectionField,
-  // 			relationTableTsKey: relationTableTsName,
-  // 			isJson: true,
-  // 			selection: builtRelationJoin.selection,
-  // 		});
-  // 		// selection = builtTableFrom.selection.map((item) =>
-  // 		// 	is(item.field, SQL.Aliased)
-  // 		// 		? { ...item, field: sql`${sql.identifier(tableAlias)}.${sql.identifier(item.field.fieldAlias)}` }
-  // 		// 		: item
-  // 		// );
-  // 		// selectionForBuild = [{
-  // 		// 	dbKey: '*',
-  // 		// 	tsKey: '*',
-  // 		// 	field: sql`${sql.identifier(tableAlias)}.*`,
-  // 		// 	selection: [],
-  // 		// 	isJson: false,
-  // 		// 	relationTableTsKey: undefined,
-  // 		// }];
-  // 		// const newSelectionItem: (typeof selection)[number] = {
-  // 		// 	dbKey: selectedRelationTsKey,
-  // 		// 	tsKey: selectedRelationTsKey,
-  // 		// 	field,
-  // 		// 	relationTableTsKey: relationTableTsName,
-  // 		// 	isJson: true,
-  // 		// 	selection: builtRelationJoin.selection,
-  // 		// };
-  // 		// selection.push(newSelectionItem);
-  // 		// selectionForBuild.push(newSelectionItem);
-  // 		tableFrom = is(builtTableFrom.sql, PgTable)
-  // 			? builtTableFrom.sql
-  // 			: new Subquery(builtTableFrom.sql, {}, tableAlias);
-  // 	}
-  // 	if (selectedColumns.length === 0 && selectedRelations.length === 0 && selectedExtras.length === 0) {
-  // 		throw new DrizzleError(`No fields selected for table "${tableConfig.tsName}" ("${tableAlias}")`);
-  // 	}
-  // 	let selection: BuildRelationalQueryResult<PgTable, PgColumn>['selection'];
-  // 	function prepareSelectedColumns() {
-  // 		return selectedColumns.map((key) => ({
-  // 			dbKey: tableConfig.columns[key]!.name,
-  // 			tsKey: key,
-  // 			field: tableConfig.columns[key] as PgColumn,
-  // 			relationTableTsKey: undefined,
-  // 			isJson: false,
-  // 			selection: [],
-  // 		}));
-  // 	}
-  // 	function prepareSelectedExtras() {
-  // 		return selectedExtras.map((item) => ({
-  // 			dbKey: item.value.fieldAlias,
-  // 			tsKey: item.tsKey,
-  // 			field: item.value,
-  // 			relationTableTsKey: undefined,
-  // 			isJson: false,
-  // 			selection: [],
-  // 		}));
-  // 	}
-  // 	if (isRoot) {
-  // 		selection = [
-  // 			...prepareSelectedColumns(),
-  // 			...prepareSelectedExtras(),
-  // 		];
-  // 	}
-  // 	if (hasUserDefinedWhere || orderBy.length > 0) {
-  // 		tableFrom = new Subquery(
-  // 			this.buildSelectQuery({
-  // 				table: is(tableFrom, PgTable) ? aliasedTable(tableFrom, tableAlias) : tableFrom,
-  // 				fields: {},
-  // 				fieldsFlat: selectionForBuild.map(({ field }) => ({
-  // 					path: [],
-  // 					field: is(field, Column) ? aliasedTableColumn(field, tableAlias) : field,
-  // 				})),
-  // 				joins,
-  // 				distinct,
-  // 			}),
-  // 			{},
-  // 			tableAlias,
-  // 		);
-  // 		selectionForBuild = selection.map((item) =>
-  // 			is(item.field, SQL.Aliased)
-  // 				? { ...item, field: sql`${sql.identifier(tableAlias)}.${sql.identifier(item.field.fieldAlias)}` }
-  // 				: item
-  // 		);
-  // 		joins = [];
-  // 		distinct = undefined;
-  // 	}
-  // 	const result = this.buildSelectQuery({
-  // 		table: is(tableFrom, PgTable) ? aliasedTable(tableFrom, tableAlias) : tableFrom,
-  // 		fields: {},
-  // 		fieldsFlat: selectionForBuild.map(({ field }) => ({
-  // 			path: [],
-  // 			field: is(field, Column) ? aliasedTableColumn(field, tableAlias) : field,
-  // 		})),
-  // 		where,
-  // 		limit,
-  // 		offset,
-  // 		joins,
-  // 		orderBy,
-  // 		distinct,
-  // 	});
-  // 	return {
-  // 		tableTsKey: tableConfig.tsName,
-  // 		sql: result,
-  // 		selection,
-  // 	};
-  // }
-  buildRelationalQueryWithoutPK({
+  buildRelationalQuery({
     fullSchema,
     schema,
     tableNamesMap,
@@ -11257,7 +4429,10 @@ var PgDialect = class {
       }));
     } else {
       const aliasedColumns = Object.fromEntries(
-        Object.entries(tableConfig.columns).map(([key, value]) => [key, aliasedTableColumn(value, tableAlias)])
+        Object.entries(tableConfig.columns).map(([key, value]) => [
+          key,
+          aliasedTableColumn(value, tableAlias)
+        ])
       );
       if (config.where) {
         const whereSql = typeof config.where === "function" ? config.where(aliasedColumns, getOperators()) : config.where;
@@ -11279,7 +4454,9 @@ var PgDialect = class {
           }
         }
         if (selectedColumns.length > 0) {
-          selectedColumns = isIncludeMode ? selectedColumns.filter((c) => config.columns?.[c] === true) : Object.keys(tableConfig.columns).filter((key) => !selectedColumns.includes(key));
+          selectedColumns = isIncludeMode ? selectedColumns.filter((c) => config.columns?.[c] === true) : Object.keys(tableConfig.columns).filter(
+            (key) => !selectedColumns.includes(key)
+          );
         }
       } else {
         selectedColumns = Object.keys(tableConfig.columns);
@@ -11290,7 +4467,13 @@ var PgDialect = class {
       }
       let selectedRelations = [];
       if (config.with) {
-        selectedRelations = Object.entries(config.with).filter((entry) => !!entry[1]).map(([tsKey, queryConfig2]) => ({ tsKey, queryConfig: queryConfig2, relation: tableConfig.relations[tsKey] }));
+        selectedRelations = Object.entries(config.with).filter(
+          (entry) => !!entry[1]
+        ).map(([tsKey, queryConfig]) => ({
+          tsKey,
+          queryConfig,
+          relation: tableConfig.relations[tsKey]
+        }));
       }
       let extras;
       if (config.extras) {
@@ -11329,19 +4512,26 @@ var PgDialect = class {
         queryConfig: selectedRelationConfigValue,
         relation
       } of selectedRelations) {
-        const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
+        const normalizedRelation = normalizeRelation(
+          schema,
+          tableNamesMap,
+          relation
+        );
         const relationTableName = getTableUniqueName(relation.referencedTable);
         const relationTableTsName = tableNamesMap[relationTableName];
         const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
         const joinOn2 = and(
           ...normalizedRelation.fields.map(
             (field2, i) => eq(
-              aliasedTableColumn(normalizedRelation.references[i], relationTableAlias),
+              aliasedTableColumn(
+                normalizedRelation.references[i],
+                relationTableAlias
+              ),
               aliasedTableColumn(field2, tableAlias)
             )
           )
         );
-        const builtRelation = this.buildRelationalQueryWithoutPK({
+        const builtRelation = this.buildRelationalQuery({
           fullSchema,
           schema,
           tableNamesMap,
@@ -11352,14 +4542,7 @@ var PgDialect = class {
           joinOn: joinOn2,
           nestedQueryRelation: relation
         });
-        const field = sql`${sql.identifier(relationTableAlias)}.${sql.identifier("data")}`.as(selectedRelationTsKey);
-        joins.push({
-          on: sql`true`,
-          table: new Subquery(builtRelation.sql, {}, relationTableAlias),
-          alias: relationTableAlias,
-          joinType: "left",
-          lateral: true
-        });
+        const field = sql`(${builtRelation.sql})`.as(selectedRelationTsKey);
         selection.push({
           dbKey: selectedRelationTsKey,
           tsKey: selectedRelationTsKey,
@@ -11371,37 +4554,43 @@ var PgDialect = class {
       }
     }
     if (selection.length === 0) {
-      throw new DrizzleError({ message: `No fields selected for table "${tableConfig.tsName}" ("${tableAlias}")` });
+      throw new DrizzleError({
+        message: `No fields selected for table "${tableConfig.tsName}" ("${tableAlias}"). You need to have at least one item in "columns", "with" or "extras". If you need to select all columns, omit the "columns" key or set it to undefined.`
+      });
     }
     let result;
     where = and(joinOn, where);
     if (nestedQueryRelation) {
-      let field = sql`json_build_array(${sql.join(
+      let field = sql`json_array(${sql.join(
         selection.map(
-          ({ field: field2, tsKey, isJson }) => isJson ? sql`${sql.identifier(`${tableAlias}_${tsKey}`)}.${sql.identifier("data")}` : is(field2, SQL.Aliased) ? field2.sql : field2
+          ({ field: field2 }) => is(field2, SQLiteColumn) ? sql.identifier(this.casing.getColumnCasing(field2)) : is(field2, SQL.Aliased) ? field2.sql : field2
         ),
         sql`, `
       )})`;
       if (is(nestedQueryRelation, Many)) {
-        field = sql`coalesce(json_agg(${field}${orderBy.length > 0 ? sql` order by ${sql.join(orderBy, sql`, `)}` : void 0}), '[]'::json)`;
+        field = sql`coalesce(json_group_array(${field}), json_array())`;
       }
-      const nestedSelection = [{
-        dbKey: "data",
-        tsKey: "data",
-        field: field.as("data"),
-        isJson: true,
-        relationTableTsKey: tableConfig.tsName,
-        selection
-      }];
+      const nestedSelection = [
+        {
+          dbKey: "data",
+          tsKey: "data",
+          field: field.as("data"),
+          isJson: true,
+          relationTableTsKey: tableConfig.tsName,
+          selection
+        }
+      ];
       const needsSubquery = limit !== void 0 || offset !== void 0 || orderBy.length > 0;
       if (needsSubquery) {
         result = this.buildSelectQuery({
           table: aliasedTable(table, tableAlias),
           fields: {},
-          fieldsFlat: [{
-            path: [],
-            field: sql.raw("*")
-          }],
+          fieldsFlat: [
+            {
+              path: [],
+              field: sql.raw("*")
+            }
+          ],
           where,
           limit,
           offset,
@@ -11411,12 +4600,12 @@ var PgDialect = class {
         where = void 0;
         limit = void 0;
         offset = void 0;
-        orderBy = [];
+        orderBy = void 0;
       } else {
         result = aliasedTable(table, tableAlias);
       }
       result = this.buildSelectQuery({
-        table: is(result, PgTable) ? result : new Subquery(result, {}, tableAlias),
+        table: is(result, SQLiteTable) ? result : new Subquery(result, {}, tableAlias),
         fields: {},
         fieldsFlat: nestedSelection.map(({ field: field2 }) => ({
           path: [],
@@ -11452,6 +4641,81 @@ var PgDialect = class {
     };
   }
 };
+var SQLiteSyncDialect = class extends SQLiteDialect {
+  static {
+    __name(this, "SQLiteSyncDialect");
+  }
+  static [entityKind] = "SQLiteSyncDialect";
+  migrate(migrations, session, config) {
+    const migrationsTable = config === void 0 ? "__drizzle_migrations" : typeof config === "string" ? "__drizzle_migrations" : config.migrationsTable ?? "__drizzle_migrations";
+    const migrationTableCreate = sql`
+			CREATE TABLE IF NOT EXISTS ${sql.identifier(migrationsTable)} (
+				id SERIAL PRIMARY KEY,
+				hash text NOT NULL,
+				created_at numeric
+			)
+		`;
+    session.run(migrationTableCreate);
+    const dbMigrations = session.values(
+      sql`SELECT id, hash, created_at FROM ${sql.identifier(migrationsTable)} ORDER BY created_at DESC LIMIT 1`
+    );
+    const lastDbMigration = dbMigrations[0] ?? void 0;
+    session.run(sql`BEGIN`);
+    try {
+      for (const migration of migrations) {
+        if (!lastDbMigration || Number(lastDbMigration[2]) < migration.folderMillis) {
+          for (const stmt of migration.sql) {
+            session.run(sql.raw(stmt));
+          }
+          session.run(
+            sql`INSERT INTO ${sql.identifier(
+              migrationsTable
+            )} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
+          );
+        }
+      }
+      session.run(sql`COMMIT`);
+    } catch (e) {
+      session.run(sql`ROLLBACK`);
+      throw e;
+    }
+  }
+};
+var SQLiteAsyncDialect = class extends SQLiteDialect {
+  static {
+    __name(this, "SQLiteAsyncDialect");
+  }
+  static [entityKind] = "SQLiteAsyncDialect";
+  async migrate(migrations, session, config) {
+    const migrationsTable = config === void 0 ? "__drizzle_migrations" : typeof config === "string" ? "__drizzle_migrations" : config.migrationsTable ?? "__drizzle_migrations";
+    const migrationTableCreate = sql`
+			CREATE TABLE IF NOT EXISTS ${sql.identifier(migrationsTable)} (
+				id SERIAL PRIMARY KEY,
+				hash text NOT NULL,
+				created_at numeric
+			)
+		`;
+    await session.run(migrationTableCreate);
+    const dbMigrations = await session.values(
+      sql`SELECT id, hash, created_at FROM ${sql.identifier(migrationsTable)} ORDER BY created_at DESC LIMIT 1`
+    );
+    const lastDbMigration = dbMigrations[0] ?? void 0;
+    await session.transaction(async (tx) => {
+      for (const migration of migrations) {
+        if (!lastDbMigration || Number(lastDbMigration[2]) < migration.folderMillis) {
+          for (const stmt of migration.sql) {
+            await tx.run(sql.raw(stmt));
+          }
+          await tx.run(
+            sql`INSERT INTO ${sql.identifier(
+              migrationsTable
+            )} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
+          );
+        }
+      }
+    });
+  }
+};
 
 // ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/query-builders/query-builder.js
 var TypedQueryBuilder = class {
@@ -11465,72 +4729,58 @@ var TypedQueryBuilder = class {
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/select.js
-var PgSelectBuilder = class {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/select.js
+var SQLiteSelectBuilder = class {
   static {
-    __name(this, "PgSelectBuilder");
+    __name(this, "SQLiteSelectBuilder");
   }
-  static [entityKind] = "PgSelectBuilder";
+  static [entityKind] = "SQLiteSelectBuilder";
   fields;
   session;
   dialect;
-  withList = [];
+  withList;
   distinct;
   constructor(config) {
     this.fields = config.fields;
     this.session = config.session;
     this.dialect = config.dialect;
-    if (config.withList) {
-      this.withList = config.withList;
-    }
+    this.withList = config.withList;
     this.distinct = config.distinct;
   }
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  /**
-   * Specify the table, subquery, or other target that you're
-   * building a select query against.
-   *
-   * {@link https://www.postgresql.org/docs/current/sql-select.html#SQL-FROM | Postgres from documentation}
-   */
   from(source) {
     const isPartialSelect = !!this.fields;
-    const src = source;
     let fields;
     if (this.fields) {
       fields = this.fields;
-    } else if (is(src, Subquery)) {
+    } else if (is(source, Subquery)) {
       fields = Object.fromEntries(
-        Object.keys(src._.selectedFields).map((key) => [key, src[key]])
+        Object.keys(source._.selectedFields).map((key) => [key, source[key]])
       );
-    } else if (is(src, PgViewBase)) {
-      fields = src[ViewBaseConfig].selectedFields;
-    } else if (is(src, SQL)) {
+    } else if (is(source, SQLiteViewBase)) {
+      fields = source[ViewBaseConfig].selectedFields;
+    } else if (is(source, SQL)) {
       fields = {};
     } else {
-      fields = getTableColumns(src);
+      fields = getTableColumns(source);
     }
-    return new PgSelectBase({
-      table: src,
+    return new SQLiteSelectBase({
+      table: source,
       fields,
       isPartialSelect,
       session: this.session,
       dialect: this.dialect,
       withList: this.withList,
       distinct: this.distinct
-    }).setToken(this.authToken);
+    });
   }
 };
-var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
+var SQLiteSelectQueryBuilderBase = class extends TypedQueryBuilder {
   static {
-    __name(this, "PgSelectQueryBuilderBase");
+    __name(this, "SQLiteSelectQueryBuilderBase");
   }
-  static [entityKind] = "PgSelectQueryBuilder";
+  static [entityKind] = "SQLiteSelectQueryBuilder";
   _;
+  /** @internal */
   config;
   joinsNotNullableMap;
   tableName;
@@ -11563,7 +4813,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
   getUsedTables() {
     return [...this.usedTables];
   }
-  createJoin(joinType, lateral) {
+  createJoin(joinType) {
     return (table, on) => {
       const baseTableName = this.tableName;
       const tableName = getTableLikeName(table);
@@ -11593,7 +4843,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
       if (!this.config.joins) {
         this.config.joins = [];
       }
-      this.config.joins.push({ on, table, joinType, alias: tableName, lateral });
+      this.config.joins.push({ on, table, joinType, alias: tableName });
       if (typeof tableName === "string") {
         switch (joinType) {
           case "left": {
@@ -11651,20 +4901,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *   .leftJoin(pets, eq(users.id, pets.ownerId))
    * ```
    */
-  leftJoin = this.createJoin("left", false);
-  /**
-   * Executes a `left join lateral` operation by adding subquery to the current query.
-   *
-   * A `lateral` join allows the right-hand expression to refer to columns from the left-hand side.
-   *
-   * Calling this method associates each row of the table with the corresponding row from the joined table, if a match is found. If no matching row exists, it sets all columns of the joined table to null.
-   *
-   * See docs: {@link https://orm.drizzle.team/docs/joins#left-join-lateral}
-   *
-   * @param table the subquery to join.
-   * @param on the `on` clause.
-   */
-  leftJoinLateral = this.createJoin("left", true);
+  leftJoin = this.createJoin("left");
   /**
    * Executes a `right join` operation by adding another table to the current query.
    *
@@ -11692,7 +4929,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *   .rightJoin(pets, eq(users.id, pets.ownerId))
    * ```
    */
-  rightJoin = this.createJoin("right", false);
+  rightJoin = this.createJoin("right");
   /**
    * Executes an `inner join` operation, creating a new table by combining rows from two tables that have matching values.
    *
@@ -11720,20 +4957,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *   .innerJoin(pets, eq(users.id, pets.ownerId))
    * ```
    */
-  innerJoin = this.createJoin("inner", false);
-  /**
-   * Executes an `inner join lateral` operation, creating a new table by combining rows from two queries that have matching values.
-   *
-   * A `lateral` join allows the right-hand expression to refer to columns from the left-hand side.
-   *
-   * Calling this method retrieves rows that have corresponding entries in both joined tables. Rows without matching entries in either table are excluded, resulting in a table that includes only matching pairs.
-   *
-   * See docs: {@link https://orm.drizzle.team/docs/joins#inner-join-lateral}
-   *
-   * @param table the subquery to join.
-   * @param on the `on` clause.
-   */
-  innerJoinLateral = this.createJoin("inner", true);
+  innerJoin = this.createJoin("inner");
   /**
    * Executes a `full join` operation by combining rows from two tables into a new table.
    *
@@ -11761,7 +4985,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *   .fullJoin(pets, eq(users.id, pets.ownerId))
    * ```
    */
-  fullJoin = this.createJoin("full", false);
+  fullJoin = this.createJoin("full");
   /**
    * Executes a `cross join` operation by combining rows from two tables into a new table.
    *
@@ -11788,22 +5012,10 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *   .crossJoin(pets)
    * ```
    */
-  crossJoin = this.createJoin("cross", false);
-  /**
-   * Executes a `cross join lateral` operation by combining rows from two queries into a new table.
-   *
-   * A `lateral` join allows the right-hand expression to refer to columns from the left-hand side.
-   *
-   * Calling this method retrieves all rows from both main and joined queries, merging all rows from each query.
-   *
-   * See docs: {@link https://orm.drizzle.team/docs/joins#cross-join-lateral}
-   *
-   * @param table the query to join.
-   */
-  crossJoinLateral = this.createJoin("cross", true);
+  crossJoin = this.createJoin("cross");
   createSetOperator(type, isAll) {
     return (rightSelection) => {
-      const rightSelect = typeof rightSelection === "function" ? rightSelection(getPgSetOperators()) : rightSelection;
+      const rightSelect = typeof rightSelection === "function" ? rightSelection(getSQLiteSetOperators()) : rightSelection;
       if (!haveSameKeys(this.getSelectedFields(), rightSelect.getSelectedFields())) {
         throw new Error(
           "Set operator error (union / intersect / except): selected fields are not the same or are in a different order"
@@ -11830,7 +5042,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *     db.select({ name: customers.name }).from(customers)
    *   );
    * // or
-   * import { union } from 'drizzle-orm/pg-core'
+   * import { union } from 'drizzle-orm/sqlite-core'
    *
    * await union(
    *   db.select({ name: users.name }).from(users),
@@ -11856,7 +5068,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *     db.select({ transaction: inStoreSales.transactionId }).from(inStoreSales)
    *   );
    * // or
-   * import { unionAll } from 'drizzle-orm/pg-core'
+   * import { unionAll } from 'drizzle-orm/sqlite-core'
    *
    * await unionAll(
    *   db.select({ transaction: onlineSales.transactionId }).from(onlineSales),
@@ -11882,7 +5094,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *     db.select({ courseName: depB.courseName }).from(depB)
    *   );
    * // or
-   * import { intersect } from 'drizzle-orm/pg-core'
+   * import { intersect } from 'drizzle-orm/sqlite-core'
    *
    * await intersect(
    *   db.select({ courseName: depA.courseName }).from(depA),
@@ -11891,47 +5103,6 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    * ```
    */
   intersect = this.createSetOperator("intersect", false);
-  /**
-   * Adds `intersect all` set operator to the query.
-   *
-   * Calling this method will retain only the rows that are present in both result sets including all duplicates.
-   *
-   * See docs: {@link https://orm.drizzle.team/docs/set-operations#intersect-all}
-   *
-   * @example
-   *
-   * ```ts
-   * // Select all products and quantities that are ordered by both regular and VIP customers
-   * await db.select({
-   *   productId: regularCustomerOrders.productId,
-   *   quantityOrdered: regularCustomerOrders.quantityOrdered
-   * })
-   * .from(regularCustomerOrders)
-   * .intersectAll(
-   *   db.select({
-   *     productId: vipCustomerOrders.productId,
-   *     quantityOrdered: vipCustomerOrders.quantityOrdered
-   *   })
-   *   .from(vipCustomerOrders)
-   * );
-   * // or
-   * import { intersectAll } from 'drizzle-orm/pg-core'
-   *
-   * await intersectAll(
-   *   db.select({
-   *     productId: regularCustomerOrders.productId,
-   *     quantityOrdered: regularCustomerOrders.quantityOrdered
-   *   })
-   *   .from(regularCustomerOrders),
-   *   db.select({
-   *     productId: vipCustomerOrders.productId,
-   *     quantityOrdered: vipCustomerOrders.quantityOrdered
-   *   })
-   *   .from(vipCustomerOrders)
-   * );
-   * ```
-   */
-  intersectAll = this.createSetOperator("intersect", true);
   /**
    * Adds `except` set operator to the query.
    *
@@ -11949,7 +5120,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    *     db.select({ courseName: depB.courseName }).from(depB)
    *   );
    * // or
-   * import { except } from 'drizzle-orm/pg-core'
+   * import { except } from 'drizzle-orm/sqlite-core'
    *
    * await except(
    *   db.select({ courseName: depA.courseName }).from(depA),
@@ -11958,47 +5129,6 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
    * ```
    */
   except = this.createSetOperator("except", false);
-  /**
-   * Adds `except all` set operator to the query.
-   *
-   * Calling this method will retrieve all rows from the left query, except for the rows that are present in the result set of the right query.
-   *
-   * See docs: {@link https://orm.drizzle.team/docs/set-operations#except-all}
-   *
-   * @example
-   *
-   * ```ts
-   * // Select all products that are ordered by regular customers but not by VIP customers
-   * await db.select({
-   *   productId: regularCustomerOrders.productId,
-   *   quantityOrdered: regularCustomerOrders.quantityOrdered,
-   * })
-   * .from(regularCustomerOrders)
-   * .exceptAll(
-   *   db.select({
-   *     productId: vipCustomerOrders.productId,
-   *     quantityOrdered: vipCustomerOrders.quantityOrdered,
-   *   })
-   *   .from(vipCustomerOrders)
-   * );
-   * // or
-   * import { exceptAll } from 'drizzle-orm/pg-core'
-   *
-   * await exceptAll(
-   *   db.select({
-   *     productId: regularCustomerOrders.productId,
-   *     quantityOrdered: regularCustomerOrders.quantityOrdered
-   *   })
-   *   .from(regularCustomerOrders),
-   *   db.select({
-   *     productId: vipCustomerOrders.productId,
-   *     quantityOrdered: vipCustomerOrders.quantityOrdered
-   *   })
-   *   .from(vipCustomerOrders)
-   * );
-   * ```
-   */
-  exceptAll = this.createSetOperator("except", true);
   /** @internal */
   addSetOperators(setOperators) {
     this.config.setOperators.push(...setOperators);
@@ -12165,20 +5295,6 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
     }
     return this;
   }
-  /**
-   * Adds a `for` clause to the query.
-   *
-   * Calling this method will specify a lock strength for this query that controls how strictly it acquires exclusive access to the rows being queried.
-   *
-   * See docs: {@link https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE}
-   *
-   * @param strength the lock strength.
-   * @param config the lock configuration.
-   */
-  for(strength, config = {}) {
-    this.config.lockingClause = { strength, config };
-    return this;
-  }
   /** @internal */
   getSQL() {
     return this.dialect.buildSelectQuery(this.config);
@@ -12191,7 +5307,7 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
     const usedTables = [];
     usedTables.push(...extractUsedTable(this.config.table));
     if (this.config.joins) {
-      for (const it2 of this.config.joins) usedTables.push(...extractUsedTable(it2.table));
+      for (const it of this.config.joins) usedTables.push(...extractUsedTable(it.table));
     }
     return new Proxy(
       new Subquery(this.getSQL(), this.config.fields, alias, false, [...new Set(usedTables)]),
@@ -12208,56 +5324,57 @@ var PgSelectQueryBuilderBase = class extends TypedQueryBuilder {
   $dynamic() {
     return this;
   }
+};
+var SQLiteSelectBase = class extends SQLiteSelectQueryBuilderBase {
+  static {
+    __name(this, "SQLiteSelectBase");
+  }
+  static [entityKind] = "SQLiteSelect";
+  /** @internal */
+  _prepare(isOneTimeQuery = true) {
+    if (!this.session) {
+      throw new Error("Cannot execute a query on a query builder. Please use a database instance instead.");
+    }
+    const fieldsList = orderSelectedFields(this.config.fields);
+    const query = this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](
+      this.dialect.sqlToQuery(this.getSQL()),
+      fieldsList,
+      "all",
+      true,
+      void 0,
+      {
+        type: "select",
+        tables: [...this.usedTables]
+      },
+      this.cacheConfig
+    );
+    query.joinsNotNullableMap = this.joinsNotNullableMap;
+    return query;
+  }
   $withCache(config) {
     this.cacheConfig = config === void 0 ? { config: {}, enable: true, autoInvalidate: true } : config === false ? { enable: false } : { enable: true, autoInvalidate: true, ...config };
     return this;
   }
+  prepare() {
+    return this._prepare(false);
+  }
+  run = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().run(placeholderValues);
+  }, "run");
+  all = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().all(placeholderValues);
+  }, "all");
+  get = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().get(placeholderValues);
+  }, "get");
+  values = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().values(placeholderValues);
+  }, "values");
+  async execute() {
+    return this.all();
+  }
 };
-var PgSelectBase = class extends PgSelectQueryBuilderBase {
-  static {
-    __name(this, "PgSelectBase");
-  }
-  static [entityKind] = "PgSelect";
-  /** @internal */
-  _prepare(name) {
-    const { session, config, dialect, joinsNotNullableMap, authToken, cacheConfig, usedTables } = this;
-    if (!session) {
-      throw new Error("Cannot execute a query on a query builder. Please use a database instance instead.");
-    }
-    const { fields } = config;
-    return tracer.startActiveSpan("drizzle.prepareQuery", () => {
-      const fieldsList = orderSelectedFields(fields);
-      const query = session.prepareQuery(dialect.sqlToQuery(this.getSQL()), fieldsList, name, true, void 0, {
-        type: "select",
-        tables: [...usedTables]
-      }, cacheConfig);
-      query.joinsNotNullableMap = joinsNotNullableMap;
-      return query.setToken(authToken);
-    });
-  }
-  /**
-   * Create a prepared statement for this query. This allows
-   * the database to remember this query for the given session
-   * and call it by name, rather than specifying the full query.
-   *
-   * {@link https://www.postgresql.org/docs/current/sql-prepare.html | Postgres prepare documentation}
-   */
-  prepare(name) {
-    return this._prepare(name);
-  }
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  execute = /* @__PURE__ */ __name((placeholderValues) => {
-    return tracer.startActiveSpan("drizzle.operation", () => {
-      return this._prepare().execute(placeholderValues, this.authToken);
-    });
-  }, "execute");
-};
-applyMixins(PgSelectBase, [QueryPromise]);
+applyMixins(SQLiteSelectBase, [QueryPromise]);
 function createSetOperator(type, isAll) {
   return (leftSelect, rightSelect, ...restSelects) => {
     const setOperators = [rightSelect, ...restSelects].map((select) => ({
@@ -12276,36 +5393,32 @@ function createSetOperator(type, isAll) {
   };
 }
 __name(createSetOperator, "createSetOperator");
-var getPgSetOperators = /* @__PURE__ */ __name(() => ({
+var getSQLiteSetOperators = /* @__PURE__ */ __name(() => ({
   union,
   unionAll,
   intersect,
-  intersectAll,
-  except,
-  exceptAll
-}), "getPgSetOperators");
+  except
+}), "getSQLiteSetOperators");
 var union = createSetOperator("union", false);
 var unionAll = createSetOperator("union", true);
 var intersect = createSetOperator("intersect", false);
-var intersectAll = createSetOperator("intersect", true);
 var except = createSetOperator("except", false);
-var exceptAll = createSetOperator("except", true);
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/query-builder.js
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/query-builder.js
 var QueryBuilder = class {
   static {
     __name(this, "QueryBuilder");
   }
-  static [entityKind] = "PgQueryBuilder";
+  static [entityKind] = "SQLiteQueryBuilder";
   dialect;
   dialectConfig;
   constructor(dialect) {
-    this.dialect = is(dialect, PgDialect) ? dialect : void 0;
-    this.dialectConfig = is(dialect, PgDialect) ? void 0 : dialect;
+    this.dialect = is(dialect, SQLiteDialect) ? dialect : void 0;
+    this.dialectConfig = is(dialect, SQLiteDialect) ? void 0 : dialect;
   }
   $with = /* @__PURE__ */ __name((alias, selection) => {
     const queryBuilder = this;
-    const as2 = /* @__PURE__ */ __name((qb) => {
+    const as = /* @__PURE__ */ __name((qb) => {
       if (typeof qb === "function") {
         qb = qb(queryBuilder);
       }
@@ -12319,12 +5432,12 @@ var QueryBuilder = class {
         new SelectionProxyHandler({ alias, sqlAliasedBehavior: "alias", sqlBehavior: "error" })
       );
     }, "as");
-    return { as: as2 };
+    return { as };
   }, "$with");
   with(...queries) {
     const self2 = this;
     function select(fields) {
-      return new PgSelectBuilder({
+      return new SQLiteSelectBuilder({
         fields: fields ?? void 0,
         session: void 0,
         dialect: self2.getDialect(),
@@ -12333,194 +5446,49 @@ var QueryBuilder = class {
     }
     __name(select, "select");
     function selectDistinct(fields) {
-      return new PgSelectBuilder({
+      return new SQLiteSelectBuilder({
         fields: fields ?? void 0,
         session: void 0,
         dialect: self2.getDialect(),
+        withList: queries,
         distinct: true
       });
     }
     __name(selectDistinct, "selectDistinct");
-    function selectDistinctOn(on, fields) {
-      return new PgSelectBuilder({
-        fields: fields ?? void 0,
-        session: void 0,
-        dialect: self2.getDialect(),
-        distinct: { on }
-      });
-    }
-    __name(selectDistinctOn, "selectDistinctOn");
-    return { select, selectDistinct, selectDistinctOn };
+    return { select, selectDistinct };
   }
   select(fields) {
-    return new PgSelectBuilder({
-      fields: fields ?? void 0,
-      session: void 0,
-      dialect: this.getDialect()
-    });
+    return new SQLiteSelectBuilder({ fields: fields ?? void 0, session: void 0, dialect: this.getDialect() });
   }
   selectDistinct(fields) {
-    return new PgSelectBuilder({
+    return new SQLiteSelectBuilder({
       fields: fields ?? void 0,
       session: void 0,
       dialect: this.getDialect(),
       distinct: true
     });
   }
-  selectDistinctOn(on, fields) {
-    return new PgSelectBuilder({
-      fields: fields ?? void 0,
-      session: void 0,
-      dialect: this.getDialect(),
-      distinct: { on }
-    });
-  }
   // Lazy load dialect to avoid circular dependency
   getDialect() {
     if (!this.dialect) {
-      this.dialect = new PgDialect(this.dialectConfig);
+      this.dialect = new SQLiteSyncDialect(this.dialectConfig);
     }
     return this.dialect;
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/utils.js
-function extractUsedTable(table) {
-  if (is(table, PgTable)) {
-    return [table[Schema] ? `${table[Schema]}.${table[Table.Symbol.BaseName]}` : table[Table.Symbol.BaseName]];
-  }
-  if (is(table, Subquery)) {
-    return table._.usedTables ?? [];
-  }
-  if (is(table, SQL)) {
-    return table.usedTables ?? [];
-  }
-  return [];
-}
-__name(extractUsedTable, "extractUsedTable");
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/delete.js
-var PgDeleteBase = class extends QueryPromise {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/insert.js
+var SQLiteInsertBuilder = class {
   static {
-    __name(this, "PgDeleteBase");
+    __name(this, "SQLiteInsertBuilder");
   }
   constructor(table, session, dialect, withList) {
-    super();
-    this.session = session;
-    this.dialect = dialect;
-    this.config = { table, withList };
-  }
-  static [entityKind] = "PgDelete";
-  config;
-  cacheConfig;
-  /**
-   * Adds a `where` clause to the query.
-   *
-   * Calling this method will delete only those rows that fulfill a specified condition.
-   *
-   * See docs: {@link https://orm.drizzle.team/docs/delete}
-   *
-   * @param where the `where` clause.
-   *
-   * @example
-   * You can use conditional operators and `sql function` to filter the rows to be deleted.
-   *
-   * ```ts
-   * // Delete all cars with green color
-   * await db.delete(cars).where(eq(cars.color, 'green'));
-   * // or
-   * await db.delete(cars).where(sql`${cars.color} = 'green'`)
-   * ```
-   *
-   * You can logically combine conditional operators with `and()` and `or()` operators:
-   *
-   * ```ts
-   * // Delete all BMW cars with a green color
-   * await db.delete(cars).where(and(eq(cars.color, 'green'), eq(cars.brand, 'BMW')));
-   *
-   * // Delete all cars with the green or blue color
-   * await db.delete(cars).where(or(eq(cars.color, 'green'), eq(cars.color, 'blue')));
-   * ```
-   */
-  where(where) {
-    this.config.where = where;
-    return this;
-  }
-  returning(fields = this.config.table[Table.Symbol.Columns]) {
-    this.config.returningFields = fields;
-    this.config.returning = orderSelectedFields(fields);
-    return this;
-  }
-  /** @internal */
-  getSQL() {
-    return this.dialect.buildDeleteQuery(this.config);
-  }
-  toSQL() {
-    const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
-    return rest;
-  }
-  /** @internal */
-  _prepare(name) {
-    return tracer.startActiveSpan("drizzle.prepareQuery", () => {
-      return this.session.prepareQuery(this.dialect.sqlToQuery(this.getSQL()), this.config.returning, name, true, void 0, {
-        type: "delete",
-        tables: extractUsedTable(this.config.table)
-      }, this.cacheConfig);
-    });
-  }
-  prepare(name) {
-    return this._prepare(name);
-  }
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  execute = /* @__PURE__ */ __name((placeholderValues) => {
-    return tracer.startActiveSpan("drizzle.operation", () => {
-      return this._prepare().execute(placeholderValues, this.authToken);
-    });
-  }, "execute");
-  /** @internal */
-  getSelectedFields() {
-    return this.config.returningFields ? new Proxy(
-      this.config.returningFields,
-      new SelectionProxyHandler({
-        alias: getTableName(this.config.table),
-        sqlAliasedBehavior: "alias",
-        sqlBehavior: "error"
-      })
-    ) : void 0;
-  }
-  $dynamic() {
-    return this;
-  }
-};
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/insert.js
-var PgInsertBuilder = class {
-  static {
-    __name(this, "PgInsertBuilder");
-  }
-  constructor(table, session, dialect, withList, overridingSystemValue_) {
     this.table = table;
     this.session = session;
     this.dialect = dialect;
     this.withList = withList;
-    this.overridingSystemValue_ = overridingSystemValue_;
   }
-  static [entityKind] = "PgInsertBuilder";
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  overridingSystemValue() {
-    this.overridingSystemValue_ = true;
-    return this;
-  }
+  static [entityKind] = "SQLiteInsertBuilder";
   values(values) {
     values = Array.isArray(values) ? values : [values];
     if (values.length === 0) {
@@ -12535,15 +5503,7 @@ var PgInsertBuilder = class {
       }
       return result;
     });
-    return new PgInsertBase(
-      this.table,
-      mappedValues,
-      this.session,
-      this.dialect,
-      this.withList,
-      false,
-      this.overridingSystemValue_
-    ).setToken(this.authToken);
+    return new SQLiteInsertBase(this.table, mappedValues, this.session, this.dialect, this.withList);
   }
   select(selectQuery) {
     const select = typeof selectQuery === "function" ? selectQuery(new QueryBuilder()) : selectQuery;
@@ -12552,24 +5512,23 @@ var PgInsertBuilder = class {
         "Insert select error: selected fields are not the same or are in a different order compared to the table definition"
       );
     }
-    return new PgInsertBase(this.table, select, this.session, this.dialect, this.withList, true);
+    return new SQLiteInsertBase(this.table, select, this.session, this.dialect, this.withList, true);
   }
 };
-var PgInsertBase = class extends QueryPromise {
+var SQLiteInsertBase = class extends QueryPromise {
   static {
-    __name(this, "PgInsertBase");
+    __name(this, "SQLiteInsertBase");
   }
-  constructor(table, values, session, dialect, withList, select, overridingSystemValue_) {
+  constructor(table, values, session, dialect, withList, select) {
     super();
     this.session = session;
     this.dialect = dialect;
-    this.config = { table, values, withList, select, overridingSystemValue_ };
+    this.config = { table, values, withList, select };
   }
-  static [entityKind] = "PgInsert";
+  static [entityKind] = "SQLiteInsert";
+  /** @internal */
   config;
-  cacheConfig;
-  returning(fields = this.config.table[Table.Symbol.Columns]) {
-    this.config.returningFields = fields;
+  returning(fields = this.config.table[SQLiteTable.Symbol.Columns]) {
     this.config.returning = orderSelectedFields(fields);
     return this;
   }
@@ -12596,13 +5555,13 @@ var PgInsertBase = class extends QueryPromise {
    * ```
    */
   onConflictDoNothing(config = {}) {
+    if (!this.config.onConflict) this.config.onConflict = [];
     if (config.target === void 0) {
-      this.config.onConflict = sql`do nothing`;
+      this.config.onConflict.push(sql` on conflict do nothing`);
     } else {
-      let targetColumn = "";
-      targetColumn = Array.isArray(config.target) ? config.target.map((it2) => this.dialect.escapeName(this.dialect.casing.getColumnCasing(it2))).join(",") : this.dialect.escapeName(this.dialect.casing.getColumnCasing(config.target));
-      const whereSql = config.where ? sql` where ${config.where}` : void 0;
-      this.config.onConflict = sql`(${sql.raw(targetColumn)})${whereSql} do nothing`;
+      const targetSql = Array.isArray(config.target) ? sql`${config.target}` : sql`${[config.target]}`;
+      const whereSql = config.where ? sql` where ${config.where}` : sql``;
+      this.config.onConflict.push(sql` on conflict ${targetSql} do nothing${whereSql}`);
     }
     return this;
   }
@@ -12631,7 +5590,7 @@ var PgInsertBase = class extends QueryPromise {
    *   .onConflictDoUpdate({
    *     target: cars.id,
    *     set: { brand: 'newBMW' },
-   *     targetWhere: sql`${cars.createdAt} > '2023-01-01'::date`,
+   *     where: sql`${cars.createdAt} > '2023-01-01'::date`,
    *   });
    * ```
    */
@@ -12641,13 +5600,15 @@ var PgInsertBase = class extends QueryPromise {
         'You cannot use both "where" and "targetWhere"/"setWhere" at the same time - "where" is deprecated, use "targetWhere" or "setWhere" instead.'
       );
     }
+    if (!this.config.onConflict) this.config.onConflict = [];
     const whereSql = config.where ? sql` where ${config.where}` : void 0;
     const targetWhereSql = config.targetWhere ? sql` where ${config.targetWhere}` : void 0;
     const setWhereSql = config.setWhere ? sql` where ${config.setWhere}` : void 0;
+    const targetSql = Array.isArray(config.target) ? sql`${config.target}` : sql`${[config.target]}`;
     const setSql = this.dialect.buildUpdateSet(this.config.table, mapUpdateSet(this.config.table, config.set));
-    let targetColumn = "";
-    targetColumn = Array.isArray(config.target) ? config.target.map((it2) => this.dialect.escapeName(this.dialect.casing.getColumnCasing(it2))).join(",") : this.dialect.escapeName(this.dialect.casing.getColumnCasing(config.target));
-    this.config.onConflict = sql`(${sql.raw(targetColumn)})${targetWhereSql} do update set ${setSql}${whereSql}${setWhereSql}`;
+    this.config.onConflict.push(
+      sql` on conflict ${targetSql}${targetWhereSql} do update set ${setSql}${whereSql}${setWhereSql}`
+    );
     return this;
   }
   /** @internal */
@@ -12659,105 +5620,46 @@ var PgInsertBase = class extends QueryPromise {
     return rest;
   }
   /** @internal */
-  _prepare(name) {
-    return tracer.startActiveSpan("drizzle.prepareQuery", () => {
-      return this.session.prepareQuery(this.dialect.sqlToQuery(this.getSQL()), this.config.returning, name, true, void 0, {
+  _prepare(isOneTimeQuery = true) {
+    return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](
+      this.dialect.sqlToQuery(this.getSQL()),
+      this.config.returning,
+      this.config.returning ? "all" : "run",
+      true,
+      void 0,
+      {
         type: "insert",
         tables: extractUsedTable(this.config.table)
-      }, this.cacheConfig);
-    });
+      }
+    );
   }
-  prepare(name) {
-    return this._prepare(name);
+  prepare() {
+    return this._prepare(false);
   }
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  execute = /* @__PURE__ */ __name((placeholderValues) => {
-    return tracer.startActiveSpan("drizzle.operation", () => {
-      return this._prepare().execute(placeholderValues, this.authToken);
-    });
-  }, "execute");
-  /** @internal */
-  getSelectedFields() {
-    return this.config.returningFields ? new Proxy(
-      this.config.returningFields,
-      new SelectionProxyHandler({
-        alias: getTableName(this.config.table),
-        sqlAliasedBehavior: "alias",
-        sqlBehavior: "error"
-      })
-    ) : void 0;
+  run = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().run(placeholderValues);
+  }, "run");
+  all = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().all(placeholderValues);
+  }, "all");
+  get = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().get(placeholderValues);
+  }, "get");
+  values = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().values(placeholderValues);
+  }, "values");
+  async execute() {
+    return this.config.returning ? this.all() : this.run();
   }
   $dynamic() {
     return this;
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/refresh-materialized-view.js
-var PgRefreshMaterializedView = class extends QueryPromise {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/update.js
+var SQLiteUpdateBuilder = class {
   static {
-    __name(this, "PgRefreshMaterializedView");
-  }
-  constructor(view, session, dialect) {
-    super();
-    this.session = session;
-    this.dialect = dialect;
-    this.config = { view };
-  }
-  static [entityKind] = "PgRefreshMaterializedView";
-  config;
-  concurrently() {
-    if (this.config.withNoData !== void 0) {
-      throw new Error("Cannot use concurrently and withNoData together");
-    }
-    this.config.concurrently = true;
-    return this;
-  }
-  withNoData() {
-    if (this.config.concurrently !== void 0) {
-      throw new Error("Cannot use concurrently and withNoData together");
-    }
-    this.config.withNoData = true;
-    return this;
-  }
-  /** @internal */
-  getSQL() {
-    return this.dialect.buildRefreshMaterializedViewQuery(this.config);
-  }
-  toSQL() {
-    const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
-    return rest;
-  }
-  /** @internal */
-  _prepare(name) {
-    return tracer.startActiveSpan("drizzle.prepareQuery", () => {
-      return this.session.prepareQuery(this.dialect.sqlToQuery(this.getSQL()), void 0, name, true);
-    });
-  }
-  prepare(name) {
-    return this._prepare(name);
-  }
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  execute = /* @__PURE__ */ __name((placeholderValues) => {
-    return tracer.startActiveSpan("drizzle.operation", () => {
-      return this._prepare().execute(placeholderValues, this.authToken);
-    });
-  }, "execute");
-};
-
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/update.js
-var PgUpdateBuilder = class {
-  static {
-    __name(this, "PgUpdateBuilder");
+    __name(this, "SQLiteUpdateBuilder");
   }
   constructor(table, session, dialect, withList) {
     this.table = table;
@@ -12765,55 +5667,33 @@ var PgUpdateBuilder = class {
     this.dialect = dialect;
     this.withList = withList;
   }
-  static [entityKind] = "PgUpdateBuilder";
-  authToken;
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
+  static [entityKind] = "SQLiteUpdateBuilder";
   set(values) {
-    return new PgUpdateBase(
+    return new SQLiteUpdateBase(
       this.table,
       mapUpdateSet(this.table, values),
       this.session,
       this.dialect,
       this.withList
-    ).setToken(this.authToken);
+    );
   }
 };
-var PgUpdateBase = class extends QueryPromise {
+var SQLiteUpdateBase = class extends QueryPromise {
   static {
-    __name(this, "PgUpdateBase");
+    __name(this, "SQLiteUpdateBase");
   }
   constructor(table, set, session, dialect, withList) {
     super();
     this.session = session;
     this.dialect = dialect;
     this.config = { set, table, withList, joins: [] };
-    this.tableName = getTableLikeName(table);
-    this.joinsNotNullableMap = typeof this.tableName === "string" ? { [this.tableName]: true } : {};
   }
-  static [entityKind] = "PgUpdate";
+  static [entityKind] = "SQLiteUpdate";
+  /** @internal */
   config;
-  tableName;
-  joinsNotNullableMap;
-  cacheConfig;
   from(source) {
-    const src = source;
-    const tableName = getTableLikeName(src);
-    if (typeof tableName === "string") {
-      this.joinsNotNullableMap[tableName] = true;
-    }
-    this.config.from = src;
+    this.config.from = source;
     return this;
-  }
-  getTableLikeFields(table) {
-    if (is(table, PgTable)) {
-      return table[Table.Symbol.Columns];
-    } else if (is(table, Subquery)) {
-      return table._.selectedFields;
-    }
-    return table[ViewBaseConfig].selectedFields;
   }
   createJoin(joinType) {
     return (table, on) => {
@@ -12822,7 +5702,7 @@ var PgUpdateBase = class extends QueryPromise {
         throw new Error(`Alias "${tableName}" is already used in this query`);
       }
       if (typeof on === "function") {
-        const from = this.config.from && !is(this.config.from, SQL) ? this.getTableLikeFields(this.config.from) : void 0;
+        const from = this.config.from ? is(table, SQLiteTable) ? table[Table.Symbol.Columns] : is(table, Subquery) ? table._.selectedFields : is(table, SQLiteViewBase) ? table[ViewBaseConfig].selectedFields : void 0 : void 0;
         on = on(
           new Proxy(
             this.config.table[Table.Symbol.Columns],
@@ -12835,32 +5715,6 @@ var PgUpdateBase = class extends QueryPromise {
         );
       }
       this.config.joins.push({ on, table, joinType, alias: tableName });
-      if (typeof tableName === "string") {
-        switch (joinType) {
-          case "left": {
-            this.joinsNotNullableMap[tableName] = false;
-            break;
-          }
-          case "right": {
-            this.joinsNotNullableMap = Object.fromEntries(
-              Object.entries(this.joinsNotNullableMap).map(([key]) => [key, false])
-            );
-            this.joinsNotNullableMap[tableName] = true;
-            break;
-          }
-          case "inner": {
-            this.joinsNotNullableMap[tableName] = true;
-            break;
-          }
-          case "full": {
-            this.joinsNotNullableMap = Object.fromEntries(
-              Object.entries(this.joinsNotNullableMap).map(([key]) => [key, false])
-            );
-            this.joinsNotNullableMap[tableName] = false;
-            break;
-          }
-        }
-      }
       return this;
     };
   }
@@ -12882,10 +5736,10 @@ var PgUpdateBase = class extends QueryPromise {
    *
    * ```ts
    * // Update all cars with green color
-   * await db.update(cars).set({ color: 'red' })
+   * db.update(cars).set({ color: 'red' })
    *   .where(eq(cars.color, 'green'));
    * // or
-   * await db.update(cars).set({ color: 'red' })
+   * db.update(cars).set({ color: 'red' })
    *   .where(sql`${cars.color} = 'green'`)
    * ```
    *
@@ -12893,11 +5747,11 @@ var PgUpdateBase = class extends QueryPromise {
    *
    * ```ts
    * // Update all BMW cars with a green color
-   * await db.update(cars).set({ color: 'red' })
+   * db.update(cars).set({ color: 'red' })
    *   .where(and(eq(cars.color, 'green'), eq(cars.brand, 'BMW')));
    *
    * // Update all cars with the green or blue color
-   * await db.update(cars).set({ color: 'red' })
+   * db.update(cars).set({ color: 'red' })
    *   .where(or(eq(cars.color, 'green'), eq(cars.color, 'blue')));
    * ```
    */
@@ -12905,25 +5759,27 @@ var PgUpdateBase = class extends QueryPromise {
     this.config.where = where;
     return this;
   }
-  returning(fields) {
-    if (!fields) {
-      fields = Object.assign({}, this.config.table[Table.Symbol.Columns]);
-      if (this.config.from) {
-        const tableName = getTableLikeName(this.config.from);
-        if (typeof tableName === "string" && this.config.from && !is(this.config.from, SQL)) {
-          const fromFields = this.getTableLikeFields(this.config.from);
-          fields[tableName] = fromFields;
-        }
-        for (const join of this.config.joins) {
-          const tableName2 = getTableLikeName(join.table);
-          if (typeof tableName2 === "string" && !is(join.table, SQL)) {
-            const fromFields = this.getTableLikeFields(join.table);
-            fields[tableName2] = fromFields;
-          }
-        }
-      }
+  orderBy(...columns) {
+    if (typeof columns[0] === "function") {
+      const orderBy = columns[0](
+        new Proxy(
+          this.config.table[Table.Symbol.Columns],
+          new SelectionProxyHandler({ sqlAliasedBehavior: "alias", sqlBehavior: "sql" })
+        )
+      );
+      const orderByArray = Array.isArray(orderBy) ? orderBy : [orderBy];
+      this.config.orderBy = orderByArray;
+    } else {
+      const orderByArray = columns;
+      this.config.orderBy = orderByArray;
     }
-    this.config.returningFields = fields;
+    return this;
+  }
+  limit(limit) {
+    this.config.limit = limit;
+    return this;
+  }
+  returning(fields = this.config.table[SQLiteTable.Symbol.Columns]) {
     this.config.returning = orderSelectedFields(fields);
     return this;
   }
@@ -12936,75 +5792,68 @@ var PgUpdateBase = class extends QueryPromise {
     return rest;
   }
   /** @internal */
-  _prepare(name) {
-    const query = this.session.prepareQuery(this.dialect.sqlToQuery(this.getSQL()), this.config.returning, name, true, void 0, {
-      type: "insert",
-      tables: extractUsedTable(this.config.table)
-    }, this.cacheConfig);
-    query.joinsNotNullableMap = this.joinsNotNullableMap;
-    return query;
+  _prepare(isOneTimeQuery = true) {
+    return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](
+      this.dialect.sqlToQuery(this.getSQL()),
+      this.config.returning,
+      this.config.returning ? "all" : "run",
+      true,
+      void 0,
+      {
+        type: "insert",
+        tables: extractUsedTable(this.config.table)
+      }
+    );
   }
-  prepare(name) {
-    return this._prepare(name);
+  prepare() {
+    return this._prepare(false);
   }
-  authToken;
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  execute = /* @__PURE__ */ __name((placeholderValues) => {
-    return this._prepare().execute(placeholderValues, this.authToken);
-  }, "execute");
-  /** @internal */
-  getSelectedFields() {
-    return this.config.returningFields ? new Proxy(
-      this.config.returningFields,
-      new SelectionProxyHandler({
-        alias: getTableName(this.config.table),
-        sqlAliasedBehavior: "alias",
-        sqlBehavior: "error"
-      })
-    ) : void 0;
+  run = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().run(placeholderValues);
+  }, "run");
+  all = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().all(placeholderValues);
+  }, "all");
+  get = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().get(placeholderValues);
+  }, "get");
+  values = /* @__PURE__ */ __name((placeholderValues) => {
+    return this._prepare().values(placeholderValues);
+  }, "values");
+  async execute() {
+    return this.config.returning ? this.all() : this.run();
   }
   $dynamic() {
     return this;
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/count.js
-var PgCountBuilder = class _PgCountBuilder extends SQL {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/count.js
+var SQLiteCountBuilder = class _SQLiteCountBuilder extends SQL {
   static {
-    __name(this, "PgCountBuilder");
+    __name(this, "SQLiteCountBuilder");
   }
   constructor(params) {
-    super(_PgCountBuilder.buildEmbeddedCount(params.source, params.filters).queryChunks);
+    super(_SQLiteCountBuilder.buildEmbeddedCount(params.source, params.filters).queryChunks);
     this.params = params;
-    this.mapWith(Number);
     this.session = params.session;
-    this.sql = _PgCountBuilder.buildCount(
+    this.sql = _SQLiteCountBuilder.buildCount(
       params.source,
       params.filters
     );
   }
   sql;
-  token;
-  static [entityKind] = "PgCountBuilder";
-  [Symbol.toStringTag] = "PgCountBuilder";
+  static [entityKind] = "SQLiteCountBuilderAsync";
+  [Symbol.toStringTag] = "SQLiteCountBuilderAsync";
   session;
   static buildEmbeddedCount(source, filters) {
     return sql`(select count(*) from ${source}${sql.raw(" where ").if(filters)}${filters})`;
   }
   static buildCount(source, filters) {
-    return sql`select count(*) as count from ${source}${sql.raw(" where ").if(filters)}${filters};`;
-  }
-  /** @intrnal */
-  setToken(token) {
-    this.token = token;
-    return this;
+    return sql`select count(*) from ${source}${sql.raw(" where ").if(filters)}${filters}`;
   }
   then(onfulfilled, onrejected) {
-    return Promise.resolve(this.session.count(this.sql, this.token)).then(
+    return Promise.resolve(this.session.count(this.sql)).then(
       onfulfilled,
       onrejected
     );
@@ -13026,12 +5875,13 @@ var PgCountBuilder = class _PgCountBuilder extends SQL {
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/query.js
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/query.js
 var RelationalQueryBuilder = class {
   static {
     __name(this, "RelationalQueryBuilder");
   }
-  constructor(fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session) {
+  constructor(mode, fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session) {
+    this.mode = mode;
     this.fullSchema = fullSchema;
     this.schema = schema;
     this.tableNamesMap = tableNamesMap;
@@ -13040,9 +5890,19 @@ var RelationalQueryBuilder = class {
     this.dialect = dialect;
     this.session = session;
   }
-  static [entityKind] = "PgRelationalQueryBuilder";
+  static [entityKind] = "SQLiteAsyncRelationalQueryBuilder";
   findMany(config) {
-    return new PgRelationalQuery(
+    return this.mode === "sync" ? new SQLiteSyncRelationalQuery(
+      this.fullSchema,
+      this.schema,
+      this.tableNamesMap,
+      this.table,
+      this.tableConfig,
+      this.dialect,
+      this.session,
+      config ? config : {},
+      "many"
+    ) : new SQLiteRelationalQuery(
       this.fullSchema,
       this.schema,
       this.tableNamesMap,
@@ -13055,7 +5915,17 @@ var RelationalQueryBuilder = class {
     );
   }
   findFirst(config) {
-    return new PgRelationalQuery(
+    return this.mode === "sync" ? new SQLiteSyncRelationalQuery(
+      this.fullSchema,
+      this.schema,
+      this.tableNamesMap,
+      this.table,
+      this.tableConfig,
+      this.dialect,
+      this.session,
+      config ? { ...config, limit: 1 } : { limit: 1 },
+      "first"
+    ) : new SQLiteRelationalQuery(
       this.fullSchema,
       this.schema,
       this.tableNamesMap,
@@ -13068,9 +5938,9 @@ var RelationalQueryBuilder = class {
     );
   }
 };
-var PgRelationalQuery = class extends QueryPromise {
+var SQLiteRelationalQuery = class extends QueryPromise {
   static {
-    __name(this, "PgRelationalQuery");
+    __name(this, "SQLiteRelationalQuery");
   }
   constructor(fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session, config, mode) {
     super();
@@ -13084,33 +5954,45 @@ var PgRelationalQuery = class extends QueryPromise {
     this.config = config;
     this.mode = mode;
   }
-  static [entityKind] = "PgRelationalQuery";
+  static [entityKind] = "SQLiteAsyncRelationalQuery";
   /** @internal */
-  _prepare(name) {
-    return tracer.startActiveSpan("drizzle.prepareQuery", () => {
-      const { query, builtQuery } = this._toSQL();
-      return this.session.prepareQuery(
-        builtQuery,
-        void 0,
-        name,
-        true,
-        (rawRows, mapColumnValue) => {
-          const rows = rawRows.map(
-            (row) => mapRelationalRow(this.schema, this.tableConfig, row, query.selection, mapColumnValue)
-          );
-          if (this.mode === "first") {
-            return rows[0];
-          }
-          return rows;
+  mode;
+  /** @internal */
+  getSQL() {
+    return this.dialect.buildRelationalQuery({
+      fullSchema: this.fullSchema,
+      schema: this.schema,
+      tableNamesMap: this.tableNamesMap,
+      table: this.table,
+      tableConfig: this.tableConfig,
+      queryConfig: this.config,
+      tableAlias: this.tableConfig.tsName
+    }).sql;
+  }
+  /** @internal */
+  _prepare(isOneTimeQuery = false) {
+    const { query, builtQuery } = this._toSQL();
+    return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](
+      builtQuery,
+      void 0,
+      this.mode === "first" ? "get" : "all",
+      true,
+      (rawRows, mapColumnValue) => {
+        const rows = rawRows.map(
+          (row) => mapRelationalRow(this.schema, this.tableConfig, row, query.selection, mapColumnValue)
+        );
+        if (this.mode === "first") {
+          return rows[0];
         }
-      );
-    });
+        return rows;
+      }
+    );
   }
-  prepare(name) {
-    return this._prepare(name);
+  prepare() {
+    return this._prepare(false);
   }
-  _getQuery() {
-    return this.dialect.buildRelationalQueryWithoutPK({
+  _toSQL() {
+    const query = this.dialect.buildRelationalQuery({
       fullSchema: this.fullSchema,
       schema: this.schema,
       tableNamesMap: this.tableNamesMap,
@@ -13119,51 +6001,51 @@ var PgRelationalQuery = class extends QueryPromise {
       queryConfig: this.config,
       tableAlias: this.tableConfig.tsName
     });
-  }
-  /** @internal */
-  getSQL() {
-    return this._getQuery().sql;
-  }
-  _toSQL() {
-    const query = this._getQuery();
     const builtQuery = this.dialect.sqlToQuery(query.sql);
     return { query, builtQuery };
   }
   toSQL() {
     return this._toSQL().builtQuery;
   }
-  authToken;
   /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
+  executeRaw() {
+    if (this.mode === "first") {
+      return this._prepare(false).get();
+    }
+    return this._prepare(false).all();
   }
-  execute() {
-    return tracer.startActiveSpan("drizzle.operation", () => {
-      return this._prepare().execute(void 0, this.authToken);
-    });
+  async execute() {
+    return this.executeRaw();
+  }
+};
+var SQLiteSyncRelationalQuery = class extends SQLiteRelationalQuery {
+  static {
+    __name(this, "SQLiteSyncRelationalQuery");
+  }
+  static [entityKind] = "SQLiteSyncRelationalQuery";
+  sync() {
+    return this.executeRaw();
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/query-builders/raw.js
-var PgRaw = class extends QueryPromise {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/query-builders/raw.js
+var SQLiteRaw = class extends QueryPromise {
   static {
-    __name(this, "PgRaw");
+    __name(this, "SQLiteRaw");
   }
-  constructor(execute, sql2, query, mapBatchResult) {
+  constructor(execute, getSQL, action, dialect, mapBatchResult) {
     super();
     this.execute = execute;
-    this.sql = sql2;
-    this.query = query;
+    this.getSQL = getSQL;
+    this.dialect = dialect;
     this.mapBatchResult = mapBatchResult;
+    this.config = { action };
   }
-  static [entityKind] = "PgRaw";
+  static [entityKind] = "SQLiteRaw";
   /** @internal */
-  getSQL() {
-    return this.sql;
-  }
+  config;
   getQuery() {
-    return this.query;
+    return { ...this.dialect.sqlToQuery(this.getSQL()), method: this.config.action };
   }
   mapResult(result, isFromBatch) {
     return isFromBatch ? this.mapBatchResult(result) : result;
@@ -13177,29 +6059,30 @@ var PgRaw = class extends QueryPromise {
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/db.js
-var PgDatabase = class {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/db.js
+var BaseSQLiteDatabase = class {
   static {
-    __name(this, "PgDatabase");
+    __name(this, "BaseSQLiteDatabase");
   }
-  constructor(dialect, session, schema) {
+  constructor(resultKind, dialect, session, schema) {
+    this.resultKind = resultKind;
     this.dialect = dialect;
     this.session = session;
     this._ = schema ? {
       schema: schema.schema,
       fullSchema: schema.fullSchema,
-      tableNamesMap: schema.tableNamesMap,
-      session
+      tableNamesMap: schema.tableNamesMap
     } : {
       schema: void 0,
       fullSchema: {},
-      tableNamesMap: {},
-      session
+      tableNamesMap: {}
     };
     this.query = {};
+    const query = this.query;
     if (this._.schema) {
       for (const [tableName, columns] of Object.entries(this._.schema)) {
-        this.query[tableName] = new RelationalQueryBuilder(
+        query[tableName] = new RelationalQueryBuilder(
+          resultKind,
           schema.fullSchema,
           this._.schema,
           this._.tableNamesMap,
@@ -13213,7 +6096,7 @@ var PgDatabase = class {
     this.$cache = { invalidate: /* @__PURE__ */ __name(async (_params) => {
     }, "invalidate") };
   }
-  static [entityKind] = "PgDatabase";
+  static [entityKind] = "BaseSQLiteDatabase";
   query;
   /**
    * Creates a subquery that defines a temporary named result set as a CTE.
@@ -13249,7 +6132,7 @@ var PgDatabase = class {
    */
   $with = /* @__PURE__ */ __name((alias, selection) => {
     const self2 = this;
-    const as2 = /* @__PURE__ */ __name((qb) => {
+    const as = /* @__PURE__ */ __name((qb) => {
       if (typeof qb === "function") {
         qb = qb(new QueryBuilder(self2.dialect));
       }
@@ -13263,12 +6146,11 @@ var PgDatabase = class {
         new SelectionProxyHandler({ alias, sqlAliasedBehavior: "alias", sqlBehavior: "error" })
       );
     }, "as");
-    return { as: as2 };
+    return { as };
   }, "$with");
   $count(source, filters) {
-    return new PgCountBuilder({ source, filters, session: this.session });
+    return new SQLiteCountBuilder({ source, filters, session: this.session });
   }
-  $cache;
   /**
    * Incorporates a previously defined CTE (using `$with`) into the main query.
    *
@@ -13291,7 +6173,7 @@ var PgDatabase = class {
   with(...queries) {
     const self2 = this;
     function select(fields) {
-      return new PgSelectBuilder({
+      return new SQLiteSelectBuilder({
         fields: fields ?? void 0,
         session: self2.session,
         dialect: self2.dialect,
@@ -13300,7 +6182,7 @@ var PgDatabase = class {
     }
     __name(select, "select");
     function selectDistinct(fields) {
-      return new PgSelectBuilder({
+      return new SQLiteSelectBuilder({
         fields: fields ?? void 0,
         session: self2.session,
         dialect: self2.dialect,
@@ -13309,51 +6191,29 @@ var PgDatabase = class {
       });
     }
     __name(selectDistinct, "selectDistinct");
-    function selectDistinctOn(on, fields) {
-      return new PgSelectBuilder({
-        fields: fields ?? void 0,
-        session: self2.session,
-        dialect: self2.dialect,
-        withList: queries,
-        distinct: { on }
-      });
-    }
-    __name(selectDistinctOn, "selectDistinctOn");
     function update(table) {
-      return new PgUpdateBuilder(table, self2.session, self2.dialect, queries);
+      return new SQLiteUpdateBuilder(table, self2.session, self2.dialect, queries);
     }
     __name(update, "update");
-    function insert(table) {
-      return new PgInsertBuilder(table, self2.session, self2.dialect, queries);
+    function insert(into) {
+      return new SQLiteInsertBuilder(into, self2.session, self2.dialect, queries);
     }
     __name(insert, "insert");
-    function delete_(table) {
-      return new PgDeleteBase(table, self2.session, self2.dialect, queries);
+    function delete_(from) {
+      return new SQLiteDeleteBase(from, self2.session, self2.dialect, queries);
     }
     __name(delete_, "delete_");
-    return { select, selectDistinct, selectDistinctOn, update, insert, delete: delete_ };
+    return { select, selectDistinct, update, insert, delete: delete_ };
   }
   select(fields) {
-    return new PgSelectBuilder({
-      fields: fields ?? void 0,
-      session: this.session,
-      dialect: this.dialect
-    });
+    return new SQLiteSelectBuilder({ fields: fields ?? void 0, session: this.session, dialect: this.dialect });
   }
   selectDistinct(fields) {
-    return new PgSelectBuilder({
+    return new SQLiteSelectBuilder({
       fields: fields ?? void 0,
       session: this.session,
       dialect: this.dialect,
       distinct: true
-    });
-  }
-  selectDistinctOn(on, fields) {
-    return new PgSelectBuilder({
-      fields: fields ?? void 0,
-      session: this.session,
-      dialect: this.dialect,
-      distinct: { on }
     });
   }
   /**
@@ -13384,8 +6244,9 @@ var PgDatabase = class {
    * ```
    */
   update(table) {
-    return new PgUpdateBuilder(table, this.session, this.dialect);
+    return new SQLiteUpdateBuilder(table, this.session, this.dialect);
   }
+  $cache;
   /**
    * Creates an insert query.
    *
@@ -13410,8 +6271,8 @@ var PgDatabase = class {
    *   .returning();
    * ```
    */
-  insert(table) {
-    return new PgInsertBuilder(table, this.session, this.dialect);
+  insert(into) {
+    return new SQLiteInsertBuilder(into, this.session, this.dialect);
   }
   /**
    * Creates a delete query.
@@ -13437,28 +6298,60 @@ var PgDatabase = class {
    *   .returning();
    * ```
    */
-  delete(table) {
-    return new PgDeleteBase(table, this.session, this.dialect);
+  delete(from) {
+    return new SQLiteDeleteBase(from, this.session, this.dialect);
   }
-  refreshMaterializedView(view) {
-    return new PgRefreshMaterializedView(view, this.session, this.dialect);
-  }
-  authToken;
-  execute(query) {
+  run(query) {
     const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
-    const builtQuery = this.dialect.sqlToQuery(sequel);
-    const prepared = this.session.prepareQuery(
-      builtQuery,
-      void 0,
-      void 0,
-      false
-    );
-    return new PgRaw(
-      () => prepared.execute(void 0, this.authToken),
-      sequel,
-      builtQuery,
-      (result) => prepared.mapResult(result, true)
-    );
+    if (this.resultKind === "async") {
+      return new SQLiteRaw(
+        async () => this.session.run(sequel),
+        () => sequel,
+        "run",
+        this.dialect,
+        this.session.extractRawRunValueFromBatchResult.bind(this.session)
+      );
+    }
+    return this.session.run(sequel);
+  }
+  all(query) {
+    const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+    if (this.resultKind === "async") {
+      return new SQLiteRaw(
+        async () => this.session.all(sequel),
+        () => sequel,
+        "all",
+        this.dialect,
+        this.session.extractRawAllValueFromBatchResult.bind(this.session)
+      );
+    }
+    return this.session.all(sequel);
+  }
+  get(query) {
+    const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+    if (this.resultKind === "async") {
+      return new SQLiteRaw(
+        async () => this.session.get(sequel),
+        () => sequel,
+        "get",
+        this.dialect,
+        this.session.extractRawGetValueFromBatchResult.bind(this.session)
+      );
+    }
+    return this.session.get(sequel);
+  }
+  values(query) {
+    const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+    if (this.resultKind === "async") {
+      return new SQLiteRaw(
+        async () => this.session.values(sequel),
+        () => sequel,
+        "values",
+        this.dialect,
+        this.session.extractRawValuesValueFromBatchResult.bind(this.session)
+      );
+    }
+    return this.session.values(sequel);
   }
   transaction(transaction, config) {
     return this.session.transaction(transaction, config);
@@ -13494,17 +6387,35 @@ async function hashQuery(sql2, params) {
   const data = encoder.encode(dataToHash);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = [...new Uint8Array(hashBuffer)];
-  const hashHex = hashArray.map((b2) => b2.toString(16).padStart(2, "0")).join("");
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   return hashHex;
 }
 __name(hashQuery, "hashQuery");
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/pg-core/session.js
-var PgPreparedQuery = class {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/sqlite-core/session.js
+var ExecuteResultSync = class extends QueryPromise {
   static {
-    __name(this, "PgPreparedQuery");
+    __name(this, "ExecuteResultSync");
   }
-  constructor(query, cache, queryMetadata, cacheConfig) {
+  constructor(resultCb) {
+    super();
+    this.resultCb = resultCb;
+  }
+  static [entityKind] = "ExecuteResultSync";
+  async execute() {
+    return this.resultCb();
+  }
+  sync() {
+    return this.resultCb();
+  }
+};
+var SQLitePreparedQuery = class {
+  static {
+    __name(this, "SQLitePreparedQuery");
+  }
+  constructor(mode, executeMethod, query, cache, queryMetadata, cacheConfig) {
+    this.mode = mode;
+    this.executeMethod = executeMethod;
     this.query = query;
     this.cache = cache;
     this.queryMetadata = queryMetadata;
@@ -13516,19 +6427,7 @@ var PgPreparedQuery = class {
       this.cacheConfig = void 0;
     }
   }
-  authToken;
-  getQuery() {
-    return this.query;
-  }
-  mapResult(response, _isFromBatch) {
-    return response;
-  }
-  /** @internal */
-  setToken(token) {
-    this.authToken = token;
-    return this;
-  }
-  static [entityKind] = "PgPreparedQuery";
+  static [entityKind] = "PreparedQuery";
   /** @internal */
   joinsNotNullableMap;
   /** @internal */
@@ -13597,189 +6496,137 @@ var PgPreparedQuery = class {
       throw new DrizzleQueryError(queryString, params, e);
     }
   }
+  getQuery() {
+    return this.query;
+  }
+  mapRunResult(result, _isFromBatch) {
+    return result;
+  }
+  mapAllResult(_result, _isFromBatch) {
+    throw new Error("Not implemented");
+  }
+  mapGetResult(_result, _isFromBatch) {
+    throw new Error("Not implemented");
+  }
+  execute(placeholderValues) {
+    if (this.mode === "async") {
+      return this[this.executeMethod](placeholderValues);
+    }
+    return new ExecuteResultSync(() => this[this.executeMethod](placeholderValues));
+  }
+  mapResult(response, isFromBatch) {
+    switch (this.executeMethod) {
+      case "run": {
+        return this.mapRunResult(response, isFromBatch);
+      }
+      case "all": {
+        return this.mapAllResult(response, isFromBatch);
+      }
+      case "get": {
+        return this.mapGetResult(response, isFromBatch);
+      }
+    }
+  }
 };
-var PgSession = class {
+var SQLiteSession = class {
   static {
-    __name(this, "PgSession");
+    __name(this, "SQLiteSession");
   }
   constructor(dialect) {
     this.dialect = dialect;
   }
-  static [entityKind] = "PgSession";
-  /** @internal */
-  execute(query, token) {
-    return tracer.startActiveSpan("drizzle.operation", () => {
-      const prepared = tracer.startActiveSpan("drizzle.prepareQuery", () => {
-        return this.prepareQuery(
-          this.dialect.sqlToQuery(query),
-          void 0,
-          void 0,
-          false
-        );
-      });
-      return prepared.setToken(token).execute(void 0, token);
-    });
-  }
-  all(query) {
+  static [entityKind] = "SQLiteSession";
+  prepareOneTimeQuery(query, fields, executeMethod, isResponseInArrayMode, customResultMapper, queryMetadata, cacheConfig) {
     return this.prepareQuery(
-      this.dialect.sqlToQuery(query),
-      void 0,
-      void 0,
-      false
-    ).all();
-  }
-  /** @internal */
-  async count(sql2, token) {
-    const res = await this.execute(sql2, token);
-    return Number(
-      res[0]["count"]
+      query,
+      fields,
+      executeMethod,
+      isResponseInArrayMode,
+      customResultMapper,
+      queryMetadata,
+      cacheConfig
     );
   }
-};
-var PgTransaction = class extends PgDatabase {
-  static {
-    __name(this, "PgTransaction");
+  run(query) {
+    const staticQuery = this.dialect.sqlToQuery(query);
+    try {
+      return this.prepareOneTimeQuery(staticQuery, void 0, "run", false).run();
+    } catch (err) {
+      throw new DrizzleError({ cause: err, message: `Failed to run the query '${staticQuery.sql}'` });
+    }
   }
-  constructor(dialect, session, schema, nestedIndex = 0) {
-    super(dialect, session, schema);
+  /** @internal */
+  extractRawRunValueFromBatchResult(result) {
+    return result;
+  }
+  all(query) {
+    return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).all();
+  }
+  /** @internal */
+  extractRawAllValueFromBatchResult(_result) {
+    throw new Error("Not implemented");
+  }
+  get(query) {
+    return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).get();
+  }
+  /** @internal */
+  extractRawGetValueFromBatchResult(_result) {
+    throw new Error("Not implemented");
+  }
+  values(query) {
+    return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).values();
+  }
+  async count(sql2) {
+    const result = await this.values(sql2);
+    return result[0][0];
+  }
+  /** @internal */
+  extractRawValuesValueFromBatchResult(_result) {
+    throw new Error("Not implemented");
+  }
+};
+var SQLiteTransaction = class extends BaseSQLiteDatabase {
+  static {
+    __name(this, "SQLiteTransaction");
+  }
+  constructor(resultType, dialect, session, schema, nestedIndex = 0) {
+    super(resultType, dialect, session, schema);
     this.schema = schema;
     this.nestedIndex = nestedIndex;
   }
-  static [entityKind] = "PgTransaction";
+  static [entityKind] = "SQLiteTransaction";
   rollback() {
     throw new TransactionRollbackError();
   }
-  /** @internal */
-  getTransactionConfigSQL(config) {
-    const chunks = [];
-    if (config.isolationLevel) {
-      chunks.push(`isolation level ${config.isolationLevel}`);
-    }
-    if (config.accessMode) {
-      chunks.push(config.accessMode);
-    }
-    if (typeof config.deferrable === "boolean") {
-      chunks.push(config.deferrable ? "deferrable" : "not deferrable");
-    }
-    return sql.raw(chunks.join(" "));
-  }
-  setTransaction(config) {
-    return this.session.execute(sql`set transaction ${this.getTransactionConfigSQL(config)}`);
-  }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/neon-http/session.js
-var rawQueryConfig = {
-  arrayMode: false,
-  fullResults: true
-};
-var queryConfig = {
-  arrayMode: true,
-  fullResults: true
-};
-var NeonHttpPreparedQuery = class extends PgPreparedQuery {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/d1/session.js
+var SQLiteD1Session = class extends SQLiteSession {
   static {
-    __name(this, "NeonHttpPreparedQuery");
-  }
-  constructor(client, query, logger, cache, queryMetadata, cacheConfig, fields, _isResponseInArrayMode, customResultMapper) {
-    super(query, cache, queryMetadata, cacheConfig);
-    this.client = client;
-    this.logger = logger;
-    this.fields = fields;
-    this._isResponseInArrayMode = _isResponseInArrayMode;
-    this.customResultMapper = customResultMapper;
-    this.clientQuery = client.query ?? client;
-  }
-  static [entityKind] = "NeonHttpPreparedQuery";
-  clientQuery;
-  /** @internal */
-  async execute(placeholderValues = {}, token = this.authToken) {
-    const params = fillPlaceholders(this.query.params, placeholderValues);
-    this.logger.logQuery(this.query.sql, params);
-    const { fields, clientQuery, query, customResultMapper } = this;
-    if (!fields && !customResultMapper) {
-      return this.queryWithCache(query.sql, params, async () => {
-        return clientQuery(
-          query.sql,
-          params,
-          token === void 0 ? rawQueryConfig : {
-            ...rawQueryConfig,
-            authToken: token
-          }
-        );
-      });
-    }
-    const result = await this.queryWithCache(query.sql, params, async () => {
-      return await clientQuery(
-        query.sql,
-        params,
-        token === void 0 ? queryConfig : {
-          ...queryConfig,
-          authToken: token
-        }
-      );
-    });
-    return this.mapResult(result);
-  }
-  mapResult(result) {
-    if (!this.fields && !this.customResultMapper) {
-      return result;
-    }
-    const rows = result.rows;
-    if (this.customResultMapper) {
-      return this.customResultMapper(rows);
-    }
-    return rows.map((row) => mapResultRow(this.fields, row, this.joinsNotNullableMap));
-  }
-  all(placeholderValues = {}) {
-    const params = fillPlaceholders(this.query.params, placeholderValues);
-    this.logger.logQuery(this.query.sql, params);
-    return this.clientQuery(
-      this.query.sql,
-      params,
-      this.authToken === void 0 ? rawQueryConfig : {
-        ...rawQueryConfig,
-        authToken: this.authToken
-      }
-    ).then((result) => result.rows);
-  }
-  /** @internal */
-  values(placeholderValues = {}, token) {
-    const params = fillPlaceholders(this.query.params, placeholderValues);
-    this.logger.logQuery(this.query.sql, params);
-    return this.clientQuery(this.query.sql, params, { arrayMode: true, fullResults: true, authToken: token }).then((result) => result.rows);
-  }
-  /** @internal */
-  isResponseInArrayMode() {
-    return this._isResponseInArrayMode;
-  }
-};
-var NeonHttpSession = class extends PgSession {
-  static {
-    __name(this, "NeonHttpSession");
+    __name(this, "SQLiteD1Session");
   }
   constructor(client, dialect, schema, options = {}) {
     super(dialect);
     this.client = client;
     this.schema = schema;
     this.options = options;
-    this.clientQuery = client.query ?? client;
     this.logger = options.logger ?? new NoopLogger();
     this.cache = options.cache ?? new NoopCache();
   }
-  static [entityKind] = "NeonHttpSession";
-  clientQuery;
+  static [entityKind] = "SQLiteD1Session";
   logger;
   cache;
-  prepareQuery(query, fields, name, isResponseInArrayMode, customResultMapper, queryMetadata, cacheConfig) {
-    return new NeonHttpPreparedQuery(
-      this.client,
+  prepareQuery(query, fields, executeMethod, isResponseInArrayMode, customResultMapper, queryMetadata, cacheConfig) {
+    const stmt = this.client.prepare(query.sql);
+    return new D1PreparedQuery(
+      stmt,
       query,
       this.logger,
       this.cache,
       queryMetadata,
       cacheConfig,
       fields,
+      executeMethod,
       isResponseInArrayMode,
       customResultMapper
     );
@@ -13791,117 +6638,173 @@ var NeonHttpSession = class extends PgSession {
       const preparedQuery = query._prepare();
       const builtQuery = preparedQuery.getQuery();
       preparedQueries.push(preparedQuery);
-      builtQueries.push(
-        this.clientQuery(builtQuery.sql, builtQuery.params, {
-          fullResults: true,
-          arrayMode: preparedQuery.isResponseInArrayMode()
-        })
-      );
+      if (builtQuery.params.length > 0) {
+        builtQueries.push(preparedQuery.stmt.bind(...builtQuery.params));
+      } else {
+        const builtQuery2 = preparedQuery.getQuery();
+        builtQueries.push(
+          this.client.prepare(builtQuery2.sql).bind(...builtQuery2.params)
+        );
+      }
     }
-    const batchResults = await this.client.transaction(builtQueries, queryConfig);
+    const batchResults = await this.client.batch(builtQueries);
     return batchResults.map((result, i) => preparedQueries[i].mapResult(result, true));
   }
-  // change return type to QueryRows<true>
-  async query(query, params) {
-    this.logger.logQuery(query, params);
-    const result = await this.clientQuery(query, params, { arrayMode: true, fullResults: true });
-    return result;
+  extractRawAllValueFromBatchResult(result) {
+    return result.results;
   }
-  // change return type to QueryRows<false>
-  async queryObjects(query, params) {
-    return this.clientQuery(query, params, { arrayMode: false, fullResults: true });
+  extractRawGetValueFromBatchResult(result) {
+    return result.results[0];
   }
-  /** @internal */
-  async count(sql2, token) {
-    const res = await this.execute(sql2, token);
-    return Number(
-      res["rows"][0]["count"]
-    );
+  extractRawValuesValueFromBatchResult(result) {
+    return d1ToRawMapping(result.results);
   }
-  async transaction(_transaction, _config = {}) {
-    throw new Error("No transactions support in neon-http driver");
+  async transaction(transaction, config) {
+    const tx = new D1Transaction("async", this.dialect, this, this.schema);
+    await this.run(sql.raw(`begin${config?.behavior ? " " + config.behavior : ""}`));
+    try {
+      const result = await transaction(tx);
+      await this.run(sql`commit`);
+      return result;
+    } catch (err) {
+      await this.run(sql`rollback`);
+      throw err;
+    }
   }
 };
-var NeonTransaction = class extends PgTransaction {
+var D1Transaction = class _D1Transaction extends SQLiteTransaction {
   static {
-    __name(this, "NeonTransaction");
+    __name(this, "D1Transaction");
   }
-  static [entityKind] = "NeonHttpTransaction";
-  async transaction(_transaction) {
-    throw new Error("No transactions support in neon-http driver");
+  static [entityKind] = "D1Transaction";
+  async transaction(transaction) {
+    const savepointName = `sp${this.nestedIndex}`;
+    const tx = new _D1Transaction("async", this.dialect, this.session, this.schema, this.nestedIndex + 1);
+    await this.session.run(sql.raw(`savepoint ${savepointName}`));
+    try {
+      const result = await transaction(tx);
+      await this.session.run(sql.raw(`release savepoint ${savepointName}`));
+      return result;
+    } catch (err) {
+      await this.session.run(sql.raw(`rollback to savepoint ${savepointName}`));
+      throw err;
+    }
+  }
+};
+function d1ToRawMapping(results) {
+  const rows = [];
+  for (const row of results) {
+    const entry = Object.keys(row).map((k) => row[k]);
+    rows.push(entry);
+  }
+  return rows;
+}
+__name(d1ToRawMapping, "d1ToRawMapping");
+var D1PreparedQuery = class extends SQLitePreparedQuery {
+  static {
+    __name(this, "D1PreparedQuery");
+  }
+  constructor(stmt, query, logger, cache, queryMetadata, cacheConfig, fields, executeMethod, _isResponseInArrayMode, customResultMapper) {
+    super("async", executeMethod, query, cache, queryMetadata, cacheConfig);
+    this.logger = logger;
+    this._isResponseInArrayMode = _isResponseInArrayMode;
+    this.customResultMapper = customResultMapper;
+    this.fields = fields;
+    this.stmt = stmt;
+  }
+  static [entityKind] = "D1PreparedQuery";
+  /** @internal */
+  customResultMapper;
+  /** @internal */
+  fields;
+  /** @internal */
+  stmt;
+  async run(placeholderValues) {
+    const params = fillPlaceholders(this.query.params, placeholderValues ?? {});
+    this.logger.logQuery(this.query.sql, params);
+    return await this.queryWithCache(this.query.sql, params, async () => {
+      return this.stmt.bind(...params).run();
+    });
+  }
+  async all(placeholderValues) {
+    const { fields, query, logger, stmt, customResultMapper } = this;
+    if (!fields && !customResultMapper) {
+      const params = fillPlaceholders(query.params, placeholderValues ?? {});
+      logger.logQuery(query.sql, params);
+      return await this.queryWithCache(query.sql, params, async () => {
+        return stmt.bind(...params).all().then(({ results }) => this.mapAllResult(results));
+      });
+    }
+    const rows = await this.values(placeholderValues);
+    return this.mapAllResult(rows);
+  }
+  mapAllResult(rows, isFromBatch) {
+    if (isFromBatch) {
+      rows = d1ToRawMapping(rows.results);
+    }
+    if (!this.fields && !this.customResultMapper) {
+      return rows;
+    }
+    if (this.customResultMapper) {
+      return this.customResultMapper(rows);
+    }
+    return rows.map((row) => mapResultRow(this.fields, row, this.joinsNotNullableMap));
+  }
+  async get(placeholderValues) {
+    const { fields, joinsNotNullableMap, query, logger, stmt, customResultMapper } = this;
+    if (!fields && !customResultMapper) {
+      const params = fillPlaceholders(query.params, placeholderValues ?? {});
+      logger.logQuery(query.sql, params);
+      return await this.queryWithCache(query.sql, params, async () => {
+        return stmt.bind(...params).all().then(({ results }) => results[0]);
+      });
+    }
+    const rows = await this.values(placeholderValues);
+    if (!rows[0]) {
+      return void 0;
+    }
+    if (customResultMapper) {
+      return customResultMapper(rows);
+    }
+    return mapResultRow(fields, rows[0], joinsNotNullableMap);
+  }
+  mapGetResult(result, isFromBatch) {
+    if (isFromBatch) {
+      result = d1ToRawMapping(result.results)[0];
+    }
+    if (!this.fields && !this.customResultMapper) {
+      return result;
+    }
+    if (this.customResultMapper) {
+      return this.customResultMapper([result]);
+    }
+    return mapResultRow(this.fields, result, this.joinsNotNullableMap);
+  }
+  async values(placeholderValues) {
+    const params = fillPlaceholders(this.query.params, placeholderValues ?? {});
+    this.logger.logQuery(this.query.sql, params);
+    return await this.queryWithCache(this.query.sql, params, async () => {
+      return this.stmt.bind(...params).raw();
+    });
+  }
+  /** @internal */
+  isResponseInArrayMode() {
+    return this._isResponseInArrayMode;
   }
 };
 
-// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/neon-http/driver.js
-var NeonHttpDriver = class {
+// ../node_modules/.pnpm/drizzle-orm@0.45.2_@cloudflare+workers-types@5.20260708.1_@neondatabase+serverless@1.1.0/node_modules/drizzle-orm/d1/driver.js
+var DrizzleD1Database = class extends BaseSQLiteDatabase {
   static {
-    __name(this, "NeonHttpDriver");
+    __name(this, "DrizzleD1Database");
   }
-  constructor(client, dialect, options = {}) {
-    this.client = client;
-    this.dialect = dialect;
-    this.options = options;
-    this.initMappers();
-  }
-  static [entityKind] = "NeonHttpDriver";
-  createSession(schema) {
-    return new NeonHttpSession(this.client, this.dialect, schema, {
-      logger: this.options.logger,
-      cache: this.options.cache
-    });
-  }
-  initMappers() {
-    export_types.setTypeParser(export_types.builtins.TIMESTAMPTZ, (val) => val);
-    export_types.setTypeParser(export_types.builtins.TIMESTAMP, (val) => val);
-    export_types.setTypeParser(export_types.builtins.DATE, (val) => val);
-    export_types.setTypeParser(export_types.builtins.INTERVAL, (val) => val);
-    export_types.setTypeParser(1231, (val) => val);
-    export_types.setTypeParser(1115, (val) => val);
-    export_types.setTypeParser(1185, (val) => val);
-    export_types.setTypeParser(1187, (val) => val);
-    export_types.setTypeParser(1182, (val) => val);
-  }
-};
-function wrap(target, token, cb, deep) {
-  return new Proxy(target, {
-    get(target2, p2) {
-      const element = target2[p2];
-      if (typeof element !== "function" && (typeof element !== "object" || element === null)) return element;
-      if (deep) return wrap(element, token, cb);
-      if (p2 === "query") return wrap(element, token, cb, true);
-      return new Proxy(element, {
-        apply(target3, thisArg, argArray) {
-          const res = target3.call(thisArg, ...argArray);
-          if (typeof res === "object" && res !== null && "setToken" in res && typeof res.setToken === "function") {
-            res.setToken(token);
-          }
-          return cb(target3, p2, res);
-        }
-      });
-    }
-  });
-}
-__name(wrap, "wrap");
-var NeonHttpDatabase = class extends PgDatabase {
-  static {
-    __name(this, "NeonHttpDatabase");
-  }
-  static [entityKind] = "NeonHttpDatabase";
-  $withAuth(token) {
-    this.authToken = token;
-    return wrap(this, token, (target, p2, res) => {
-      if (p2 === "with") {
-        return wrap(res, token, (_, __, res2) => res2);
-      }
-      return res;
-    });
-  }
+  static [entityKind] = "D1Database";
   async batch(batch) {
     return this.session.batch(batch);
   }
 };
-function construct(client, config = {}) {
-  const dialect = new PgDialect({ casing: config.casing });
+function drizzle(client, config = {}) {
+  const dialect = new SQLiteAsyncDialect({ casing: config.casing });
   let logger;
   if (config.logger === true) {
     logger = new DefaultLogger();
@@ -13920,13 +6823,8 @@ function construct(client, config = {}) {
       tableNamesMap: tablesConfig.tableNamesMap
     };
   }
-  const driver = new NeonHttpDriver(client, dialect, { logger, cache: config.cache });
-  const session = driver.createSession(schema);
-  const db = new NeonHttpDatabase(
-    dialect,
-    session,
-    schema
-  );
+  const session = new SQLiteD1Session(client, dialect, schema, { logger, cache: config.cache });
+  const db = new DrizzleD1Database("async", dialect, session, schema);
   db.$client = client;
   db.$cache = config.cache;
   if (db.$cache) {
@@ -13934,33 +6832,7 @@ function construct(client, config = {}) {
   }
   return db;
 }
-__name(construct, "construct");
-function drizzle(...params) {
-  if (typeof params[0] === "string") {
-    const instance = cs(params[0]);
-    return construct(instance, params[1]);
-  }
-  if (isConfig(params[0])) {
-    const { connection, client, ...drizzleConfig } = params[0];
-    if (client) return construct(client, drizzleConfig);
-    if (typeof connection === "object") {
-      const { connectionString, ...options } = connection;
-      const instance2 = cs(connectionString, options);
-      return construct(instance2, drizzleConfig);
-    }
-    const instance = cs(connection);
-    return construct(instance, drizzleConfig);
-  }
-  return construct(params[0], params[1]);
-}
 __name(drizzle, "drizzle");
-((drizzle2) => {
-  function mock(config) {
-    return construct({}, config);
-  }
-  __name(mock, "mock");
-  drizzle2.mock = mock;
-})(drizzle || (drizzle = {}));
 
 // db/schema.ts
 var schema_exports = {};
@@ -13970,52 +6842,49 @@ __export(schema_exports, {
   sessions: () => sessions,
   users: () => users
 });
-var users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
+var users = sqliteTable("users", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   username: text("username").notNull(),
   usernameLower: text("username_lower").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => /* @__PURE__ */ new Date())
 });
-var sessions = pgTable("sessions", {
+var sessions = sqliteTable("sessions", {
   tokenHash: text("token_hash").primaryKey(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull()
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull()
 });
-var matches = pgTable("matches", {
-  id: uuid("id").primaryKey(),
+var matches = sqliteTable("matches", {
+  id: text("id").primaryKey(),
   roomCode: text("room_code").notNull(),
   seed: text("seed").notNull(),
   playersCount: integer("players_count").notNull(),
   wavesCleared: integer("waves_cleared").notNull(),
   durationS: real("duration_s").notNull(),
-  endedAt: timestamp("ended_at", { withTimezone: true }).notNull().defaultNow()
+  endedAt: integer("ended_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => /* @__PURE__ */ new Date())
 });
-var matchPlayers = pgTable(
+var matchPlayers = sqliteTable(
   "match_players",
   {
-    matchId: uuid("match_id").notNull().references(() => matches.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    matchId: text("match_id").notNull().references(() => matches.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     score: integer("score").notNull(),
     kills: integer("kills").notNull(),
     deaths: integer("deaths").notNull(),
-    mvp: boolean("mvp").notNull().default(false)
+    mvp: integer("mvp", { mode: "boolean" }).notNull().default(false)
   },
   (t) => [primaryKey({ columns: [t.matchId, t.userId] })]
 );
 
 // db/client.ts
-function createDb(databaseUrl) {
-  if (/db\.localtest\.me|localhost|127\.0\.0\.1/.test(databaseUrl)) {
-    ce.fetchEndpoint = (host) => `http://${host}:4446/sql`;
-  }
-  return drizzle(cs(databaseUrl), { schema: schema_exports });
+function createDb(d1) {
+  return drizzle(d1, { schema: schema_exports });
 }
 __name(createDb, "createDb");
 
 // db/matches.ts
 async function writeMatch(db, roomCode, seed, results, userIdByHandle) {
-  const players = results.players.filter((p2) => userIdByHandle.has(p2.id));
+  const players = results.players.filter((p) => userIdByHandle.has(p.id));
   if (players.length === 0) return;
   const matchId = crypto.randomUUID();
   await db.batch([
@@ -14028,13 +6897,13 @@ async function writeMatch(db, roomCode, seed, results, userIdByHandle) {
       durationS: Math.round(results.durationS * 10) / 10
     }),
     ...players.map(
-      (p2) => db.insert(matchPlayers).values({
+      (p) => db.insert(matchPlayers).values({
         matchId,
-        userId: userIdByHandle.get(p2.id),
-        score: p2.score,
-        kills: p2.kills,
-        deaths: p2.deaths,
-        mvp: p2.mvp
+        userId: userIdByHandle.get(p.id),
+        score: p.score,
+        kills: p.kills,
+        deaths: p.deaths,
+        mvp: p.mvp
       })
     )
   ]);
@@ -14055,14 +6924,14 @@ async function readLeaderboard(db) {
   }).from(matchPlayers).innerJoin(users, eq(matchPlayers.userId, users.id)).where(
     inArray(
       matchPlayers.matchId,
-      topMatches.map((m2) => m2.id)
+      topMatches.map((m) => m.id)
     )
   );
-  const teams = topMatches.map((m2) => ({
-    wavesCleared: m2.wavesCleared,
-    durationS: m2.durationS,
-    endedAt: m2.endedAt.toISOString(),
-    players: rosterRows.filter((r) => r.matchId === m2.id).sort((a2, b2) => b2.score - a2.score).map((r) => ({ username: r.username, score: r.score, mvp: r.mvp }))
+  const teams = topMatches.map((m) => ({
+    wavesCleared: m.wavesCleared,
+    durationS: m.durationS,
+    endedAt: m.endedAt.toISOString(),
+    players: rosterRows.filter((r) => r.matchId === m.id).sort((a, b) => b.score - a.score).map((r) => ({ username: r.username, score: r.score, mvp: r.mvp }))
   }));
   const soldierRows = await db.select({
     username: users.username,
@@ -14117,13 +6986,13 @@ function corsHeaders(request) {
   };
 }
 __name(corsHeaders, "corsHeaders");
-function json2(request, status, body) {
+function json(request, status, body) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders(request) }
   });
 }
-__name(json2, "json");
+__name(json, "json");
 async function readBody(request) {
   try {
     const body = await request.json();
@@ -14143,20 +7012,20 @@ async function handleApi(request, env2) {
     return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
   const path = new URL(request.url).pathname;
-  const db = createDb(env2.DATABASE_URL);
-  if (path === "/api/health") return json2(request, 200, { ok: true });
+  const db = createDb(env2.DB);
+  if (path === "/api/health") return json(request, 200, { ok: true });
   if (path === "/api/register" && request.method === "POST") {
     const body = await readBody(request);
     const username = typeof body?.username === "string" ? body.username.trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
     if (!USERNAME_RE.test(username)) {
-      return json2(request, 400, { error: "Handle must be 3-16 letters, digits, - or _" });
+      return json(request, 400, { error: "Handle must be 3-16 letters, digits, - or _" });
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
-      return json2(request, 400, { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      return json(request, 400, { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
     }
     const taken = await db.select({ id: users.id }).from(users).where(eq(users.usernameLower, username.toLowerCase())).limit(1);
-    if (taken.length > 0) return json2(request, 409, { error: "That handle is already enlisted" });
+    if (taken.length > 0) return json(request, 409, { error: "That handle is already enlisted" });
     try {
       const inserted = await db.insert(users).values({
         username,
@@ -14164,9 +7033,9 @@ async function handleApi(request, env2) {
         passwordHash: await hashPassword(password)
       }).returning({ id: users.id });
       const token = await createSession(db, inserted[0].id);
-      return json2(request, 201, { token, username });
+      return json(request, 201, { token, username });
     } catch {
-      return json2(request, 409, { error: "That handle is already enlisted" });
+      return json(request, 409, { error: "That handle is already enlisted" });
     }
   }
   if (path === "/api/login" && request.method === "POST") {
@@ -14176,20 +7045,20 @@ async function handleApi(request, env2) {
     const rows = await db.select({ id: users.id, username: users.username, passwordHash: users.passwordHash }).from(users).where(eq(users.usernameLower, username.toLowerCase())).limit(1);
     const user = rows[0];
     if (!user || !await verifyPassword(password, user.passwordHash)) {
-      return json2(request, 401, { error: "Wrong handle or password" });
+      return json(request, 401, { error: "Wrong handle or password" });
     }
     const token = await createSession(db, user.id);
-    return json2(request, 200, { token, username: user.username });
+    return json(request, 200, { token, username: user.username });
   }
   if (path === "/api/me" && request.method === "GET") {
     const session = await validateSessionToken(db, bearerToken(request));
-    if (!session) return json2(request, 401, { error: "Not signed in" });
-    return json2(request, 200, { username: session.username });
+    if (!session) return json(request, 401, { error: "Not signed in" });
+    return json(request, 200, { username: session.username });
   }
   if (path === "/api/leaderboard" && request.method === "GET") {
-    return json2(request, 200, await readLeaderboard(db));
+    return json(request, 200, await readLeaderboard(db));
   }
-  return json2(request, 404, { error: "Not found" });
+  return json(request, 404, { error: "Not found" });
 }
 __name(handleApi, "handleApi");
 
@@ -14386,20 +7255,20 @@ function generateUUID() {
   const d1 = Math.random() * 4294967295 | 0;
   const d2 = Math.random() * 4294967295 | 0;
   const d3 = Math.random() * 4294967295 | 0;
-  const uuid2 = _lut[d0 & 255] + _lut[d0 >> 8 & 255] + _lut[d0 >> 16 & 255] + _lut[d0 >> 24 & 255] + "-" + _lut[d1 & 255] + _lut[d1 >> 8 & 255] + "-" + _lut[d1 >> 16 & 15 | 64] + _lut[d1 >> 24 & 255] + "-" + _lut[d2 & 63 | 128] + _lut[d2 >> 8 & 255] + "-" + _lut[d2 >> 16 & 255] + _lut[d2 >> 24 & 255] + _lut[d3 & 255] + _lut[d3 >> 8 & 255] + _lut[d3 >> 16 & 255] + _lut[d3 >> 24 & 255];
-  return uuid2.toLowerCase();
+  const uuid = _lut[d0 & 255] + _lut[d0 >> 8 & 255] + _lut[d0 >> 16 & 255] + _lut[d0 >> 24 & 255] + "-" + _lut[d1 & 255] + _lut[d1 >> 8 & 255] + "-" + _lut[d1 >> 16 & 15 | 64] + _lut[d1 >> 24 & 255] + "-" + _lut[d2 & 63 | 128] + _lut[d2 >> 8 & 255] + "-" + _lut[d2 >> 16 & 255] + _lut[d2 >> 24 & 255] + _lut[d3 & 255] + _lut[d3 >> 8 & 255] + _lut[d3 >> 16 & 255] + _lut[d3 >> 24 & 255];
+  return uuid.toLowerCase();
 }
 __name(generateUUID, "generateUUID");
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 __name(clamp, "clamp");
-function euclideanModulo(n, m2) {
-  return (n % m2 + m2) % m2;
+function euclideanModulo(n, m) {
+  return (n % m + m) % m;
 }
 __name(euclideanModulo, "euclideanModulo");
-function lerp(x2, y, t) {
-  return (1 - t) * x2 + t * y;
+function lerp(x, y, t) {
+  return (1 - t) * x + t * y;
 }
 __name(lerp, "lerp");
 var Vector2 = class _Vector2 {
@@ -14415,8 +7284,8 @@ var Vector2 = class _Vector2 {
    * @param {number} [x=0] - The x value of this vector.
    * @param {number} [y=0] - The y value of this vector.
    */
-  constructor(x2 = 0, y = 0) {
-    this.x = x2;
+  constructor(x = 0, y = 0) {
+    this.x = x;
     this.y = y;
   }
   /**
@@ -14448,8 +7317,8 @@ var Vector2 = class _Vector2 {
    * @param {number} y - The value of the y component.
    * @return {Vector2} A reference to this vector.
    */
-  set(x2, y) {
-    this.x = x2;
+  set(x, y) {
+    this.x = x;
     this.y = y;
     return this;
   }
@@ -14470,8 +7339,8 @@ var Vector2 = class _Vector2 {
    * @param {number} x - The value to set.
    * @return {Vector2} A reference to this vector.
    */
-  setX(x2) {
-    this.x = x2;
+  setX(x) {
+    this.x = x;
     return this;
   }
   /**
@@ -14534,9 +7403,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to copy.
    * @return {Vector2} A reference to this vector.
    */
-  copy(v2) {
-    this.x = v2.x;
-    this.y = v2.y;
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
     return this;
   }
   /**
@@ -14545,9 +7414,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to add.
    * @return {Vector2} A reference to this vector.
    */
-  add(v2) {
-    this.x += v2.x;
-    this.y += v2.y;
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
     return this;
   }
   /**
@@ -14568,9 +7437,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} b - The second vector.
    * @return {Vector2} A reference to this vector.
    */
-  addVectors(a2, b2) {
-    this.x = a2.x + b2.x;
-    this.y = a2.y + b2.y;
+  addVectors(a, b) {
+    this.x = a.x + b.x;
+    this.y = a.y + b.y;
     return this;
   }
   /**
@@ -14580,9 +7449,9 @@ var Vector2 = class _Vector2 {
    * @param {number} s - The factor that scales `v`.
    * @return {Vector2} A reference to this vector.
    */
-  addScaledVector(v2, s) {
-    this.x += v2.x * s;
-    this.y += v2.y * s;
+  addScaledVector(v, s) {
+    this.x += v.x * s;
+    this.y += v.y * s;
     return this;
   }
   /**
@@ -14591,9 +7460,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to subtract.
    * @return {Vector2} A reference to this vector.
    */
-  sub(v2) {
-    this.x -= v2.x;
-    this.y -= v2.y;
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
     return this;
   }
   /**
@@ -14614,9 +7483,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} b - The second vector.
    * @return {Vector2} A reference to this vector.
    */
-  subVectors(a2, b2) {
-    this.x = a2.x - b2.x;
-    this.y = a2.y - b2.y;
+  subVectors(a, b) {
+    this.x = a.x - b.x;
+    this.y = a.y - b.y;
     return this;
   }
   /**
@@ -14625,9 +7494,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to multiply.
    * @return {Vector2} A reference to this vector.
    */
-  multiply(v2) {
-    this.x *= v2.x;
-    this.y *= v2.y;
+  multiply(v) {
+    this.x *= v.x;
+    this.y *= v.y;
     return this;
   }
   /**
@@ -14647,9 +7516,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to divide.
    * @return {Vector2} A reference to this vector.
    */
-  divide(v2) {
-    this.x /= v2.x;
-    this.y /= v2.y;
+  divide(v) {
+    this.x /= v.x;
+    this.y /= v.y;
     return this;
   }
   /**
@@ -14668,11 +7537,11 @@ var Vector2 = class _Vector2 {
    * @param {Matrix3} m - The matrix to apply.
    * @return {Vector2} A reference to this vector.
    */
-  applyMatrix3(m2) {
-    const x2 = this.x, y = this.y;
-    const e = m2.elements;
-    this.x = e[0] * x2 + e[3] * y + e[6];
-    this.y = e[1] * x2 + e[4] * y + e[7];
+  applyMatrix3(m) {
+    const x = this.x, y = this.y;
+    const e = m.elements;
+    this.x = e[0] * x + e[3] * y + e[6];
+    this.y = e[1] * x + e[4] * y + e[7];
     return this;
   }
   /**
@@ -14682,9 +7551,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector.
    * @return {Vector2} A reference to this vector.
    */
-  min(v2) {
-    this.x = Math.min(this.x, v2.x);
-    this.y = Math.min(this.y, v2.y);
+  min(v) {
+    this.x = Math.min(this.x, v.x);
+    this.y = Math.min(this.y, v.y);
     return this;
   }
   /**
@@ -14694,9 +7563,9 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector.
    * @return {Vector2} A reference to this vector.
    */
-  max(v2) {
-    this.x = Math.max(this.x, v2.x);
-    this.y = Math.max(this.y, v2.y);
+  max(v) {
+    this.x = Math.max(this.x, v.x);
+    this.y = Math.max(this.y, v.y);
     return this;
   }
   /**
@@ -14800,8 +7669,8 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to compute the dot product with.
    * @return {number} The result of the dot product.
    */
-  dot(v2) {
-    return this.x * v2.x + this.y * v2.y;
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
   }
   /**
    * Calculates the cross product of the given vector with this instance.
@@ -14809,8 +7678,8 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to compute the cross product with.
    * @return {number} The result of the cross product.
    */
-  cross(v2) {
-    return this.x * v2.y - this.y * v2.x;
+  cross(v) {
+    return this.x * v.y - this.y * v.x;
   }
   /**
    * Computes the square of the Euclidean length (straight-line length) from
@@ -14862,10 +7731,10 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to compute the angle with.
    * @return {number} The angle in radians.
    */
-  angleTo(v2) {
-    const denominator = Math.sqrt(this.lengthSq() * v2.lengthSq());
+  angleTo(v) {
+    const denominator = Math.sqrt(this.lengthSq() * v.lengthSq());
     if (denominator === 0) return Math.PI / 2;
-    const theta = this.dot(v2) / denominator;
+    const theta = this.dot(v) / denominator;
     return Math.acos(clamp(theta, -1, 1));
   }
   /**
@@ -14874,8 +7743,8 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to compute the distance to.
    * @return {number} The distance.
    */
-  distanceTo(v2) {
-    return Math.sqrt(this.distanceToSquared(v2));
+  distanceTo(v) {
+    return Math.sqrt(this.distanceToSquared(v));
   }
   /**
    * Computes the squared distance from the given vector to this instance.
@@ -14885,8 +7754,8 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to compute the squared distance to.
    * @return {number} The squared distance.
    */
-  distanceToSquared(v2) {
-    const dx = this.x - v2.x, dy = this.y - v2.y;
+  distanceToSquared(v) {
+    const dx = this.x - v.x, dy = this.y - v.y;
     return dx * dx + dy * dy;
   }
   /**
@@ -14895,8 +7764,8 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to compute the Manhattan distance to.
    * @return {number} The Manhattan distance.
    */
-  manhattanDistanceTo(v2) {
-    return Math.abs(this.x - v2.x) + Math.abs(this.y - v2.y);
+  manhattanDistanceTo(v) {
+    return Math.abs(this.x - v.x) + Math.abs(this.y - v.y);
   }
   /**
    * Sets this vector to a vector with the same direction as this one, but
@@ -14917,9 +7786,9 @@ var Vector2 = class _Vector2 {
    * @param {number} alpha - The interpolation factor, typically in the closed interval `[0, 1]`.
    * @return {Vector2} A reference to this vector.
    */
-  lerp(v2, alpha) {
-    this.x += (v2.x - this.x) * alpha;
-    this.y += (v2.y - this.y) * alpha;
+  lerp(v, alpha) {
+    this.x += (v.x - this.x) * alpha;
+    this.y += (v.y - this.y) * alpha;
     return this;
   }
   /**
@@ -14943,8 +7812,8 @@ var Vector2 = class _Vector2 {
    * @param {Vector2} v - The vector to test for equality.
    * @return {boolean} Whether this vector is equal with the given one.
    */
-  equals(v2) {
-    return v2.x === this.x && v2.y === this.y;
+  equals(v) {
+    return v.x === this.x && v.y === this.y;
   }
   /**
    * Sets this vector's x value to be `array[ offset ]` and y
@@ -14993,10 +7862,10 @@ var Vector2 = class _Vector2 {
    */
   rotateAround(center, angle) {
     const c = Math.cos(angle), s = Math.sin(angle);
-    const x2 = this.x - center.x;
+    const x = this.x - center.x;
     const y = this.y - center.y;
-    this.x = x2 * c - y * s + center.x;
-    this.y = x2 * s + y * c + center.y;
+    this.x = x * c - y * s + center.x;
+    this.y = x * s + y * c + center.y;
     return this;
   }
   /**
@@ -15027,9 +7896,9 @@ var Quaternion = class {
    * @param {number} [z=0] - The z value of this quaternion.
    * @param {number} [w=1] - The w value of this quaternion.
    */
-  constructor(x2 = 0, y = 0, z = 0, w = 1) {
+  constructor(x = 0, y = 0, z = 0, w = 1) {
     this.isQuaternion = true;
-    this._x = x2;
+    this._x = x;
     this._y = y;
     this._z = z;
     this._w = w;
@@ -15175,8 +8044,8 @@ var Quaternion = class {
    * @param {number} w - The w value of this quaternion.
    * @return {Quaternion} A reference to this quaternion.
    */
-  set(x2, y, z, w) {
-    this._x = x2;
+  set(x, y, z, w) {
+    this._x = x;
     this._y = y;
     this._z = z;
     this._w = w;
@@ -15214,13 +8083,13 @@ var Quaternion = class {
    * @return {Quaternion} A reference to this quaternion.
    */
   setFromEuler(euler, update = true) {
-    const x2 = euler._x, y = euler._y, z = euler._z, order = euler._order;
+    const x = euler._x, y = euler._y, z = euler._z, order = euler._order;
     const cos = Math.cos;
     const sin = Math.sin;
-    const c1 = cos(x2 / 2);
+    const c1 = cos(x / 2);
     const c2 = cos(y / 2);
     const c3 = cos(z / 2);
-    const s1 = sin(x2 / 2);
+    const s1 = sin(x / 2);
     const s2 = sin(y / 2);
     const s3 = sin(z / 2);
     switch (order) {
@@ -15288,8 +8157,8 @@ var Quaternion = class {
    * @param {Matrix4} m - A 4x4 matrix of which the upper 3x3 of matrix is a pure rotation matrix (i.e. unscaled).
    * @return {Quaternion} A reference to this quaternion.
    */
-  setFromRotationMatrix(m2) {
-    const te = m2.elements, m11 = te[0], m12 = te[4], m13 = te[8], m21 = te[1], m22 = te[5], m23 = te[9], m31 = te[2], m32 = te[6], m33 = te[10], trace = m11 + m22 + m33;
+  setFromRotationMatrix(m) {
+    const te = m.elements, m11 = te[0], m12 = te[4], m13 = te[8], m21 = te[1], m22 = te[5], m23 = te[9], m31 = te[2], m32 = te[6], m33 = te[10], trace = m11 + m22 + m33;
     if (trace > 0) {
       const s = 0.5 / Math.sqrt(trace + 1);
       this._w = 0.25 / s;
@@ -15411,8 +8280,8 @@ var Quaternion = class {
    * @param {Quaternion} v - The quaternion to compute the dot product with.
    * @return {number} The result of the dot product.
    */
-  dot(v2) {
-    return this._x * v2._x + this._y * v2._y + this._z * v2._z + this._w * v2._w;
+  dot(v) {
+    return this._x * v._x + this._y * v._y + this._z * v._z + this._w * v._w;
   }
   /**
    * Computes the squared Euclidean length (straight-line length) of this quaternion,
@@ -15482,9 +8351,9 @@ var Quaternion = class {
    * @param {Quaternion} b - The second quaternion.
    * @return {Quaternion} A reference to this quaternion.
    */
-  multiplyQuaternions(a2, b2) {
-    const qax = a2._x, qay = a2._y, qaz = a2._z, qaw = a2._w;
-    const qbx = b2._x, qby = b2._y, qbz = b2._z, qbw = b2._w;
+  multiplyQuaternions(a, b) {
+    const qax = a._x, qay = a._y, qaz = a._z, qaw = a._w;
+    const qbx = b._x, qby = b._y, qbz = b._z, qbw = b._w;
     this._x = qax * qbw + qaw * qbx + qay * qbz - qaz * qby;
     this._y = qay * qbw + qaw * qby + qaz * qbx - qax * qbz;
     this._z = qaz * qbw + qaw * qbz + qax * qby - qay * qbx;
@@ -15500,10 +8369,10 @@ var Quaternion = class {
    * @return {Quaternion} A reference to this quaternion.
    */
   slerp(qb, t) {
-    let x2 = qb._x, y = qb._y, z = qb._z, w = qb._w;
+    let x = qb._x, y = qb._y, z = qb._z, w = qb._w;
     let dot = this.dot(qb);
     if (dot < 0) {
-      x2 = -x2;
+      x = -x;
       y = -y;
       z = -z;
       w = -w;
@@ -15515,13 +8384,13 @@ var Quaternion = class {
       const sin = Math.sin(theta);
       s = Math.sin(s * theta) / sin;
       t = Math.sin(t * theta) / sin;
-      this._x = this._x * s + x2 * t;
+      this._x = this._x * s + x * t;
       this._y = this._y * s + y * t;
       this._z = this._z * s + z * t;
       this._w = this._w * s + w * t;
       this._onChangeCallback();
     } else {
-      this._x = this._x * s + x2 * t;
+      this._x = this._x * s + x * t;
       this._y = this._y * s + y * t;
       this._z = this._z * s + z * t;
       this._w = this._w * s + w * t;
@@ -15649,8 +8518,8 @@ var Vector3 = class _Vector3 {
    * @param {number} [y=0] - The y value of this vector.
    * @param {number} [z=0] - The z value of this vector.
    */
-  constructor(x2 = 0, y = 0, z = 0) {
-    this.x = x2;
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = x;
     this.y = y;
     this.z = z;
   }
@@ -15662,9 +8531,9 @@ var Vector3 = class _Vector3 {
    * @param {number} z - The value of the z component.
    * @return {Vector3} A reference to this vector.
    */
-  set(x2, y, z) {
+  set(x, y, z) {
     if (z === void 0) z = this.z;
-    this.x = x2;
+    this.x = x;
     this.y = y;
     this.z = z;
     return this;
@@ -15687,8 +8556,8 @@ var Vector3 = class _Vector3 {
    * @param {number} x - The value to set.
    * @return {Vector3} A reference to this vector.
    */
-  setX(x2) {
-    this.x = x2;
+  setX(x) {
+    this.x = x;
     return this;
   }
   /**
@@ -15766,10 +8635,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to copy.
    * @return {Vector3} A reference to this vector.
    */
-  copy(v2) {
-    this.x = v2.x;
-    this.y = v2.y;
-    this.z = v2.z;
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
     return this;
   }
   /**
@@ -15778,10 +8647,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to add.
    * @return {Vector3} A reference to this vector.
    */
-  add(v2) {
-    this.x += v2.x;
-    this.y += v2.y;
-    this.z += v2.z;
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    this.z += v.z;
     return this;
   }
   /**
@@ -15803,10 +8672,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} b - The second vector.
    * @return {Vector3} A reference to this vector.
    */
-  addVectors(a2, b2) {
-    this.x = a2.x + b2.x;
-    this.y = a2.y + b2.y;
-    this.z = a2.z + b2.z;
+  addVectors(a, b) {
+    this.x = a.x + b.x;
+    this.y = a.y + b.y;
+    this.z = a.z + b.z;
     return this;
   }
   /**
@@ -15816,10 +8685,10 @@ var Vector3 = class _Vector3 {
    * @param {number} s - The factor that scales `v`.
    * @return {Vector3} A reference to this vector.
    */
-  addScaledVector(v2, s) {
-    this.x += v2.x * s;
-    this.y += v2.y * s;
-    this.z += v2.z * s;
+  addScaledVector(v, s) {
+    this.x += v.x * s;
+    this.y += v.y * s;
+    this.z += v.z * s;
     return this;
   }
   /**
@@ -15828,10 +8697,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to subtract.
    * @return {Vector3} A reference to this vector.
    */
-  sub(v2) {
-    this.x -= v2.x;
-    this.y -= v2.y;
-    this.z -= v2.z;
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    this.z -= v.z;
     return this;
   }
   /**
@@ -15853,10 +8722,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} b - The second vector.
    * @return {Vector3} A reference to this vector.
    */
-  subVectors(a2, b2) {
-    this.x = a2.x - b2.x;
-    this.y = a2.y - b2.y;
-    this.z = a2.z - b2.z;
+  subVectors(a, b) {
+    this.x = a.x - b.x;
+    this.y = a.y - b.y;
+    this.z = a.z - b.z;
     return this;
   }
   /**
@@ -15865,10 +8734,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to multiply.
    * @return {Vector3} A reference to this vector.
    */
-  multiply(v2) {
-    this.x *= v2.x;
-    this.y *= v2.y;
-    this.z *= v2.z;
+  multiply(v) {
+    this.x *= v.x;
+    this.y *= v.y;
+    this.z *= v.z;
     return this;
   }
   /**
@@ -15890,10 +8759,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} b - The second vector.
    * @return {Vector3} A reference to this vector.
    */
-  multiplyVectors(a2, b2) {
-    this.x = a2.x * b2.x;
-    this.y = a2.y * b2.y;
-    this.z = a2.z * b2.z;
+  multiplyVectors(a, b) {
+    this.x = a.x * b.x;
+    this.y = a.y * b.y;
+    this.z = a.z * b.z;
     return this;
   }
   /**
@@ -15921,12 +8790,12 @@ var Vector3 = class _Vector3 {
    * @param {Matrix3} m - The 3x3 matrix.
    * @return {Vector3} A reference to this vector.
    */
-  applyMatrix3(m2) {
-    const x2 = this.x, y = this.y, z = this.z;
-    const e = m2.elements;
-    this.x = e[0] * x2 + e[3] * y + e[6] * z;
-    this.y = e[1] * x2 + e[4] * y + e[7] * z;
-    this.z = e[2] * x2 + e[5] * y + e[8] * z;
+  applyMatrix3(m) {
+    const x = this.x, y = this.y, z = this.z;
+    const e = m.elements;
+    this.x = e[0] * x + e[3] * y + e[6] * z;
+    this.y = e[1] * x + e[4] * y + e[7] * z;
+    this.z = e[2] * x + e[5] * y + e[8] * z;
     return this;
   }
   /**
@@ -15936,8 +8805,8 @@ var Vector3 = class _Vector3 {
    * @param {Matrix3} m - The normal matrix.
    * @return {Vector3} A reference to this vector.
    */
-  applyNormalMatrix(m2) {
-    return this.applyMatrix3(m2).normalize();
+  applyNormalMatrix(m) {
+    return this.applyMatrix3(m).normalize();
   }
   /**
    * Multiplies this vector (with an implicit 1 in the 4th dimension) by m, and
@@ -15946,13 +8815,13 @@ var Vector3 = class _Vector3 {
    * @param {Matrix4} m - The matrix to apply.
    * @return {Vector3} A reference to this vector.
    */
-  applyMatrix4(m2) {
-    const x2 = this.x, y = this.y, z = this.z;
-    const e = m2.elements;
-    const w = 1 / (e[3] * x2 + e[7] * y + e[11] * z + e[15]);
-    this.x = (e[0] * x2 + e[4] * y + e[8] * z + e[12]) * w;
-    this.y = (e[1] * x2 + e[5] * y + e[9] * z + e[13]) * w;
-    this.z = (e[2] * x2 + e[6] * y + e[10] * z + e[14]) * w;
+  applyMatrix4(m) {
+    const x = this.x, y = this.y, z = this.z;
+    const e = m.elements;
+    const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+    this.x = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
+    this.y = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
+    this.z = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
     return this;
   }
   /**
@@ -15999,12 +8868,12 @@ var Vector3 = class _Vector3 {
    * @param {Matrix4} m - The matrix.
    * @return {Vector3} A reference to this vector.
    */
-  transformDirection(m2) {
-    const x2 = this.x, y = this.y, z = this.z;
-    const e = m2.elements;
-    this.x = e[0] * x2 + e[4] * y + e[8] * z;
-    this.y = e[1] * x2 + e[5] * y + e[9] * z;
-    this.z = e[2] * x2 + e[6] * y + e[10] * z;
+  transformDirection(m) {
+    const x = this.x, y = this.y, z = this.z;
+    const e = m.elements;
+    this.x = e[0] * x + e[4] * y + e[8] * z;
+    this.y = e[1] * x + e[5] * y + e[9] * z;
+    this.z = e[2] * x + e[6] * y + e[10] * z;
     return this.normalize();
   }
   /**
@@ -16013,10 +8882,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to divide.
    * @return {Vector3} A reference to this vector.
    */
-  divide(v2) {
-    this.x /= v2.x;
-    this.y /= v2.y;
-    this.z /= v2.z;
+  divide(v) {
+    this.x /= v.x;
+    this.y /= v.y;
+    this.z /= v.z;
     return this;
   }
   /**
@@ -16035,10 +8904,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector.
    * @return {Vector3} A reference to this vector.
    */
-  min(v2) {
-    this.x = Math.min(this.x, v2.x);
-    this.y = Math.min(this.y, v2.y);
-    this.z = Math.min(this.z, v2.z);
+  min(v) {
+    this.x = Math.min(this.x, v.x);
+    this.y = Math.min(this.y, v.y);
+    this.z = Math.min(this.z, v.z);
     return this;
   }
   /**
@@ -16048,10 +8917,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector.
    * @return {Vector3} A reference to this vector.
    */
-  max(v2) {
-    this.x = Math.max(this.x, v2.x);
-    this.y = Math.max(this.y, v2.y);
-    this.z = Math.max(this.z, v2.z);
+  max(v) {
+    this.x = Math.max(this.x, v.x);
+    this.y = Math.max(this.y, v.y);
+    this.z = Math.max(this.z, v.z);
     return this;
   }
   /**
@@ -16162,8 +9031,8 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to compute the dot product with.
    * @return {number} The result of the dot product.
    */
-  dot(v2) {
-    return this.x * v2.x + this.y * v2.y + this.z * v2.z;
+  dot(v) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
   }
   /**
    * Computes the square of the Euclidean length (straight-line length) from
@@ -16219,10 +9088,10 @@ var Vector3 = class _Vector3 {
    * @param {number} alpha - The interpolation factor, typically in the closed interval `[0, 1]`.
    * @return {Vector3} A reference to this vector.
    */
-  lerp(v2, alpha) {
-    this.x += (v2.x - this.x) * alpha;
-    this.y += (v2.y - this.y) * alpha;
-    this.z += (v2.z - this.z) * alpha;
+  lerp(v, alpha) {
+    this.x += (v.x - this.x) * alpha;
+    this.y += (v.y - this.y) * alpha;
+    this.z += (v.z - this.z) * alpha;
     return this;
   }
   /**
@@ -16247,8 +9116,8 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to compute the cross product with.
    * @return {Vector3} The result of the cross product.
    */
-  cross(v2) {
-    return this.crossVectors(this, v2);
+  cross(v) {
+    return this.crossVectors(this, v);
   }
   /**
    * Calculates the cross product of the given vectors and stores the result
@@ -16258,9 +9127,9 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} b - The second vector.
    * @return {Vector3} A reference to this vector.
    */
-  crossVectors(a2, b2) {
-    const ax = a2.x, ay = a2.y, az = a2.z;
-    const bx = b2.x, by = b2.y, bz = b2.z;
+  crossVectors(a, b) {
+    const ax = a.x, ay = a.y, az = a.z;
+    const bx = b.x, by = b.y, bz = b.z;
     this.x = ay * bz - az * by;
     this.y = az * bx - ax * bz;
     this.z = ax * by - ay * bx;
@@ -16272,11 +9141,11 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to project to.
    * @return {Vector3} A reference to this vector.
    */
-  projectOnVector(v2) {
-    const denominator = v2.lengthSq();
+  projectOnVector(v) {
+    const denominator = v.lengthSq();
     if (denominator === 0) return this.set(0, 0, 0);
-    const scalar = v2.dot(this) / denominator;
-    return this.copy(v2).multiplyScalar(scalar);
+    const scalar = v.dot(this) / denominator;
+    return this.copy(v).multiplyScalar(scalar);
   }
   /**
    * Projects this vector onto a plane by subtracting this
@@ -16304,10 +9173,10 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to compute the angle with.
    * @return {number} The angle in radians.
    */
-  angleTo(v2) {
-    const denominator = Math.sqrt(this.lengthSq() * v2.lengthSq());
+  angleTo(v) {
+    const denominator = Math.sqrt(this.lengthSq() * v.lengthSq());
     if (denominator === 0) return Math.PI / 2;
-    const theta = this.dot(v2) / denominator;
+    const theta = this.dot(v) / denominator;
     return Math.acos(clamp(theta, -1, 1));
   }
   /**
@@ -16316,8 +9185,8 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to compute the distance to.
    * @return {number} The distance.
    */
-  distanceTo(v2) {
-    return Math.sqrt(this.distanceToSquared(v2));
+  distanceTo(v) {
+    return Math.sqrt(this.distanceToSquared(v));
   }
   /**
    * Computes the squared distance from the given vector to this instance.
@@ -16327,8 +9196,8 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to compute the squared distance to.
    * @return {number} The squared distance.
    */
-  distanceToSquared(v2) {
-    const dx = this.x - v2.x, dy = this.y - v2.y, dz = this.z - v2.z;
+  distanceToSquared(v) {
+    const dx = this.x - v.x, dy = this.y - v.y, dz = this.z - v.z;
     return dx * dx + dy * dy + dz * dz;
   }
   /**
@@ -16337,8 +9206,8 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to compute the Manhattan distance to.
    * @return {number} The Manhattan distance.
    */
-  manhattanDistanceTo(v2) {
-    return Math.abs(this.x - v2.x) + Math.abs(this.y - v2.y) + Math.abs(this.z - v2.z);
+  manhattanDistanceTo(v) {
+    return Math.abs(this.x - v.x) + Math.abs(this.y - v.y) + Math.abs(this.z - v.z);
   }
   /**
    * Sets the vector components from the given spherical coordinates.
@@ -16394,8 +9263,8 @@ var Vector3 = class _Vector3 {
    * @param {Matrix4} m - The 4x4 matrix.
    * @return {Vector3} A reference to this vector.
    */
-  setFromMatrixPosition(m2) {
-    const e = m2.elements;
+  setFromMatrixPosition(m) {
+    const e = m.elements;
     this.x = e[12];
     this.y = e[13];
     this.z = e[14];
@@ -16408,10 +9277,10 @@ var Vector3 = class _Vector3 {
    * @param {Matrix4} m - The 4x4 matrix.
    * @return {Vector3} A reference to this vector.
    */
-  setFromMatrixScale(m2) {
-    const sx = this.setFromMatrixColumn(m2, 0).length();
-    const sy = this.setFromMatrixColumn(m2, 1).length();
-    const sz = this.setFromMatrixColumn(m2, 2).length();
+  setFromMatrixScale(m) {
+    const sx = this.setFromMatrixColumn(m, 0).length();
+    const sy = this.setFromMatrixColumn(m, 1).length();
+    const sz = this.setFromMatrixColumn(m, 2).length();
     this.x = sx;
     this.y = sy;
     this.z = sz;
@@ -16424,8 +9293,8 @@ var Vector3 = class _Vector3 {
    * @param {number} index - The column index.
    * @return {Vector3} A reference to this vector.
    */
-  setFromMatrixColumn(m2, index) {
-    return this.fromArray(m2.elements, index * 4);
+  setFromMatrixColumn(m, index) {
+    return this.fromArray(m.elements, index * 4);
   }
   /**
    * Sets the vector components from the specified matrix column.
@@ -16434,8 +9303,8 @@ var Vector3 = class _Vector3 {
    * @param {number} index - The column index.
    * @return {Vector3} A reference to this vector.
    */
-  setFromMatrix3Column(m2, index) {
-    return this.fromArray(m2.elements, index * 3);
+  setFromMatrix3Column(m, index) {
+    return this.fromArray(m.elements, index * 3);
   }
   /**
    * Sets the vector components from the given Euler angles.
@@ -16468,8 +9337,8 @@ var Vector3 = class _Vector3 {
    * @param {Vector3} v - The vector to test for equality.
    * @return {boolean} Whether this vector is equal with the given one.
    */
-  equals(v2) {
-    return v2.x === this.x && v2.y === this.y && v2.z === this.z;
+  equals(v) {
+    return v.x === this.x && v.y === this.y && v.z === this.z;
   }
   /**
    * Sets this vector's x value to be `array[ offset ]`, y value to be `array[ offset + 1 ]`
@@ -16637,9 +9506,9 @@ var Matrix3 = class _Matrix3 {
    * @param {Matrix3} m - The matrix to copy.
    * @return {Matrix3} A reference to this matrix.
    */
-  copy(m2) {
+  copy(m) {
     const te = this.elements;
-    const me = m2.elements;
+    const me = m.elements;
     te[0] = me[0];
     te[1] = me[1];
     te[2] = me[2];
@@ -16671,8 +9540,8 @@ var Matrix3 = class _Matrix3 {
    * @param {Matrix4} m - The 4x4 matrix.
    * @return {Matrix3} A reference to this matrix.
    */
-  setFromMatrix4(m2) {
-    const me = m2.elements;
+  setFromMatrix4(m) {
+    const me = m.elements;
     this.set(
       me[0],
       me[4],
@@ -16692,8 +9561,8 @@ var Matrix3 = class _Matrix3 {
    * @param {Matrix3} m - The matrix to multiply with.
    * @return {Matrix3} A reference to this matrix.
    */
-  multiply(m2) {
-    return this.multiplyMatrices(this, m2);
+  multiply(m) {
+    return this.multiplyMatrices(this, m);
   }
   /**
    * Pre-multiplies this matrix by the given 3x3 matrix.
@@ -16701,8 +9570,8 @@ var Matrix3 = class _Matrix3 {
    * @param {Matrix3} m - The matrix to multiply with.
    * @return {Matrix3} A reference to this matrix.
    */
-  premultiply(m2) {
-    return this.multiplyMatrices(m2, this);
+  premultiply(m) {
+    return this.multiplyMatrices(m, this);
   }
   /**
    * Multiples the given 3x3 matrices and stores the result
@@ -16712,16 +9581,16 @@ var Matrix3 = class _Matrix3 {
    * @param {Matrix3} b - The second matrix.
    * @return {Matrix3} A reference to this matrix.
    */
-  multiplyMatrices(a2, b2) {
-    const ae = a2.elements;
-    const be2 = b2.elements;
+  multiplyMatrices(a, b) {
+    const ae = a.elements;
+    const be = b.elements;
     const te = this.elements;
     const a11 = ae[0], a12 = ae[3], a13 = ae[6];
     const a21 = ae[1], a22 = ae[4], a23 = ae[7];
     const a31 = ae[2], a32 = ae[5], a33 = ae[8];
-    const b11 = be2[0], b12 = be2[3], b13 = be2[6];
-    const b21 = be2[1], b22 = be2[4], b23 = be2[7];
-    const b31 = be2[2], b32 = be2[5], b33 = be2[8];
+    const b11 = be[0], b12 = be[3], b13 = be[6];
+    const b21 = be[1], b22 = be[4], b23 = be[7];
+    const b31 = be[2], b32 = be[5], b33 = be[8];
     te[0] = a11 * b11 + a12 * b21 + a13 * b31;
     te[3] = a11 * b12 + a12 * b22 + a13 * b32;
     te[6] = a11 * b13 + a12 * b23 + a13 * b33;
@@ -16759,8 +9628,8 @@ var Matrix3 = class _Matrix3 {
    */
   determinant() {
     const te = this.elements;
-    const a2 = te[0], b2 = te[1], c = te[2], d2 = te[3], e = te[4], f = te[5], g = te[6], h = te[7], i = te[8];
-    return a2 * e * i - a2 * f * h - b2 * d2 * i + b2 * f * g + c * d2 * h - c * e * g;
+    const a = te[0], b = te[1], c = te[2], d = te[3], e = te[4], f = te[5], g = te[6], h = te[7], i = te[8];
+    return a * e * i - a * f * h - b * d * i + b * f * g + c * d * h - c * e * g;
   }
   /**
    * Inverts this matrix, using the [analytic method](https://en.wikipedia.org/wiki/Invertible_matrix#Analytic_solution).
@@ -16791,16 +9660,16 @@ var Matrix3 = class _Matrix3 {
    */
   transpose() {
     let tmp;
-    const m2 = this.elements;
-    tmp = m2[1];
-    m2[1] = m2[3];
-    m2[3] = tmp;
-    tmp = m2[2];
-    m2[2] = m2[6];
-    m2[6] = tmp;
-    tmp = m2[5];
-    m2[5] = m2[7];
-    m2[7] = tmp;
+    const m = this.elements;
+    tmp = m[1];
+    m[1] = m[3];
+    m[3] = tmp;
+    tmp = m[2];
+    m[2] = m[6];
+    m[6] = tmp;
+    tmp = m[5];
+    m[5] = m[7];
+    m[7] = tmp;
     return this;
   }
   /**
@@ -16820,16 +9689,16 @@ var Matrix3 = class _Matrix3 {
    * @return {Matrix3} A reference to this matrix.
    */
   transposeIntoArray(r) {
-    const m2 = this.elements;
-    r[0] = m2[0];
-    r[1] = m2[3];
-    r[2] = m2[6];
-    r[3] = m2[1];
-    r[4] = m2[4];
-    r[5] = m2[7];
-    r[6] = m2[2];
-    r[7] = m2[5];
-    r[8] = m2[8];
+    const m = this.elements;
+    r[0] = m[0];
+    r[1] = m[3];
+    r[2] = m[6];
+    r[3] = m[1];
+    r[4] = m[4];
+    r[5] = m[7];
+    r[6] = m[2];
+    r[7] = m[5];
+    r[8] = m[8];
     return this;
   }
   /**
@@ -16906,15 +9775,15 @@ var Matrix3 = class _Matrix3 {
    * @param {number} y - The amount to translate in the Y axis.
    * @return {Matrix3} A reference to this matrix.
    */
-  makeTranslation(x2, y) {
-    if (x2.isVector2) {
+  makeTranslation(x, y) {
+    if (x.isVector2) {
       this.set(
         1,
         0,
-        x2.x,
+        x.x,
         0,
         1,
-        x2.y,
+        x.y,
         0,
         0,
         1
@@ -16923,7 +9792,7 @@ var Matrix3 = class _Matrix3 {
       this.set(
         1,
         0,
-        x2,
+        x,
         0,
         1,
         y,
@@ -16963,9 +9832,9 @@ var Matrix3 = class _Matrix3 {
    * @param {number} y - The amount to scale in the Y axis.
    * @return {Matrix3} A reference to this matrix.
    */
-  makeScale(x2, y) {
+  makeScale(x, y) {
     this.set(
-      x2,
+      x,
       0,
       0,
       0,
@@ -17695,8 +10564,8 @@ var Vector4 = class _Vector4 {
    * @param {number} [z=0] - The z value of this vector.
    * @param {number} [w=1] - The w value of this vector.
    */
-  constructor(x2 = 0, y = 0, z = 0, w = 1) {
-    this.x = x2;
+  constructor(x = 0, y = 0, z = 0, w = 1) {
+    this.x = x;
     this.y = y;
     this.z = z;
     this.w = w;
@@ -17732,8 +10601,8 @@ var Vector4 = class _Vector4 {
    * @param {number} w - The value of the w component.
    * @return {Vector4} A reference to this vector.
    */
-  set(x2, y, z, w) {
-    this.x = x2;
+  set(x, y, z, w) {
+    this.x = x;
     this.y = y;
     this.z = z;
     this.w = w;
@@ -17758,8 +10627,8 @@ var Vector4 = class _Vector4 {
    * @param {number} x - The value to set.
    * @return {Vector4} A reference to this vector.
    */
-  setX(x2) {
-    this.x = x2;
+  setX(x) {
+    this.x = x;
     return this;
   }
   /**
@@ -17854,11 +10723,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector3|Vector4} v - The vector to copy.
    * @return {Vector4} A reference to this vector.
    */
-  copy(v2) {
-    this.x = v2.x;
-    this.y = v2.y;
-    this.z = v2.z;
-    this.w = v2.w !== void 0 ? v2.w : 1;
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
+    this.w = v.w !== void 0 ? v.w : 1;
     return this;
   }
   /**
@@ -17867,11 +10736,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector to add.
    * @return {Vector4} A reference to this vector.
    */
-  add(v2) {
-    this.x += v2.x;
-    this.y += v2.y;
-    this.z += v2.z;
-    this.w += v2.w;
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    this.z += v.z;
+    this.w += v.w;
     return this;
   }
   /**
@@ -17894,11 +10763,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} b - The second vector.
    * @return {Vector4} A reference to this vector.
    */
-  addVectors(a2, b2) {
-    this.x = a2.x + b2.x;
-    this.y = a2.y + b2.y;
-    this.z = a2.z + b2.z;
-    this.w = a2.w + b2.w;
+  addVectors(a, b) {
+    this.x = a.x + b.x;
+    this.y = a.y + b.y;
+    this.z = a.z + b.z;
+    this.w = a.w + b.w;
     return this;
   }
   /**
@@ -17908,11 +10777,11 @@ var Vector4 = class _Vector4 {
    * @param {number} s - The factor that scales `v`.
    * @return {Vector4} A reference to this vector.
    */
-  addScaledVector(v2, s) {
-    this.x += v2.x * s;
-    this.y += v2.y * s;
-    this.z += v2.z * s;
-    this.w += v2.w * s;
+  addScaledVector(v, s) {
+    this.x += v.x * s;
+    this.y += v.y * s;
+    this.z += v.z * s;
+    this.w += v.w * s;
     return this;
   }
   /**
@@ -17921,11 +10790,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector to subtract.
    * @return {Vector4} A reference to this vector.
    */
-  sub(v2) {
-    this.x -= v2.x;
-    this.y -= v2.y;
-    this.z -= v2.z;
-    this.w -= v2.w;
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    this.z -= v.z;
+    this.w -= v.w;
     return this;
   }
   /**
@@ -17948,11 +10817,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} b - The second vector.
    * @return {Vector4} A reference to this vector.
    */
-  subVectors(a2, b2) {
-    this.x = a2.x - b2.x;
-    this.y = a2.y - b2.y;
-    this.z = a2.z - b2.z;
-    this.w = a2.w - b2.w;
+  subVectors(a, b) {
+    this.x = a.x - b.x;
+    this.y = a.y - b.y;
+    this.z = a.z - b.z;
+    this.w = a.w - b.w;
     return this;
   }
   /**
@@ -17961,11 +10830,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector to multiply.
    * @return {Vector4} A reference to this vector.
    */
-  multiply(v2) {
-    this.x *= v2.x;
-    this.y *= v2.y;
-    this.z *= v2.z;
-    this.w *= v2.w;
+  multiply(v) {
+    this.x *= v.x;
+    this.y *= v.y;
+    this.z *= v.z;
+    this.w *= v.w;
     return this;
   }
   /**
@@ -17987,13 +10856,13 @@ var Vector4 = class _Vector4 {
    * @param {Matrix4} m - The 4x4 matrix.
    * @return {Vector4} A reference to this vector.
    */
-  applyMatrix4(m2) {
-    const x2 = this.x, y = this.y, z = this.z, w = this.w;
-    const e = m2.elements;
-    this.x = e[0] * x2 + e[4] * y + e[8] * z + e[12] * w;
-    this.y = e[1] * x2 + e[5] * y + e[9] * z + e[13] * w;
-    this.z = e[2] * x2 + e[6] * y + e[10] * z + e[14] * w;
-    this.w = e[3] * x2 + e[7] * y + e[11] * z + e[15] * w;
+  applyMatrix4(m) {
+    const x = this.x, y = this.y, z = this.z, w = this.w;
+    const e = m.elements;
+    this.x = e[0] * x + e[4] * y + e[8] * z + e[12] * w;
+    this.y = e[1] * x + e[5] * y + e[9] * z + e[13] * w;
+    this.z = e[2] * x + e[6] * y + e[10] * z + e[14] * w;
+    this.w = e[3] * x + e[7] * y + e[11] * z + e[15] * w;
     return this;
   }
   /**
@@ -18002,11 +10871,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector to divide.
    * @return {Vector4} A reference to this vector.
    */
-  divide(v2) {
-    this.x /= v2.x;
-    this.y /= v2.y;
-    this.z /= v2.z;
-    this.w /= v2.w;
+  divide(v) {
+    this.x /= v.x;
+    this.y /= v.y;
+    this.z /= v.z;
+    this.w /= v.w;
     return this;
   }
   /**
@@ -18046,9 +10915,9 @@ var Vector4 = class _Vector4 {
    * @param {Matrix4} m - A 4x4 matrix of which the upper left 3x3 matrix is a pure rotation matrix.
    * @return {Vector4} A reference to this vector.
    */
-  setAxisAngleFromRotationMatrix(m2) {
-    let angle, x2, y, z;
-    const epsilon = 0.01, epsilon2 = 0.1, te = m2.elements, m11 = te[0], m12 = te[4], m13 = te[8], m21 = te[1], m22 = te[5], m23 = te[9], m31 = te[2], m32 = te[6], m33 = te[10];
+  setAxisAngleFromRotationMatrix(m) {
+    let angle, x, y, z;
+    const epsilon = 0.01, epsilon2 = 0.1, te = m.elements, m11 = te[0], m12 = te[4], m13 = te[8], m21 = te[1], m22 = te[5], m23 = te[9], m31 = te[2], m32 = te[6], m33 = te[10];
     if (Math.abs(m12 - m21) < epsilon && Math.abs(m13 - m31) < epsilon && Math.abs(m23 - m32) < epsilon) {
       if (Math.abs(m12 + m21) < epsilon2 && Math.abs(m13 + m31) < epsilon2 && Math.abs(m23 + m32) < epsilon2 && Math.abs(m11 + m22 + m33 - 3) < epsilon2) {
         this.set(1, 0, 0, 0);
@@ -18063,36 +10932,36 @@ var Vector4 = class _Vector4 {
       const yz = (m23 + m32) / 4;
       if (xx > yy && xx > zz) {
         if (xx < epsilon) {
-          x2 = 0;
+          x = 0;
           y = 0.707106781;
           z = 0.707106781;
         } else {
-          x2 = Math.sqrt(xx);
-          y = xy / x2;
-          z = xz / x2;
+          x = Math.sqrt(xx);
+          y = xy / x;
+          z = xz / x;
         }
       } else if (yy > zz) {
         if (yy < epsilon) {
-          x2 = 0.707106781;
+          x = 0.707106781;
           y = 0;
           z = 0.707106781;
         } else {
           y = Math.sqrt(yy);
-          x2 = xy / y;
+          x = xy / y;
           z = yz / y;
         }
       } else {
         if (zz < epsilon) {
-          x2 = 0.707106781;
+          x = 0.707106781;
           y = 0.707106781;
           z = 0;
         } else {
           z = Math.sqrt(zz);
-          x2 = xz / z;
+          x = xz / z;
           y = yz / z;
         }
       }
-      this.set(x2, y, z, angle);
+      this.set(x, y, z, angle);
       return this;
     }
     let s = Math.sqrt((m32 - m23) * (m32 - m23) + (m13 - m31) * (m13 - m31) + (m21 - m12) * (m21 - m12));
@@ -18110,8 +10979,8 @@ var Vector4 = class _Vector4 {
    * @param {Matrix4} m - The 4x4 matrix.
    * @return {Vector4} A reference to this vector.
    */
-  setFromMatrixPosition(m2) {
-    const e = m2.elements;
+  setFromMatrixPosition(m) {
+    const e = m.elements;
     this.x = e[12];
     this.y = e[13];
     this.z = e[14];
@@ -18125,11 +10994,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector.
    * @return {Vector4} A reference to this vector.
    */
-  min(v2) {
-    this.x = Math.min(this.x, v2.x);
-    this.y = Math.min(this.y, v2.y);
-    this.z = Math.min(this.z, v2.z);
-    this.w = Math.min(this.w, v2.w);
+  min(v) {
+    this.x = Math.min(this.x, v.x);
+    this.y = Math.min(this.y, v.y);
+    this.z = Math.min(this.z, v.z);
+    this.w = Math.min(this.w, v.w);
     return this;
   }
   /**
@@ -18139,11 +11008,11 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector.
    * @return {Vector4} A reference to this vector.
    */
-  max(v2) {
-    this.x = Math.max(this.x, v2.x);
-    this.y = Math.max(this.y, v2.y);
-    this.z = Math.max(this.z, v2.z);
-    this.w = Math.max(this.w, v2.w);
+  max(v) {
+    this.x = Math.max(this.x, v.x);
+    this.y = Math.max(this.y, v.y);
+    this.z = Math.max(this.z, v.z);
+    this.w = Math.max(this.w, v.w);
     return this;
   }
   /**
@@ -18261,8 +11130,8 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector to compute the dot product with.
    * @return {number} The result of the dot product.
    */
-  dot(v2) {
-    return this.x * v2.x + this.y * v2.y + this.z * v2.z + this.w * v2.w;
+  dot(v) {
+    return this.x * v.x + this.y * v.y + this.z * v.z + this.w * v.w;
   }
   /**
    * Computes the square of the Euclidean length (straight-line length) from
@@ -18318,11 +11187,11 @@ var Vector4 = class _Vector4 {
    * @param {number} alpha - The interpolation factor, typically in the closed interval `[0, 1]`.
    * @return {Vector4} A reference to this vector.
    */
-  lerp(v2, alpha) {
-    this.x += (v2.x - this.x) * alpha;
-    this.y += (v2.y - this.y) * alpha;
-    this.z += (v2.z - this.z) * alpha;
-    this.w += (v2.w - this.w) * alpha;
+  lerp(v, alpha) {
+    this.x += (v.x - this.x) * alpha;
+    this.y += (v.y - this.y) * alpha;
+    this.z += (v.z - this.z) * alpha;
+    this.w += (v.w - this.w) * alpha;
     return this;
   }
   /**
@@ -18348,8 +11217,8 @@ var Vector4 = class _Vector4 {
    * @param {Vector4} v - The vector to test for equality.
    * @return {boolean} Whether this vector is equal with the given one.
    */
-  equals(v2) {
-    return v2.x === this.x && v2.y === this.y && v2.z === this.z && v2.w === this.w;
+  equals(v) {
+    return v.x === this.x && v.y === this.y && v.z === this.z && v.w === this.w;
   }
   /**
    * Sets this vector's x value to be `array[ offset ]`, y value to be `array[ offset + 1 ]`,
@@ -18549,9 +11418,9 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix4} m - The matrix to copy.
    * @return {Matrix4} A reference to this matrix.
    */
-  copy(m2) {
+  copy(m) {
     const te = this.elements;
-    const me = m2.elements;
+    const me = m.elements;
     te[0] = me[0];
     te[1] = me[1];
     te[2] = me[2];
@@ -18577,8 +11446,8 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix4} m - The matrix to copy the translation component.
    * @return {Matrix4} A reference to this matrix.
    */
-  copyPosition(m2) {
-    const te = this.elements, me = m2.elements;
+  copyPosition(m) {
+    const te = this.elements, me = m.elements;
     te[12] = me[12];
     te[13] = me[13];
     te[14] = me[14];
@@ -18590,8 +11459,8 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix3} m - The 3x3 matrix.
    * @return {Matrix4} A reference to this matrix.
    */
-  setFromMatrix3(m2) {
-    const me = m2.elements;
+  setFromMatrix3(m) {
+    const me = m.elements;
     this.set(
       me[0],
       me[3],
@@ -18670,15 +11539,15 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix4} m - The matrix.
    * @return {Matrix4} A reference to this matrix.
    */
-  extractRotation(m2) {
-    if (m2.determinantAffine() === 0) {
+  extractRotation(m) {
+    if (m.determinantAffine() === 0) {
       return this.identity();
     }
     const te = this.elements;
-    const me = m2.elements;
-    const scaleX = 1 / _v1$7.setFromMatrixColumn(m2, 0).length();
-    const scaleY = 1 / _v1$7.setFromMatrixColumn(m2, 1).length();
-    const scaleZ = 1 / _v1$7.setFromMatrixColumn(m2, 2).length();
+    const me = m.elements;
+    const scaleX = 1 / _v1$7.setFromMatrixColumn(m, 0).length();
+    const scaleY = 1 / _v1$7.setFromMatrixColumn(m, 1).length();
+    const scaleZ = 1 / _v1$7.setFromMatrixColumn(m, 2).length();
     te[0] = me[0] * scaleX;
     te[1] = me[1] * scaleX;
     te[2] = me[2] * scaleX;
@@ -18709,75 +11578,75 @@ var Matrix4 = class _Matrix4 {
    */
   makeRotationFromEuler(euler) {
     const te = this.elements;
-    const x2 = euler.x, y = euler.y, z = euler.z;
-    const a2 = Math.cos(x2), b2 = Math.sin(x2);
-    const c = Math.cos(y), d2 = Math.sin(y);
+    const x = euler.x, y = euler.y, z = euler.z;
+    const a = Math.cos(x), b = Math.sin(x);
+    const c = Math.cos(y), d = Math.sin(y);
     const e = Math.cos(z), f = Math.sin(z);
     if (euler.order === "XYZ") {
-      const ae = a2 * e, af = a2 * f, be2 = b2 * e, bf = b2 * f;
+      const ae = a * e, af = a * f, be = b * e, bf = b * f;
       te[0] = c * e;
       te[4] = -c * f;
-      te[8] = d2;
-      te[1] = af + be2 * d2;
-      te[5] = ae - bf * d2;
-      te[9] = -b2 * c;
-      te[2] = bf - ae * d2;
-      te[6] = be2 + af * d2;
-      te[10] = a2 * c;
+      te[8] = d;
+      te[1] = af + be * d;
+      te[5] = ae - bf * d;
+      te[9] = -b * c;
+      te[2] = bf - ae * d;
+      te[6] = be + af * d;
+      te[10] = a * c;
     } else if (euler.order === "YXZ") {
-      const ce2 = c * e, cf = c * f, de = d2 * e, df = d2 * f;
-      te[0] = ce2 + df * b2;
-      te[4] = de * b2 - cf;
-      te[8] = a2 * d2;
-      te[1] = a2 * f;
-      te[5] = a2 * e;
-      te[9] = -b2;
-      te[2] = cf * b2 - de;
-      te[6] = df + ce2 * b2;
-      te[10] = a2 * c;
+      const ce = c * e, cf = c * f, de = d * e, df = d * f;
+      te[0] = ce + df * b;
+      te[4] = de * b - cf;
+      te[8] = a * d;
+      te[1] = a * f;
+      te[5] = a * e;
+      te[9] = -b;
+      te[2] = cf * b - de;
+      te[6] = df + ce * b;
+      te[10] = a * c;
     } else if (euler.order === "ZXY") {
-      const ce2 = c * e, cf = c * f, de = d2 * e, df = d2 * f;
-      te[0] = ce2 - df * b2;
-      te[4] = -a2 * f;
-      te[8] = de + cf * b2;
-      te[1] = cf + de * b2;
-      te[5] = a2 * e;
-      te[9] = df - ce2 * b2;
-      te[2] = -a2 * d2;
-      te[6] = b2;
-      te[10] = a2 * c;
+      const ce = c * e, cf = c * f, de = d * e, df = d * f;
+      te[0] = ce - df * b;
+      te[4] = -a * f;
+      te[8] = de + cf * b;
+      te[1] = cf + de * b;
+      te[5] = a * e;
+      te[9] = df - ce * b;
+      te[2] = -a * d;
+      te[6] = b;
+      te[10] = a * c;
     } else if (euler.order === "ZYX") {
-      const ae = a2 * e, af = a2 * f, be2 = b2 * e, bf = b2 * f;
+      const ae = a * e, af = a * f, be = b * e, bf = b * f;
       te[0] = c * e;
-      te[4] = be2 * d2 - af;
-      te[8] = ae * d2 + bf;
+      te[4] = be * d - af;
+      te[8] = ae * d + bf;
       te[1] = c * f;
-      te[5] = bf * d2 + ae;
-      te[9] = af * d2 - be2;
-      te[2] = -d2;
-      te[6] = b2 * c;
-      te[10] = a2 * c;
+      te[5] = bf * d + ae;
+      te[9] = af * d - be;
+      te[2] = -d;
+      te[6] = b * c;
+      te[10] = a * c;
     } else if (euler.order === "YZX") {
-      const ac = a2 * c, ad = a2 * d2, bc = b2 * c, bd = b2 * d2;
+      const ac = a * c, ad = a * d, bc = b * c, bd = b * d;
       te[0] = c * e;
       te[4] = bd - ac * f;
       te[8] = bc * f + ad;
       te[1] = f;
-      te[5] = a2 * e;
-      te[9] = -b2 * e;
-      te[2] = -d2 * e;
+      te[5] = a * e;
+      te[9] = -b * e;
+      te[2] = -d * e;
       te[6] = ad * f + bc;
       te[10] = ac - bd * f;
     } else if (euler.order === "XZY") {
-      const ac = a2 * c, ad = a2 * d2, bc = b2 * c, bd = b2 * d2;
+      const ac = a * c, ad = a * d, bc = b * c, bd = b * d;
       te[0] = c * e;
       te[4] = -f;
-      te[8] = d2 * e;
+      te[8] = d * e;
       te[1] = ac * f + bd;
-      te[5] = a2 * e;
+      te[5] = a * e;
       te[9] = ad * f - bc;
       te[2] = bc * f - ad;
-      te[6] = b2 * e;
+      te[6] = b * e;
       te[10] = bd * f + ac;
     }
     te[3] = 0;
@@ -18845,8 +11714,8 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix4} m - The matrix to multiply with.
    * @return {Matrix4} A reference to this matrix.
    */
-  multiply(m2) {
-    return this.multiplyMatrices(this, m2);
+  multiply(m) {
+    return this.multiplyMatrices(this, m);
   }
   /**
    * Pre-multiplies this matrix by the given 4x4 matrix.
@@ -18854,8 +11723,8 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix4} m - The matrix to multiply with.
    * @return {Matrix4} A reference to this matrix.
    */
-  premultiply(m2) {
-    return this.multiplyMatrices(m2, this);
+  premultiply(m) {
+    return this.multiplyMatrices(m, this);
   }
   /**
    * Multiples the given 4x4 matrices and stores the result
@@ -18865,18 +11734,18 @@ var Matrix4 = class _Matrix4 {
    * @param {Matrix4} b - The second matrix.
    * @return {Matrix4} A reference to this matrix.
    */
-  multiplyMatrices(a2, b2) {
-    const ae = a2.elements;
-    const be2 = b2.elements;
+  multiplyMatrices(a, b) {
+    const ae = a.elements;
+    const be = b.elements;
     const te = this.elements;
     const a11 = ae[0], a12 = ae[4], a13 = ae[8], a14 = ae[12];
     const a21 = ae[1], a22 = ae[5], a23 = ae[9], a24 = ae[13];
     const a31 = ae[2], a32 = ae[6], a33 = ae[10], a34 = ae[14];
     const a41 = ae[3], a42 = ae[7], a43 = ae[11], a44 = ae[15];
-    const b11 = be2[0], b12 = be2[4], b13 = be2[8], b14 = be2[12];
-    const b21 = be2[1], b22 = be2[5], b23 = be2[9], b24 = be2[13];
-    const b31 = be2[2], b32 = be2[6], b33 = be2[10], b34 = be2[14];
-    const b41 = be2[3], b42 = be2[7], b43 = be2[11], b44 = be2[15];
+    const b11 = be[0], b12 = be[4], b13 = be[8], b14 = be[12];
+    const b21 = be[1], b22 = be[5], b23 = be[9], b24 = be[13];
+    const b31 = be[2], b32 = be[6], b33 = be[10], b34 = be[14];
+    const b41 = be[3], b42 = be[7], b43 = be[11], b44 = be[15];
     te[0] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41;
     te[4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42;
     te[8] = a11 * b13 + a12 * b23 + a13 * b33 + a14 * b43;
@@ -18997,14 +11866,14 @@ var Matrix4 = class _Matrix4 {
    * @param {number} z - The z component of the vector.
    * @return {Matrix4} A reference to this matrix.
    */
-  setPosition(x2, y, z) {
+  setPosition(x, y, z) {
     const te = this.elements;
-    if (x2.isVector3) {
-      te[12] = x2.x;
-      te[13] = x2.y;
-      te[14] = x2.z;
+    if (x.isVector3) {
+      te[12] = x.x;
+      te[13] = x.y;
+      te[14] = x.z;
     } else {
-      te[12] = x2;
+      te[12] = x;
       te[13] = y;
       te[14] = z;
     }
@@ -19046,19 +11915,19 @@ var Matrix4 = class _Matrix4 {
    * @param {Vector3} v - The scale vector.
    * @return {Matrix4} A reference to this matrix.
    */
-  scale(v2) {
+  scale(v) {
     const te = this.elements;
-    const x2 = v2.x, y = v2.y, z = v2.z;
-    te[0] *= x2;
+    const x = v.x, y = v.y, z = v.z;
+    te[0] *= x;
     te[4] *= y;
     te[8] *= z;
-    te[1] *= x2;
+    te[1] *= x;
     te[5] *= y;
     te[9] *= z;
-    te[2] *= x2;
+    te[2] *= x;
     te[6] *= y;
     te[10] *= z;
-    te[3] *= x2;
+    te[3] *= x;
     te[7] *= y;
     te[11] *= z;
     return this;
@@ -19083,21 +11952,21 @@ var Matrix4 = class _Matrix4 {
    * @param {number} z - The amount to translate in the z axis.
    * @return {Matrix4} A reference to this matrix.
    */
-  makeTranslation(x2, y, z) {
-    if (x2.isVector3) {
+  makeTranslation(x, y, z) {
+    if (x.isVector3) {
       this.set(
         1,
         0,
         0,
-        x2.x,
+        x.x,
         0,
         1,
         0,
-        x2.y,
+        x.y,
         0,
         0,
         1,
-        x2.z,
+        x.z,
         0,
         0,
         0,
@@ -19108,7 +11977,7 @@ var Matrix4 = class _Matrix4 {
         1,
         0,
         0,
-        x2,
+        x,
         0,
         1,
         0,
@@ -19227,19 +12096,19 @@ var Matrix4 = class _Matrix4 {
     const c = Math.cos(angle);
     const s = Math.sin(angle);
     const t = 1 - c;
-    const x2 = axis.x, y = axis.y, z = axis.z;
-    const tx = t * x2, ty = t * y;
+    const x = axis.x, y = axis.y, z = axis.z;
+    const tx = t * x, ty = t * y;
     this.set(
-      tx * x2 + c,
+      tx * x + c,
       tx * y - s * z,
       tx * z + s * y,
       0,
       tx * y + s * z,
       ty * y + c,
-      ty * z - s * x2,
+      ty * z - s * x,
       0,
       tx * z - s * y,
-      ty * z + s * x2,
+      ty * z + s * x,
       t * z * z + c,
       0,
       0,
@@ -19257,9 +12126,9 @@ var Matrix4 = class _Matrix4 {
    * @param {number} z - The amount to scale in the Z axis.
    * @return {Matrix4} A reference to this matrix.
    */
-  makeScale(x2, y, z) {
+  makeScale(x, y, z) {
     this.set(
-      x2,
+      x,
       0,
       0,
       0,
@@ -19321,11 +12190,11 @@ var Matrix4 = class _Matrix4 {
    */
   compose(position, quaternion, scale) {
     const te = this.elements;
-    const x2 = quaternion._x, y = quaternion._y, z = quaternion._z, w = quaternion._w;
-    const x22 = x2 + x2, y2 = y + y, z2 = z + z;
-    const xx = x2 * x22, xy = x2 * y2, xz = x2 * z2;
+    const x = quaternion._x, y = quaternion._y, z = quaternion._z, w = quaternion._w;
+    const x2 = x + x, y2 = y + y, z2 = z + z;
+    const xx = x * x2, xy = x * y2, xz = x * z2;
     const yy = y * y2, yz = y * z2, zz = z * z2;
-    const wx = w * x22, wy = w * y2, wz = w * z2;
+    const wx = w * x2, wy = w * y2, wz = w * z2;
     const sx = scale.x, sy = scale.y, sz = scale.z;
     te[0] = (1 - (yy + zz)) * sx;
     te[1] = (xy + wz) * sx;
@@ -19408,37 +12277,37 @@ var Matrix4 = class _Matrix4 {
   	 */
   makePerspective(left, right, top, bottom, near, far, coordinateSystem = WebGLCoordinateSystem, reversedDepth = false) {
     const te = this.elements;
-    const x2 = 2 * near / (right - left);
+    const x = 2 * near / (right - left);
     const y = 2 * near / (top - bottom);
-    const a2 = (right + left) / (right - left);
-    const b2 = (top + bottom) / (top - bottom);
-    let c, d2;
+    const a = (right + left) / (right - left);
+    const b = (top + bottom) / (top - bottom);
+    let c, d;
     if (reversedDepth) {
       c = near / (far - near);
-      d2 = far * near / (far - near);
+      d = far * near / (far - near);
     } else {
       if (coordinateSystem === WebGLCoordinateSystem) {
         c = -(far + near) / (far - near);
-        d2 = -2 * far * near / (far - near);
+        d = -2 * far * near / (far - near);
       } else if (coordinateSystem === WebGPUCoordinateSystem) {
         c = -far / (far - near);
-        d2 = -far * near / (far - near);
+        d = -far * near / (far - near);
       } else {
         throw new Error("THREE.Matrix4.makePerspective(): Invalid coordinate system: " + coordinateSystem);
       }
     }
-    te[0] = x2;
+    te[0] = x;
     te[4] = 0;
-    te[8] = a2;
+    te[8] = a;
     te[12] = 0;
     te[1] = 0;
     te[5] = y;
-    te[9] = b2;
+    te[9] = b;
     te[13] = 0;
     te[2] = 0;
     te[6] = 0;
     te[10] = c;
-    te[14] = d2;
+    te[14] = d;
     te[3] = 0;
     te[7] = 0;
     te[11] = -1;
@@ -19461,37 +12330,37 @@ var Matrix4 = class _Matrix4 {
   	 */
   makeOrthographic(left, right, top, bottom, near, far, coordinateSystem = WebGLCoordinateSystem, reversedDepth = false) {
     const te = this.elements;
-    const x2 = 2 / (right - left);
+    const x = 2 / (right - left);
     const y = 2 / (top - bottom);
-    const a2 = -(right + left) / (right - left);
-    const b2 = -(top + bottom) / (top - bottom);
-    let c, d2;
+    const a = -(right + left) / (right - left);
+    const b = -(top + bottom) / (top - bottom);
+    let c, d;
     if (reversedDepth) {
       c = 1 / (far - near);
-      d2 = far / (far - near);
+      d = far / (far - near);
     } else {
       if (coordinateSystem === WebGLCoordinateSystem) {
         c = -2 / (far - near);
-        d2 = -(far + near) / (far - near);
+        d = -(far + near) / (far - near);
       } else if (coordinateSystem === WebGPUCoordinateSystem) {
         c = -1 / (far - near);
-        d2 = -near / (far - near);
+        d = -near / (far - near);
       } else {
         throw new Error("THREE.Matrix4.makeOrthographic(): Invalid coordinate system: " + coordinateSystem);
       }
     }
-    te[0] = x2;
+    te[0] = x;
     te[4] = 0;
     te[8] = 0;
-    te[12] = a2;
+    te[12] = a;
     te[1] = 0;
     te[5] = y;
     te[9] = 0;
-    te[13] = b2;
+    te[13] = b;
     te[2] = 0;
     te[6] = 0;
     te[10] = c;
-    te[14] = d2;
+    te[14] = d;
     te[3] = 0;
     te[7] = 0;
     te[11] = 0;
@@ -19575,9 +12444,9 @@ var Euler = class _Euler {
    * @param {number} [z=0] - The angle of the z axis in radians.
    * @param {string} [order=Euler.DEFAULT_ORDER] - A string representing the order that the rotations are applied.
    */
-  constructor(x2 = 0, y = 0, z = 0, order = _Euler.DEFAULT_ORDER) {
+  constructor(x = 0, y = 0, z = 0, order = _Euler.DEFAULT_ORDER) {
     this.isEuler = true;
-    this._x = x2;
+    this._x = x;
     this._y = y;
     this._z = z;
     this._order = order;
@@ -19643,8 +12512,8 @@ var Euler = class _Euler {
    * @param {string} [order] - A string representing the order that the rotations are applied.
    * @return {Euler} A reference to this Euler instance.
    */
-  set(x2, y, z, order = this._order) {
-    this._x = x2;
+  set(x, y, z, order = this._order) {
+    this._x = x;
     this._y = y;
     this._z = z;
     this._order = order;
@@ -19681,8 +12550,8 @@ var Euler = class _Euler {
    * @param {boolean} [update=true] - Whether the internal `onChange` callback should be executed or not.
    * @return {Euler} A reference to this Euler instance.
    */
-  setFromRotationMatrix(m2, order = this._order, update = true) {
-    const te = m2.elements;
+  setFromRotationMatrix(m, order = this._order, update = true) {
+    const te = m.elements;
     const m11 = te[0], m12 = te[4], m13 = te[8];
     const m21 = te[1], m22 = te[5], m23 = te[9];
     const m31 = te[2], m32 = te[6], m33 = te[10];
@@ -19773,8 +12642,8 @@ var Euler = class _Euler {
    * @param {string} [order] - A string representing the order that the rotations are applied.
    * @return {Euler} A reference to this Euler instance.
    */
-  setFromVector3(v2, order = this._order) {
-    return this.set(v2.x, v2.y, v2.z, order);
+  setFromVector3(v, order = this._order) {
+    return this.set(v.x, v.y, v.z, order);
   }
   /**
    * Resets the euler angle with a new order by creating a quaternion from this
@@ -20144,8 +13013,8 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Matrix4} m - Although a 4x4 matrix is expected, the upper 3x3 portion must be
    * a pure rotation matrix (i.e, unscaled).
    */
-  setRotationFromMatrix(m2) {
-    this.quaternion.setFromRotationMatrix(m2);
+  setRotationFromMatrix(m) {
+    this.quaternion.setFromRotationMatrix(m);
   }
   /**
    * Sets the given rotation represented as a Quaternion to the 3D object.
@@ -20251,9 +13120,9 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Vector3} vector - The vector to convert.
    * @return {Vector3} The converted vector.
    */
-  localToWorld(vector2) {
+  localToWorld(vector) {
     this.updateWorldMatrix(true, false);
-    return vector2.applyMatrix4(this.matrixWorld);
+    return vector.applyMatrix4(this.matrixWorld);
   }
   /**
    * Converts the given vector from this 3D object's world space to local space.
@@ -20261,9 +13130,9 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Vector3} vector - The vector to convert.
    * @return {Vector3} The converted vector.
    */
-  worldToLocal(vector2) {
+  worldToLocal(vector) {
     this.updateWorldMatrix(true, false);
-    return vector2.applyMatrix4(_m1$1.copy(this.matrixWorld).invert());
+    return vector.applyMatrix4(_m1$1.copy(this.matrixWorld).invert());
   }
   /**
    * Rotates the object to face a point in world space.
@@ -20274,11 +13143,11 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {number} [y] - The y coordinate in world space.
    * @param {number} [z] - The z coordinate in world space.
    */
-  lookAt(x2, y, z) {
-    if (x2.isVector3) {
-      _target.copy(x2);
+  lookAt(x, y, z) {
+    if (x.isVector3) {
+      _target.copy(x);
     } else {
-      _target.set(x2, y, z);
+      _target.set(x, y, z);
     }
     const parent = this.parent;
     this.updateWorldMatrix(true, false);
@@ -21023,13 +13892,13 @@ var _colorKeywords = {
 };
 var _hslA = { h: 0, s: 0, l: 0 };
 var _hslB = { h: 0, s: 0, l: 0 };
-function hue2rgb(p2, q, t) {
+function hue2rgb(p, q, t) {
   if (t < 0) t += 1;
   if (t > 1) t -= 1;
-  if (t < 1 / 6) return p2 + (q - p2) * 6 * t;
+  if (t < 1 / 6) return p + (q - p) * 6 * t;
   if (t < 1 / 2) return q;
-  if (t < 2 / 3) return p2 + (q - p2) * 6 * (2 / 3 - t);
-  return p2;
+  if (t < 2 / 3) return p + (q - p) * 6 * (2 / 3 - t);
+  return p;
 }
 __name(hue2rgb, "hue2rgb");
 var Color = class {
@@ -21047,12 +13916,12 @@ var Color = class {
    * @param {number} [g] - The green component.
    * @param {number} [b] - The blue component.
    */
-  constructor(r, g, b2) {
+  constructor(r, g, b) {
     this.isColor = true;
     this.r = 1;
     this.g = 1;
     this.b = 1;
-    return this.set(r, g, b2);
+    return this.set(r, g, b);
   }
   /**
    * Sets the colors's components from the given values.
@@ -21063,8 +13932,8 @@ var Color = class {
    * @param {number} [b] - The blue component.
    * @return {Color} A reference to this color.
    */
-  set(r, g, b2) {
-    if (g === void 0 && b2 === void 0) {
+  set(r, g, b) {
+    if (g === void 0 && b === void 0) {
       const value = r;
       if (value && value.isColor) {
         this.copy(value);
@@ -21074,7 +13943,7 @@ var Color = class {
         this.setStyle(value);
       }
     } else {
-      this.setRGB(r, g, b2);
+      this.setRGB(r, g, b);
     }
     return this;
   }
@@ -21114,10 +13983,10 @@ var Color = class {
    * @param {string} [colorSpace=ColorManagement.workingColorSpace] - The color space.
    * @return {Color} A reference to this color.
    */
-  setRGB(r, g, b2, colorSpace = ColorManagement.workingColorSpace) {
+  setRGB(r, g, b, colorSpace = ColorManagement.workingColorSpace) {
     this.r = r;
     this.g = g;
-    this.b = b2;
+    this.b = b;
     ColorManagement.colorSpaceToWorking(this, colorSpace);
     return this;
   }
@@ -21137,11 +14006,11 @@ var Color = class {
     if (s === 0) {
       this.r = this.g = this.b = l;
     } else {
-      const p2 = l <= 0.5 ? l * (1 + s) : l + s - l * s;
-      const q = 2 * l - p2;
-      this.r = hue2rgb(q, p2, h + 1 / 3);
-      this.g = hue2rgb(q, p2, h);
-      this.b = hue2rgb(q, p2, h - 1 / 3);
+      const p = l <= 0.5 ? l * (1 + s) : l + s - l * s;
+      const q = 2 * l - p;
+      this.r = hue2rgb(q, p, h + 1 / 3);
+      this.g = hue2rgb(q, p, h);
+      this.b = hue2rgb(q, p, h - 1 / 3);
     }
     ColorManagement.colorSpaceToWorking(this, colorSpace);
     return this;
@@ -21164,11 +14033,11 @@ var Color = class {
       }
     }
     __name(handleAlpha, "handleAlpha");
-    let m2;
-    if (m2 = /^(\w+)\(([^\)]*)\)/.exec(style)) {
+    let m;
+    if (m = /^(\w+)\(([^\)]*)\)/.exec(style)) {
       let color;
-      const name = m2[1];
-      const components = m2[2];
+      const name = m[1];
+      const components = m[2];
       switch (name) {
         case "rgb":
         case "rgba":
@@ -21206,8 +14075,8 @@ var Color = class {
         default:
           warn("Color: Unknown color model " + style);
       }
-    } else if (m2 = /^\#([A-Fa-f\d]+)$/.exec(style)) {
-      const hex = m2[1];
+    } else if (m = /^\#([A-Fa-f\d]+)$/.exec(style)) {
+      const hex = m[1];
       const size = hex.length;
       if (size === 3) {
         return this.setRGB(
@@ -21341,9 +14210,9 @@ var Color = class {
    */
   getHSL(target, colorSpace = ColorManagement.workingColorSpace) {
     ColorManagement.workingToColorSpace(_color.copy(this), colorSpace);
-    const r = _color.r, g = _color.g, b2 = _color.b;
-    const max = Math.max(r, g, b2);
-    const min = Math.min(r, g, b2);
+    const r = _color.r, g = _color.g, b = _color.b;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
     let hue, saturation;
     const lightness = (min + max) / 2;
     if (min === max) {
@@ -21354,12 +14223,12 @@ var Color = class {
       saturation = lightness <= 0.5 ? delta / (max + min) : delta / (2 - max - min);
       switch (max) {
         case r:
-          hue = (g - b2) / delta + (g < b2 ? 6 : 0);
+          hue = (g - b) / delta + (g < b ? 6 : 0);
           break;
         case g:
-          hue = (b2 - r) / delta + 2;
+          hue = (b - r) / delta + 2;
           break;
-        case b2:
+        case b:
           hue = (r - g) / delta + 4;
           break;
       }
@@ -21392,11 +14261,11 @@ var Color = class {
    */
   getStyle(colorSpace = SRGBColorSpace) {
     ColorManagement.workingToColorSpace(_color.copy(this), colorSpace);
-    const r = _color.r, g = _color.g, b2 = _color.b;
+    const r = _color.r, g = _color.g, b = _color.b;
     if (colorSpace !== SRGBColorSpace) {
-      return `color(${colorSpace} ${r.toFixed(3)} ${g.toFixed(3)} ${b2.toFixed(3)})`;
+      return `color(${colorSpace} ${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)})`;
     }
-    return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b2 * 255)})`;
+    return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
   }
   /**
    * Adds the given HSL values to this color's values.
@@ -21542,10 +14411,10 @@ var Color = class {
    * @param {Vector3} v - The vector to set.
    * @return {Color} A reference to this color.
    */
-  setFromVector3(v2) {
-    this.r = v2.x;
-    this.g = v2.y;
-    this.b = v2.z;
+  setFromVector3(v) {
+    this.r = v.x;
+    this.g = v.y;
+    this.b = v.z;
     return this;
   }
   /**
@@ -21554,12 +14423,12 @@ var Color = class {
    * @param {Matrix3} m - The matrix.
    * @return {Color} A reference to this color.
    */
-  applyMatrix3(m2) {
-    const r = this.r, g = this.g, b2 = this.b;
-    const e = m2.elements;
-    this.r = e[0] * r + e[3] * g + e[6] * b2;
-    this.g = e[1] * r + e[4] * g + e[7] * b2;
-    this.b = e[2] * r + e[5] * g + e[8] * b2;
+  applyMatrix3(m) {
+    const r = this.r, g = this.g, b = this.b;
+    const e = m.elements;
+    this.r = e[0] * r + e[3] * g + e[6] * b;
+    this.g = e[1] * r + e[4] * g + e[7] * b;
+    this.b = e[2] * r + e[5] * g + e[8] * b;
     return this;
   }
   /**
@@ -21632,14 +14501,14 @@ function cloneUniforms(src) {
   const dst = {};
   for (const u in src) {
     dst[u] = {};
-    for (const p2 in src[u]) {
-      const property = src[u][p2];
+    for (const p in src[u]) {
+      const property = src[u][p];
       if (isThreeObject(property)) {
         if (property.isRenderTargetTexture) {
           warn("UniformsUtils: Textures of render targets cannot be cloned via cloneUniforms() or mergeUniforms().");
-          dst[u][p2] = null;
+          dst[u][p] = null;
         } else {
-          dst[u][p2] = property.clone();
+          dst[u][p] = property.clone();
         }
       } else if (Array.isArray(property)) {
         if (isThreeObject(property[0])) {
@@ -21647,12 +14516,12 @@ function cloneUniforms(src) {
           for (let i = 0, l = property.length; i < l; i++) {
             clonedProperty[i] = property[i].clone();
           }
-          dst[u][p2] = clonedProperty;
+          dst[u][p] = clonedProperty;
         } else {
-          dst[u][p2] = property.slice();
+          dst[u][p] = property.slice();
         }
       } else {
-        dst[u][p2] = property;
+        dst[u][p] = property;
       }
     }
   }
@@ -21663,8 +14532,8 @@ function mergeUniforms(uniforms) {
   const merged = {};
   for (let u = 0; u < uniforms.length; u++) {
     const tmp = cloneUniforms(uniforms[u]);
-    for (const p2 in tmp) {
-      merged[p2] = tmp[p2];
+    for (const p in tmp) {
+      merged[p] = tmp[p];
     }
   }
   return merged;
@@ -21890,10 +14759,10 @@ var CubicInterpolant = class extends Interpolant {
     this._offsetNext = iNext * stride;
   }
   interpolate_(i1, t0, t, t1) {
-    const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, o1 = i1 * stride, o0 = o1 - stride, oP = this._offsetPrev, oN = this._offsetNext, wP = this._weightPrev, wN = this._weightNext, p2 = (t - t0) / (t1 - t0), pp = p2 * p2, ppp = pp * p2;
-    const sP = -wP * ppp + 2 * wP * pp - wP * p2;
-    const s0 = (1 + wP) * ppp + (-1.5 - 2 * wP) * pp + (-0.5 + wP) * p2 + 1;
-    const s1 = (-1 - wN) * ppp + (1.5 + wN) * pp + 0.5 * p2;
+    const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, o1 = i1 * stride, o0 = o1 - stride, oP = this._offsetPrev, oN = this._offsetNext, wP = this._weightPrev, wN = this._weightNext, p = (t - t0) / (t1 - t0), pp = p * p, ppp = pp * p;
+    const sP = -wP * ppp + 2 * wP * pp - wP * p;
+    const s0 = (1 + wP) * ppp + (-1.5 - 2 * wP) * pp + (-0.5 + wP) * p + 1;
+    const s1 = (-1 - wN) * ppp + (1.5 + wN) * pp + 0.5 * p;
     const sN = wN * ppp - wN * pp;
     for (let i = 0; i !== stride; ++i) {
       result[i] = sP * values[oP + i] + s0 * values[o0 + i] + s1 * values[o1 + i] + sN * values[oN + i];
@@ -22024,22 +14893,22 @@ var KeyframeTrack = class {
    */
   static toJSON(track) {
     const trackType = track.constructor;
-    let json3;
+    let json2;
     if (trackType.toJSON !== this.toJSON) {
-      json3 = trackType.toJSON(track);
+      json2 = trackType.toJSON(track);
     } else {
-      json3 = {
+      json2 = {
         "name": track.name,
         "times": convertArray(track.times, Array),
         "values": convertArray(track.values, Array)
       };
       const interpolation = track.getInterpolation();
       if (interpolation !== track.DefaultInterpolation) {
-        json3.interpolation = interpolation;
+        json2.interpolation = interpolation;
       }
     }
-    json3.type = track.ValueTypeName;
-    return json3;
+    json2.type = track.ValueTypeName;
+    return json2;
   }
   /**
    * Factory method for creating a new discrete interpolant.
@@ -22272,9 +15141,9 @@ var KeyframeTrack = class {
     let writeIndex = 1;
     for (let i = 1; i < lastIndex; ++i) {
       let keep = false;
-      const time2 = times[i];
+      const time = times[i];
       const timeNext = times[i + 1];
-      if (time2 !== timeNext && (i !== 1 || time2 !== times[0])) {
+      if (time !== timeNext && (i !== 1 || time !== times[0])) {
         if (!smoothInterpolation) {
           const offset = i * stride, offsetP = offset - stride, offsetN = offset + stride;
           for (let j = 0; j !== stride; ++j) {
@@ -24646,34 +17515,34 @@ function fillRowHouses(arena, cx, cz, rng) {
   }
 }
 __name(fillRowHouses, "fillRowHouses");
-function eaveHeight(b2) {
-  return b2.h * (b2.kind === "tower" ? 0.78 : 0.7);
+function eaveHeight(b) {
+  return b.h * (b.kind === "tower" ? 0.78 : 0.7);
 }
 __name(eaveHeight, "eaveHeight");
-function insideBuildingXZ(arena, x2, z, inflate = 0) {
-  for (const b2 of arena.buildings) {
-    if (Math.abs(x2 - b2.x) < b2.w / 2 + inflate && Math.abs(z - b2.z) < b2.d / 2 + inflate) return true;
+function insideBuildingXZ(arena, x, z, inflate = 0) {
+  for (const b of arena.buildings) {
+    if (Math.abs(x - b.x) < b.w / 2 + inflate && Math.abs(z - b.z) < b.d / 2 + inflate) return true;
   }
   return false;
 }
 __name(insideBuildingXZ, "insideBuildingXZ");
 function resolveBuildingCollision(arena, pos, vel, radius) {
-  for (const b2 of arena.buildings) {
-    if (pos.y >= eaveHeight(b2)) continue;
-    const ex = b2.w / 2 + radius;
-    const ez = b2.d / 2 + radius;
-    const dx = pos.x - b2.x;
-    const dz = pos.z - b2.z;
+  for (const b of arena.buildings) {
+    if (pos.y >= eaveHeight(b)) continue;
+    const ex = b.w / 2 + radius;
+    const ez = b.d / 2 + radius;
+    const dx = pos.x - b.x;
+    const dz = pos.z - b.z;
     if (Math.abs(dx) >= ex || Math.abs(dz) >= ez) continue;
     const penX = ex - Math.abs(dx);
     const penZ = ez - Math.abs(dz);
     if (penX < penZ) {
       const side = dx >= 0 ? 1 : -1;
-      pos.x = b2.x + side * ex;
+      pos.x = b.x + side * ex;
       if (vel.x * side < 0) vel.x = 0;
     } else {
       const side = dz >= 0 ? 1 : -1;
-      pos.z = b2.z + side * ez;
+      pos.z = b.z + side * ez;
       if (vel.z * side < 0) vel.z = 0;
     }
   }
@@ -24684,8 +17553,8 @@ __name(resolveBuildingCollision, "resolveBuildingCollision");
 var CELL = 2;
 var CLEARANCE = 1.6;
 var SQRT2 = Math.SQRT2;
-function toIndex(grid, x2) {
-  return Math.floor((x2 + grid.extent) / grid.cell);
+function toIndex(grid, x) {
+  return Math.floor((x + grid.extent) / grid.cell);
 }
 __name(toIndex, "toIndex");
 function toWorld(grid, i) {
@@ -24697,8 +17566,8 @@ function cellWalkable(grid, ix, iz) {
   return grid.walkable[iz * grid.size + ix] === 1;
 }
 __name(cellWalkable, "cellWalkable");
-function isWalkable(grid, x2, z) {
-  return cellWalkable(grid, toIndex(grid, x2), toIndex(grid, z));
+function isWalkable(grid, x, z) {
+  return cellWalkable(grid, toIndex(grid, x), toIndex(grid, z));
 }
 __name(isWalkable, "isWalkable");
 function buildNavGrid(arena, clearance = CLEARANCE, cell = CELL) {
@@ -24708,16 +17577,16 @@ function buildNavGrid(arena, clearance = CLEARANCE, cell = CELL) {
   const wallLimit = arena.wallRadius - 2;
   for (let iz = 0; iz < size; iz++) {
     for (let ix = 0; ix < size; ix++) {
-      const x2 = toWorld(grid, ix);
+      const x = toWorld(grid, ix);
       const z = toWorld(grid, iz);
-      if (Math.hypot(x2, z) < wallLimit) grid.walkable[iz * size + ix] = 1;
+      if (Math.hypot(x, z) < wallLimit) grid.walkable[iz * size + ix] = 1;
     }
   }
-  for (const b2 of arena.buildings) {
-    const x0 = Math.max(0, toIndex(grid, b2.x - b2.w / 2 - clearance));
-    const x1 = Math.min(size - 1, toIndex(grid, b2.x + b2.w / 2 + clearance));
-    const z0 = Math.max(0, toIndex(grid, b2.z - b2.d / 2 - clearance));
-    const z1 = Math.min(size - 1, toIndex(grid, b2.z + b2.d / 2 + clearance));
+  for (const b of arena.buildings) {
+    const x0 = Math.max(0, toIndex(grid, b.x - b.w / 2 - clearance));
+    const x1 = Math.min(size - 1, toIndex(grid, b.x + b.w / 2 + clearance));
+    const z0 = Math.max(0, toIndex(grid, b.z - b.d / 2 - clearance));
+    const z1 = Math.min(size - 1, toIndex(grid, b.z + b.d / 2 + clearance));
     for (let iz = z0; iz <= z1; iz++) {
       for (let ix = x0; ix <= x1; ix++) {
         grid.walkable[iz * size + ix] = 0;
@@ -24727,8 +17596,8 @@ function buildNavGrid(arena, clearance = CLEARANCE, cell = CELL) {
   return grid;
 }
 __name(buildNavGrid, "buildNavGrid");
-function nearestWalkable(grid, x2, z) {
-  const cx = toIndex(grid, x2);
+function nearestWalkable(grid, x, z) {
+  const cx = toIndex(grid, x);
   const cz = toIndex(grid, z);
   for (let r = 0; r < grid.size; r++) {
     for (let dz = -r; dz <= r; dz++) {
@@ -24740,7 +17609,7 @@ function nearestWalkable(grid, x2, z) {
       }
     }
   }
-  return [x2, z];
+  return [x, z];
 }
 __name(nearestWalkable, "nearestWalkable");
 function lineWalkable(grid, x0, z0, x1, z1) {
@@ -24773,7 +17642,7 @@ function findPath(grid, fromX, fromZ, toX, toZ) {
   }, "octile");
   const heap = [];
   const fScore = new Float64Array(size * size).fill(Infinity);
-  const less = /* @__PURE__ */ __name((a2, b2) => fScore[a2] !== fScore[b2] ? fScore[a2] < fScore[b2] : g[a2] !== g[b2] ? g[a2] > g[b2] : a2 < b2, "less");
+  const less = /* @__PURE__ */ __name((a, b) => fScore[a] !== fScore[b] ? fScore[a] < fScore[b] : g[a] !== g[b] ? g[a] > g[b] : a < b, "less");
   const push = /* @__PURE__ */ __name((node) => {
     heap.push(node);
     let i2 = heap.length - 1;
@@ -25078,8 +17947,8 @@ function stepTitan(t, playerPos, dt, rng, arena, nav, allowChase = true) {
 __name(stepTitan, "stepTitan");
 
 // ../src/sim/combat.ts
-function trySlash(p2, titans) {
-  const speed = p2.vel.length();
+function trySlash(p, titans) {
+  const speed = p.vel.length();
   const none = {
     hit: false,
     napeHit: false,
@@ -25091,16 +17960,16 @@ function trySlash(p2, titans) {
     speed,
     bladeBroke: false
   };
-  if (p2.slashTimer > 0) return none;
-  if (p2.blades <= 0) return none;
-  p2.slashTimer = p2.config.slashCooldown;
+  if (p.slashTimer > 0) return none;
+  if (p.blades <= 0) return none;
+  p.slashTimer = p.config.slashCooldown;
   let best = null;
   let bestDist = Infinity;
   let napeHit = false;
   for (const t of titans) {
     if (t.hp <= 0) continue;
-    const napeDist = p2.pos.distanceTo(napeCenter(t));
-    if (napeDist <= p2.config.slashRange * 0.75 + t.height * 0.07 && napeDist < bestDist) {
+    const napeDist = p.pos.distanceTo(napeCenter(t));
+    if (napeDist <= p.config.slashRange * 0.75 + t.height * 0.07 && napeDist < bestDist) {
       best = t;
       bestDist = napeDist;
       napeHit = true;
@@ -25111,9 +17980,9 @@ function trySlash(p2, titans) {
       if (t.hp <= 0 || t.state === "crippled") continue;
       for (const side of [0, 1]) {
         if (t.ankles[side]) continue;
-        const ankleDist = p2.pos.distanceTo(anklePos(t, side));
-        if (ankleDist <= p2.config.slashRange * 0.4 + t.height * 0.02 && ankleDist < bestDist) {
-          const bladeBroke2 = wearBlade(p2, 1);
+        const ankleDist = p.pos.distanceTo(anklePos(t, side));
+        if (ankleDist <= p.config.slashRange * 0.4 + t.height * 0.02 && ankleDist < bestDist) {
+          const bladeBroke2 = wearBlade(p, 1);
           t.ankles[side] = true;
           const crippled = crippleTitan(t);
           return {
@@ -25136,17 +18005,17 @@ function trySlash(p2, titans) {
   if (!best) {
     for (const t of titans) {
       if (t.hp <= 0) continue;
-      const bodyDist = p2.pos.distanceTo(bodyCenter(t));
-      if (bodyDist <= p2.config.slashRange + t.height * 0.22 && bodyDist < bestDist) {
+      const bodyDist = p.pos.distanceTo(bodyCenter(t));
+      if (bodyDist <= p.config.slashRange + t.height * 0.22 && bodyDist < bestDist) {
         best = t;
         bestDist = bodyDist;
       }
     }
   }
   if (!best) return none;
-  const bladeBroke = wearBlade(p2, napeHit ? 1 : 2);
+  const bladeBroke = wearBlade(p, napeHit ? 1 : 2);
   if (napeHit) {
-    if (speed >= p2.config.killSpeed) {
+    if (speed >= p.config.killSpeed) {
       const oneCut = best.hp === best.maxHp;
       const damage3 = best.hp;
       best.hp = 0;
@@ -25163,7 +18032,7 @@ function trySlash(p2, titans) {
         titanId: best.id
       };
     }
-    const damage2 = Math.max(6, 45 * Math.pow(speed / p2.config.killSpeed, 1.5));
+    const damage2 = Math.max(6, 45 * Math.pow(speed / p.config.killSpeed, 1.5));
     best.hp = Math.max(0, best.hp - damage2);
     return {
       hit: true,
@@ -25194,11 +18063,11 @@ function trySlash(p2, titans) {
   };
 }
 __name(trySlash, "trySlash");
-function wearBlade(p2, amount) {
-  p2.bladeHp -= amount;
-  if (p2.bladeHp > 0) return false;
-  p2.blades -= 1;
-  p2.bladeHp = p2.blades > 0 ? p2.config.bladeDurability : 0;
+function wearBlade(p, amount) {
+  p.bladeHp -= amount;
+  if (p.bladeHp > 0) return false;
+  p.blades -= 1;
+  p.bladeHp = p.blades > 0 ? p.config.bladeDurability : 0;
   return true;
 }
 __name(wearBlade, "wearBlade");
@@ -25291,86 +18160,86 @@ var UPGRADE_POOL = [
     id: "gas-tank",
     name: "Expanded Gas Tank",
     desc: "+40% gas capacity, tank refilled",
-    apply(p2) {
-      p2.config.maxGas = Math.round(p2.config.maxGas * 1.4);
-      p2.gas = p2.config.maxGas;
+    apply(p) {
+      p.config.maxGas = Math.round(p.config.maxGas * 1.4);
+      p.gas = p.config.maxGas;
     }
   },
   {
     id: "sharp-blades",
     name: "Ultrahard Steel",
     desc: "One-cut speed threshold -15%",
-    apply(p2) {
-      p2.config.killSpeed *= 0.85;
+    apply(p) {
+      p.config.killSpeed *= 0.85;
     }
   },
   {
     id: "long-cables",
     name: "Extended Cables",
     desc: "+25% hook range",
-    apply(p2) {
-      p2.config.hookRange *= 1.25;
+    apply(p) {
+      p.config.hookRange *= 1.25;
     }
   },
   {
     id: "fast-reel",
     name: "Winch Overdrive",
     desc: "+50% reel speed",
-    apply(p2) {
-      p2.config.reelSpeed *= 1.5;
+    apply(p) {
+      p.config.reelSpeed *= 1.5;
     }
   },
   {
     id: "extra-blades",
     name: "Spare Blade Racks",
     desc: "+2 blade pairs, now and at resupply",
-    apply(p2) {
-      p2.config.bladePairs += 2;
-      p2.blades += 2;
-      if (p2.bladeHp <= 0) p2.bladeHp = p2.config.bladeDurability;
+    apply(p) {
+      p.config.bladePairs += 2;
+      p.blades += 2;
+      if (p.bladeHp <= 0) p.bladeHp = p.config.bladeDurability;
     }
   },
   {
     id: "heart",
     name: "Survivor's Resolve",
     desc: "+1 heart, fully healed",
-    apply(p2) {
-      p2.config.maxHp += 1;
-      p2.hp = p2.config.maxHp;
+    apply(p) {
+      p.config.maxHp += 1;
+      p.hp = p.config.maxHp;
     }
   },
   {
     id: "spare-canister",
     name: "Spare Canister",
     desc: "+1 gas canister, now and at resupply",
-    apply(p2) {
-      p2.config.gasCanisters += 1;
-      p2.canisters += 1;
+    apply(p) {
+      p.config.gasCanisters += 1;
+      p.canisters += 1;
     }
   },
   {
     id: "gas-refund",
     name: "Combat Scavenging",
     desc: "Each kill refunds 12 gas",
-    apply(p2) {
-      p2.config.gasKillRefund += 12;
+    apply(p) {
+      p.config.gasKillRefund += 12;
     }
   },
   {
     id: "wind-dancer",
     name: "Wind Dancer",
     desc: "+60% air control, +30% air boost",
-    apply(p2) {
-      p2.config.airControl *= 1.6;
-      p2.config.airBoostThrust *= 1.3;
+    apply(p) {
+      p.config.airControl *= 1.6;
+      p.config.airBoostThrust *= 1.3;
     }
   },
   {
     id: "thrusters",
     name: "Tuned Thrusters",
     desc: "+20% gas thrust",
-    apply(p2) {
-      p2.config.gasThrust *= 1.2;
+    apply(p) {
+      p.config.gasThrust *= 1.2;
     }
   }
 ];
@@ -25378,10 +18247,10 @@ function offerUpgrades(rng, count = 3) {
   return shuffle(rng, UPGRADE_POOL).slice(0, count);
 }
 __name(offerUpgrades, "offerUpgrades");
-function applyUpgrade(p2, id) {
+function applyUpgrade(p, id) {
   const upgrade = UPGRADE_POOL.find((u) => u.id === id);
   if (!upgrade) throw new Error(`Unknown upgrade: ${id}`);
-  upgrade.apply(p2);
+  upgrade.apply(p);
 }
 __name(applyUpgrade, "applyUpgrade");
 
@@ -25458,7 +18327,7 @@ function createCoopWorld(seed, playerIds, citySeed = seed) {
 __name(createCoopWorld, "createCoopWorld");
 function connectedCount(w) {
   let n = 0;
-  for (const p2 of w.players.values()) if (p2.connected) n++;
+  for (const p of w.players.values()) if (p.connected) n++;
   return n;
 }
 __name(connectedCount, "connectedCount");
@@ -25466,15 +18335,15 @@ function spawnWave(w) {
   const rng = createRng(hashSeed(`${w.seed}:wave:${w.wave}`));
   const scale = 1 + COOP_SCALE_PER_PLAYER * (Math.max(1, connectedCount(w)) - 1);
   w.titans = waveComposition(w.wave, rng, scale).map((s) => {
-    const [x2, z] = nearestWalkable(w.nav, s.x, s.z);
-    return createTitan({ id: w.nextTitanId++, kind: s.kind, height: s.height, x: x2, z });
+    const [x, z] = nearestWalkable(w.nav, s.x, s.z);
+    return createTitan({ id: w.nextTitanId++, kind: s.kind, height: s.height, x, z });
   });
   w.history.clear();
 }
 __name(spawnWave, "spawnWave");
 function applyPlayerUpdate(w, playerId, update) {
-  const p2 = w.players.get(playerId);
-  if (!p2 || !p2.connected) return;
+  const p = w.players.get(playerId);
+  if (!p || !p.connected) return;
   const pos = update.pos.clone();
   const radial = Math.hypot(pos.x, pos.z);
   const maxRadial = w.arena.wallRadius + 60;
@@ -25485,25 +18354,25 @@ function applyPlayerUpdate(w, playerId, update) {
   pos.y = Math.min(400, Math.max(0, pos.y));
   const vel = update.vel.clone();
   if (vel.length() > MAX_REPORTED_SPEED) vel.setLength(MAX_REPORTED_SPEED);
-  p2.body.pos.copy(pos);
-  p2.body.vel.copy(vel);
-  p2.body.onGround = update.onGround;
-  p2.onGround = update.onGround;
-  if (update.pose) p2.pose = update.pose;
+  p.body.pos.copy(pos);
+  p.body.vel.copy(vel);
+  p.body.onGround = update.onGround;
+  p.onGround = update.onGround;
+  if (update.pose) p.pose = update.pose;
 }
 __name(applyPlayerUpdate, "applyPlayerUpdate");
 function pickTargets(w) {
   const alive = [];
-  for (const p2 of w.players.values()) if (p2.connected && p2.alive) alive.push(p2);
+  for (const p of w.players.values()) if (p.connected && p.alive) alive.push(p);
   const targets = /* @__PURE__ */ new Map();
   if (alive.length === 0) return targets;
   for (const t of w.titans) {
     let best = alive[0];
     let bestDist = Infinity;
-    for (const p2 of alive) {
-      const dist = Math.hypot(p2.body.pos.x - t.pos.x, p2.body.pos.z - t.pos.z);
+    for (const p of alive) {
+      const dist = Math.hypot(p.body.pos.x - t.pos.x, p.body.pos.z - t.pos.z);
       if (dist < bestDist) {
-        best = p2;
+        best = p;
         bestDist = dist;
       }
     }
@@ -25526,7 +18395,7 @@ function pickCoopChasers(w, targets) {
   }
   const tokens = /* @__PURE__ */ new Set();
   for (const group of groups.values()) {
-    group.sort((a2, b2) => a2.key - b2.key || a2.id - b2.id);
+    group.sort((a, b) => a.key - b.key || a.id - b.id);
     for (const c of group.slice(0, CHASERS_PER_PLAYER)) tokens.add(c.id);
   }
   return tokens;
@@ -25546,23 +18415,23 @@ function coopStep(w, dt) {
   if (w.phase === "ended") return events;
   w.time += dt;
   w.tick += 1;
-  for (const p2 of w.players.values()) {
-    if (!p2.connected) continue;
-    p2.body.slashTimer = Math.max(0, p2.body.slashTimer - dt);
-    p2.body.invulnTimer = Math.max(0, p2.body.invulnTimer - dt);
-    stepScore(p2.score, dt);
+  for (const p of w.players.values()) {
+    if (!p.connected) continue;
+    p.body.slashTimer = Math.max(0, p.body.slashTimer - dt);
+    p.body.invulnTimer = Math.max(0, p.body.invulnTimer - dt);
+    stepScore(p.score, dt);
   }
   if (w.phase === "upgrading") {
     w.pickTimer -= dt;
     if (w.pickTimer <= 0) {
-      for (const p2 of w.players.values()) {
-        if (!p2.connected || p2.picked) continue;
-        const fallback = p2.offers[0];
+      for (const p of w.players.values()) {
+        if (!p.connected || p.picked) continue;
+        const fallback = p.offers[0];
         if (fallback) {
-          applyUpgrade(p2.body, fallback.id);
-          events.push({ type: "upgradePicked", playerId: p2.id, upgradeId: fallback.id, auto: true });
+          applyUpgrade(p.body, fallback.id);
+          events.push({ type: "upgradePicked", playerId: p.id, upgradeId: fallback.id, auto: true });
         }
-        p2.picked = true;
+        p.picked = true;
       }
       events.push(...startNextWave(w));
     }
@@ -25580,23 +18449,23 @@ function coopStep(w, dt) {
     if (!target) continue;
     for (const event of stepTitan(titan, target.pos, dt, w.rngLive, w.arena, w.nav, chasers.has(titan.id))) {
       if (event.type !== "swat") continue;
-      for (const p2 of w.players.values()) {
-        if (!p2.connected || !p2.alive || p2.body.invulnTimer > 0) continue;
-        if (p2.body.pos.distanceTo(event.pos) > event.radius) continue;
-        p2.body.hp -= 1;
-        p2.body.invulnTimer = 1.2;
-        const away = new Vector3(p2.body.pos.x - titan.pos.x, 0, p2.body.pos.z - titan.pos.z);
+      for (const p of w.players.values()) {
+        if (!p.connected || !p.alive || p.body.invulnTimer > 0) continue;
+        if (p.body.pos.distanceTo(event.pos) > event.radius) continue;
+        p.body.hp -= 1;
+        p.body.invulnTimer = 1.2;
+        const away = new Vector3(p.body.pos.x - titan.pos.x, 0, p.body.pos.z - titan.pos.z);
         if (away.lengthSq() > 0) away.normalize();
         events.push({
           type: "playerHit",
-          playerId: p2.id,
-          hp: p2.body.hp,
+          playerId: p.id,
+          hp: p.body.hp,
           knockback: { x: away.x * 18, y: 9, z: away.z * 18 }
         });
-        if (p2.body.hp <= 0) {
-          p2.alive = false;
-          p2.deaths += 1;
-          events.push({ type: "playerDied", playerId: p2.id });
+        if (p.body.hp <= 0) {
+          p.alive = false;
+          p.deaths += 1;
+          events.push({ type: "playerDied", playerId: p.id });
         }
       }
     }
@@ -25604,19 +18473,19 @@ function coopStep(w, dt) {
   if (w.titans.length > 0 && w.titans.every((t) => t.hp <= 0)) {
     const bonus = WAVE_BONUS * w.wave;
     let index = 0;
-    for (const p2 of w.players.values()) {
-      if (!p2.connected) continue;
-      p2.score.score += bonus;
-      p2.offers = offerUpgrades(createRng(hashSeed(`${w.seed}:offers:${w.wave}:${p2.id}`)));
-      p2.picked = false;
-      if (!p2.alive) {
-        p2.alive = true;
-        p2.body.hp = p2.body.config.maxHp;
+    for (const p of w.players.values()) {
+      if (!p.connected) continue;
+      p.score.score += bonus;
+      p.offers = offerUpgrades(createRng(hashSeed(`${w.seed}:offers:${w.wave}:${p.id}`)));
+      p.picked = false;
+      if (!p.alive) {
+        p.alive = true;
+        p.body.hp = p.body.config.maxHp;
         const pos = musterPos(index, connectedCount(w));
-        p2.body.pos.copy(pos);
-        events.push({ type: "respawn", playerId: p2.id, pos: { x: pos.x, y: pos.y, z: pos.z } });
+        p.body.pos.copy(pos);
+        events.push({ type: "respawn", playerId: p.id, pos: { x: pos.x, y: pos.y, z: pos.z } });
       }
-      events.push({ type: "offers", playerId: p2.id, upgradeIds: p2.offers.map((u) => u.id) });
+      events.push({ type: "offers", playerId: p.id, upgradeIds: p.offers.map((u) => u.id) });
       index += 1;
     }
     w.phase = "upgrading";
@@ -25625,24 +18494,24 @@ function coopStep(w, dt) {
     return events;
   }
   let anyAlive = false;
-  for (const p2 of w.players.values()) if (p2.connected && p2.alive) anyAlive = true;
+  for (const p of w.players.values()) if (p.connected && p.alive) anyAlive = true;
   if (!anyAlive) events.push(endMatch(w));
   return events;
 }
 __name(coopStep, "coopStep");
 function allPicked(w) {
-  for (const p2 of w.players.values()) if (p2.connected && !p2.picked) return false;
+  for (const p of w.players.values()) if (p.connected && !p.picked) return false;
   return true;
 }
 __name(allPicked, "allPicked");
 function startNextWave(w) {
   w.wave += 1;
-  for (const p2 of w.players.values()) {
-    if (!p2.connected) continue;
-    p2.body.hp = p2.body.config.maxHp;
-    p2.alive = true;
-    p2.offers = [];
-    p2.picked = false;
+  for (const p of w.players.values()) {
+    if (!p.connected) continue;
+    p.body.hp = p.body.config.maxHp;
+    p.alive = true;
+    p.offers = [];
+    p.picked = false;
   }
   spawnWave(w);
   w.phase = "playing";
@@ -25650,7 +18519,7 @@ function startNextWave(w) {
 }
 __name(startNextWave, "startNextWave");
 function endMatch(w) {
-  const ranked = [...w.players.values()].map((p2) => ({ id: p2.id, score: p2.score.score, kills: p2.score.kills, deaths: p2.deaths })).sort((a2, b2) => b2.score - a2.score || a2.id.localeCompare(b2.id));
+  const ranked = [...w.players.values()].map((p) => ({ id: p.id, score: p.score.score, kills: p.score.kills, deaths: p.deaths })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
   w.results = {
     wavesCleared: w.wave - 1,
     durationS: w.time,
@@ -25684,11 +18553,11 @@ __name(rewindTitans, "rewindTitans");
 function coopSlash(w, playerId, rewindS = SLASH_REWIND) {
   const events = [];
   if (w.phase !== "playing") return events;
-  const p2 = w.players.get(playerId);
-  if (!p2 || !p2.connected || !p2.alive) return events;
+  const p = w.players.get(playerId);
+  if (!p || !p.connected || !p.alive) return events;
   const restore = rewindS > 0 ? rewindTitans(w, rewindS) : () => {
   };
-  const result = trySlash(p2.body, w.titans);
+  const result = trySlash(p.body, w.titans);
   restore();
   if (result.hit || result.bladeBroke) {
     events.push({ type: "slash", playerId, hit: result.hit, napeHit: result.napeHit });
@@ -25710,12 +18579,12 @@ function coopSlash(w, playerId, rewindS = SLASH_REWIND) {
     const killed = w.titans.find((t) => t.id === result.titanId);
     const abnormal = killed?.kind === "abnormal";
     const points = registerKill(
-      p2.score,
-      { speed: result.speed, airborne: !p2.onGround, oneCut: result.oneCut, abnormal },
-      p2.body.config.killSpeed
+      p.score,
+      { speed: result.speed, airborne: !p.onGround, oneCut: result.oneCut, abnormal },
+      p.body.config.killSpeed
     );
-    const heartGained = p2.body.hp < p2.body.config.maxHp;
-    if (heartGained) p2.body.hp += 1;
+    const heartGained = p.body.hp < p.body.config.maxHp;
+    if (heartGained) p.body.hp += 1;
     events.push({
       type: "kill",
       playerId,
@@ -25732,12 +18601,12 @@ function coopSlash(w, playerId, rewindS = SLASH_REWIND) {
 __name(coopSlash, "coopSlash");
 function coopPickUpgrade(w, playerId, upgradeId) {
   if (w.phase !== "upgrading") return [];
-  const p2 = w.players.get(playerId);
-  if (!p2 || !p2.connected || p2.picked) return [];
-  const offer = p2.offers.find((u) => u.id === upgradeId);
+  const p = w.players.get(playerId);
+  if (!p || !p.connected || p.picked) return [];
+  const offer = p.offers.find((u) => u.id === upgradeId);
   if (!offer) return [];
-  applyUpgrade(p2.body, offer.id);
-  p2.picked = true;
+  applyUpgrade(p.body, offer.id);
+  p.picked = true;
   const events = [{ type: "upgradePicked", playerId, upgradeId, auto: false }];
   if (allPicked(w)) events.push(...startNextWave(w));
   return events;
@@ -25745,22 +18614,22 @@ function coopPickUpgrade(w, playerId, upgradeId) {
 __name(coopPickUpgrade, "coopPickUpgrade");
 function coopResupply(w, playerId) {
   if (w.phase === "ended") return [];
-  const p2 = w.players.get(playerId);
-  if (!p2 || !p2.connected || !p2.alive) return [];
-  const dist = Math.hypot(p2.body.pos.x - w.arena.station.x, p2.body.pos.z - w.arena.station.z);
+  const p = w.players.get(playerId);
+  if (!p || !p.connected || !p.alive) return [];
+  const dist = Math.hypot(p.body.pos.x - w.arena.station.x, p.body.pos.z - w.arena.station.z);
   if (dist > RESUPPLY_RADIUS) return [];
-  p2.body.gas = p2.body.config.maxGas;
-  p2.body.canisters = p2.body.config.gasCanisters;
-  p2.body.blades = p2.body.config.bladePairs;
-  p2.body.bladeHp = p2.body.config.bladeDurability;
-  p2.body.hp = p2.body.config.maxHp;
+  p.body.gas = p.body.config.maxGas;
+  p.body.canisters = p.body.config.gasCanisters;
+  p.body.blades = p.body.config.bladePairs;
+  p.body.bladeHp = p.body.config.bladeDurability;
+  p.body.hp = p.body.config.maxHp;
   return [{ type: "resupply", playerId }];
 }
 __name(coopResupply, "coopResupply");
 function removePlayer(w, playerId) {
-  const p2 = w.players.get(playerId);
-  if (!p2 || !p2.connected) return [];
-  p2.connected = false;
+  const p = w.players.get(playerId);
+  if (!p || !p.connected) return [];
+  p.connected = false;
   const events = [];
   if (w.phase === "playing") {
     let anyAlive = false;
@@ -25774,7 +18643,7 @@ function removePlayer(w, playerId) {
   return events;
 }
 __name(removePlayer, "removePlayer");
-var r2 = /* @__PURE__ */ __name((v2) => Math.round(v2 * 100) / 100, "r2");
+var r2 = /* @__PURE__ */ __name((v) => Math.round(v * 100) / 100, "r2");
 function coopSnapshot(w) {
   return {
     tick: w.tick,
@@ -25794,28 +18663,28 @@ function coopSnapshot(w) {
       maxHp: t.maxHp,
       ankles: [t.ankles[0], t.ankles[1]]
     })),
-    players: [...w.players.values()].map((p2) => ({
-      id: p2.id,
-      x: r2(p2.body.pos.x),
-      y: r2(p2.body.pos.y),
-      z: r2(p2.body.pos.z),
-      vx: r2(p2.body.vel.x),
-      vy: r2(p2.body.vel.y),
-      vz: r2(p2.body.vel.z),
-      onGround: p2.onGround,
-      yaw: r2(p2.pose.yaw),
-      pitch: r2(p2.pose.pitch),
-      hooks: p2.pose.hooks,
-      hp: p2.body.hp,
-      maxHp: p2.body.config.maxHp,
-      alive: p2.alive,
-      connected: p2.connected,
-      score: p2.score.score,
-      kills: p2.score.kills,
-      combo: p2.score.combo,
-      blades: p2.body.blades,
-      bladeHp: p2.body.bladeHp,
-      picked: p2.picked
+    players: [...w.players.values()].map((p) => ({
+      id: p.id,
+      x: r2(p.body.pos.x),
+      y: r2(p.body.pos.y),
+      z: r2(p.body.pos.z),
+      vx: r2(p.body.vel.x),
+      vy: r2(p.body.vel.y),
+      vz: r2(p.body.vel.z),
+      onGround: p.onGround,
+      yaw: r2(p.pose.yaw),
+      pitch: r2(p.pose.pitch),
+      hooks: p.pose.hooks,
+      hp: p.body.hp,
+      maxHp: p.body.config.maxHp,
+      alive: p.alive,
+      connected: p.connected,
+      score: p.score.score,
+      kills: p.score.kills,
+      combo: p.score.combo,
+      blades: p.body.blades,
+      bladeHp: p.body.bladeHp,
+      picked: p.picked
     })),
     results: w.results
   };
@@ -25848,7 +18717,7 @@ var MatchRoom = class extends Server {
   matchIndex = 0;
   async onConnect(conn, ctx) {
     const token = new URL(ctx.request.url).searchParams.get("token") ?? "";
-    const session = token ? await validateSessionToken(createDb(this.env.DATABASE_URL), token) : null;
+    const session = token ? await validateSessionToken(createDb(this.env.DB), token) : null;
     if (!session) return this.refuse(conn, "unauthorized", 4001, "Sign in to muster");
     for (const member of this.members.values()) {
       if (member.handle === session.username) {
@@ -25883,7 +18752,7 @@ var MatchRoom = class extends Server {
         if (this.phase !== "lobby") return;
         if (member.handle !== this.creator) return this.sendError(conn, "not-creator", "Only the squad leader starts");
         const allReady = [...this.members.values()].every(
-          (m2) => m2.handle === this.creator || this.ready.has(m2.handle)
+          (m) => m.handle === this.creator || this.ready.has(m.handle)
         );
         if (!allReady) return;
         this.startMatch();
@@ -25941,8 +18810,8 @@ var MatchRoom = class extends Server {
     this.onClose(conn);
   }
   startMatch() {
-    const roster = [...this.members.values()].map((m2) => m2.handle);
-    this.rosterIds = new Map([...this.members.values()].map((m2) => [m2.handle, m2.userId]));
+    const roster = [...this.members.values()].map((m) => m.handle);
+    this.rosterIds = new Map([...this.members.values()].map((m) => [m.handle, m.userId]));
     this.matchIndex += 1;
     const citySeed = `coop-${this.name.toLowerCase()}`;
     this.seed = `${citySeed}#${this.matchIndex}`;
@@ -25986,7 +18855,7 @@ var MatchRoom = class extends Server {
       this.broadcastMsg({ v: PROTOCOL_VERSION, type: "results", results });
       if (!this.matchWritten) {
         this.matchWritten = true;
-        const write = writeMatch(createDb(this.env.DATABASE_URL), this.name, this.seed, results, this.rosterIds);
+        const write = writeMatch(createDb(this.env.DB), this.name, this.seed, results, this.rosterIds);
         this.ctx.waitUntil(
           write.catch((err) => console.error("match write failed", err instanceof Error ? err.message : err))
         );
@@ -26019,10 +18888,10 @@ var MatchRoom = class extends Server {
     if (this.world?.phase === "ended") this.finishMatch();
   }
   broadcastLobby() {
-    const players = [...this.members.values()].map((m2) => ({
-      id: m2.handle,
-      ready: m2.handle === this.creator || this.ready.has(m2.handle),
-      inMatch: this.world ? this.world.players.get(m2.handle)?.connected ?? false : !m2.spectator,
+    const players = [...this.members.values()].map((m) => ({
+      id: m.handle,
+      ready: m.handle === this.creator || this.ready.has(m.handle),
+      inMatch: this.world ? this.world.players.get(m.handle)?.connected ?? false : !m.spectator,
       connected: true
     }));
     for (const [connId, member] of this.members) {
@@ -26105,7 +18974,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env2, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-p5eY9z/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-ZBGBTM/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -26137,7 +19006,7 @@ function __facade_invoke__(request, env2, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-p5eY9z/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-ZBGBTM/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -26241,21 +19110,6 @@ export {
   middleware_loader_entry_default as default
 };
 /*! Bundled license information:
-
-@neondatabase/serverless/index.mjs:
-  (*! Bundled license information:
-  
-  ieee754/index.js:
-    (*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> *)
-  
-  buffer/index.js:
-    (*!
-     * The buffer module from node.js, for the browser.
-     *
-     * @author   Feross Aboukhadijeh <https://feross.org>
-     * @license  MIT
-     *)
-  *)
 
 three/build/three.core.js:
 three/build/three.module.js:

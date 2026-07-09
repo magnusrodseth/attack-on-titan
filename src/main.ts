@@ -4,6 +4,7 @@ import { CoopSession } from './coopSession'
 import { Hud } from './hud'
 import type { Account } from './net/client'
 import { clearAccount, fetchLeaderboard, loadAccount, login, register } from './net/client'
+import type { Leaderboard } from './net/protocol'
 import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
@@ -637,10 +638,29 @@ hud.onLeaveLobby = () => {
   gotoLobby(null)
 }
 hud.onRematch = () => coop?.sendRematch()
+// stale-while-revalidate: paint the cached board instantly, refresh in the background
+const LB_CACHE_KEY = 'aot-leaderboard-cache'
+let leaderboardCache: Leaderboard | null = null
+try {
+  const raw = localStorage.getItem(LB_CACHE_KEY)
+  if (raw) leaderboardCache = JSON.parse(raw) as Leaderboard
+} catch {
+  // corrupt cache: first open shows skeletons instead
+}
 hud.onOpenLeaderboard = () => {
-  hud.showLeaderboard(null)
+  hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading')
   void fetchLeaderboard().then((data) => {
-    if (hud.leaderboardOpen) hud.showLeaderboard(data)
+    if (data) {
+      leaderboardCache = data
+      try {
+        localStorage.setItem(LB_CACHE_KEY, JSON.stringify(data))
+      } catch {
+        // cache is a nicety
+      }
+      if (hud.leaderboardOpen) hud.showLeaderboard(data)
+    } else if (!leaderboardCache && hud.leaderboardOpen) {
+      hud.showLeaderboard(null, 'error')
+    }
   })
 }
 hud.onCloseLeaderboard = () => {

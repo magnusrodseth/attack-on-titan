@@ -1,44 +1,50 @@
-import { boolean, integer, pgTable, primaryKey, real, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
+export const users = sqliteTable('users', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   username: text('username').notNull(),
   usernameLower: text('username_lower').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
 })
 
-export const sessions = pgTable('sessions', {
+export const sessions = sqliteTable('sessions', {
   tokenHash: text('token_hash').primaryKey(),
-  userId: uuid('user_id')
+  userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
-export const matches = pgTable('matches', {
-  id: uuid('id').primaryKey(),
+export const matches = sqliteTable('matches', {
+  id: text('id').primaryKey(),
   roomCode: text('room_code').notNull(),
   seed: text('seed').notNull(),
   playersCount: integer('players_count').notNull(),
   wavesCleared: integer('waves_cleared').notNull(),
   durationS: real('duration_s').notNull(),
-  endedAt: timestamp('ended_at', { withTimezone: true }).notNull().defaultNow(),
+  endedAt: integer('ended_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
 })
 
-export const matchPlayers = pgTable(
+export const matchPlayers = sqliteTable(
   'match_players',
   {
-    matchId: uuid('match_id')
+    matchId: text('match_id')
       .notNull()
       .references(() => matches.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
+    userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     score: integer('score').notNull(),
     kills: integer('kills').notNull(),
     deaths: integer('deaths').notNull(),
-    mvp: boolean('mvp').notNull().default(false),
+    mvp: integer('mvp', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => [primaryKey({ columns: [t.matchId, t.userId] })],
 )

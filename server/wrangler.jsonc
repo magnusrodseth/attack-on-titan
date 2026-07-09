@@ -7,5 +7,13 @@
     "bindings": [{ "name": "MatchRoom", "class_name": "MatchRoom" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MatchRoom"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "aot",
+      "database_id": "ead6d99a-1c30-4ad0-9fde-1330ee540b49",
+      "migrations_dir": "drizzle"
+    }
+  ],
   "observability": { "enabled": true }
 }

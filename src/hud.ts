@@ -62,6 +62,10 @@ export class Hud {
   private squad = el('squad')
   private feed = el('feed')
   private pickStatus = el('pick-status')
+  private toastEl = el('toast')
+  private toastTimer: number | undefined
+  private copyTimer: number | undefined
+  private joinUrl = ''
 
   onStart: () => void = () => {}
   onRestart: () => void = () => {}
@@ -111,6 +115,7 @@ export class Hud {
     el<HTMLInputElement>('coop-join-code').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.onJoinLobby(el<HTMLInputElement>('coop-join-code').value)
     })
+    el<HTMLButtonElement>('lobby-copy').addEventListener('click', () => void this.copyJoinLink())
     el<HTMLButtonElement>('lobby-ready').addEventListener('click', () => this.onReadyToggle())
     el<HTMLButtonElement>('lobby-start').addEventListener('click', () => this.onStartMatch())
     el<HTMLButtonElement>('lobby-leave').addEventListener('click', () => this.onLeaveLobby())
@@ -321,10 +326,9 @@ export class Hud {
     this.start.classList.add('hidden')
     this.resultsPanel.classList.add('hidden')
     this.lobbyPanel.classList.remove('hidden')
+    this.joinUrl = joinUrl
     el('lobby-title').textContent = lobby.code.toUpperCase()
-    el('lobby-share').innerHTML =
-      `Share this district with your squad: <b style="color: var(--brass-bright)">${joinUrl}</b><br />` +
-      `${lobby.players.length} / ${lobby.maxPlayers} soldiers mustered`
+    el('lobby-share').textContent = `${lobby.players.length} / ${lobby.maxPlayers} soldiers mustered`
     const roster = el('lobby-roster')
     roster.innerHTML = ''
     for (const player of lobby.players) {
@@ -355,6 +359,36 @@ export class Hud {
 
   hideLobby(): void {
     this.lobbyPanel.classList.add('hidden')
+  }
+
+  private async copyJoinLink(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.joinUrl)
+    } catch {
+      // clipboard API can be denied outside secure contexts: fall back to the classic trick
+      const scratch = document.createElement('textarea')
+      scratch.value = this.joinUrl
+      document.body.appendChild(scratch)
+      scratch.select()
+      document.execCommand('copy')
+      scratch.remove()
+    }
+    const btn = el<HTMLButtonElement>('lobby-copy')
+    btn.textContent = 'Link Copied'
+    btn.classList.add('copied')
+    window.clearTimeout(this.copyTimer)
+    this.copyTimer = window.setTimeout(() => {
+      btn.textContent = 'Copy Squad Link'
+      btn.classList.remove('copied')
+    }, 1600)
+    this.toast('Squad link copied · Send it to your soldiers')
+  }
+
+  toast(text: string): void {
+    this.toastEl.textContent = text
+    this.toastEl.classList.add('show')
+    window.clearTimeout(this.toastTimer)
+    this.toastTimer = window.setTimeout(() => this.toastEl.classList.remove('show'), 2600)
   }
 
   get lobbyOpen(): boolean {
@@ -419,14 +453,24 @@ export class Hud {
     this.pickStatus.textContent = text
   }
 
-  showLeaderboard(data: Leaderboard | null): void {
+  showLeaderboard(data: Leaderboard | null, state: 'loading' | 'ready' | 'error' = 'ready'): void {
     this.start.classList.add('hidden')
     this.leaderboardPanel.classList.remove('hidden')
     const teams = el('lb-teams')
     const soldiers = el('lb-soldiers')
     if (!data) {
-      teams.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
-      soldiers.innerHTML = ''
+      if (state === 'loading') {
+        // skeleton rows hold the exact card layout while the archive loads
+        const skeletons = Array.from(
+          { length: 5 },
+          () => '<div class="lb-row skeleton"><span class="sk-bar"></span><span class="sk-bar sk-short"></span></div>',
+        ).join('')
+        teams.innerHTML = skeletons
+        soldiers.innerHTML = skeletons
+      } else {
+        teams.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
+        soldiers.innerHTML = '<div class="lb-empty"></div>'
+      }
       return
     }
     teams.innerHTML =

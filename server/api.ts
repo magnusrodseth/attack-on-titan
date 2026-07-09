@@ -51,7 +51,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     return new Response(null, { status: 204, headers: corsHeaders(request) })
   }
   const path = new URL(request.url).pathname
-  const db = createDb(env.DATABASE_URL)
+  const db = createDb(env.DB)
 
   if (path === '/api/health') return json(request, 200, { ok: true })
 

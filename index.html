@@ -342,9 +342,46 @@
         font-size: 16px; color: var(--parchment); }
       .lb-row b { color: #ffd57a; font-family: var(--header-font); letter-spacing: 1px; }
       .lb-row .lb-sub { color: #9b8a68; font-size: 13px; letter-spacing: 1px; }
-      .lb-empty { color: #9b8a68; font-size: 16px; padding: 12px; }
+      .lb-empty { color: #9b8a68; font-size: 16px; padding: 12px; min-height: 22px; }
+      .lb-rows { min-height: 230px; } /* five rows: data replaces skeletons without layout shift */
+      .lb-row.skeleton { pointer-events: none; }
+      .lb-row .sk-bar {
+        display: inline-block; height: 14px; width: 190px; border-radius: 2px;
+        background: linear-gradient(90deg, #2a2218 25%, #3a2f20 50%, #2a2218 75%);
+        background-size: 200% 100%; animation: sk-shimmer 1.2s infinite linear;
+      }
+      .lb-row .sk-bar.sk-short { width: 70px; }
+      @keyframes sk-shimmer { to { background-position: -200% 0; } }
 
       body.coop .solo-only { display: none !important; }
+
+      /* lobby code: ornament in the heading, legibility in the code itself */
+      .lobby-code {
+        font-family: var(--header-font); font-size: 40px; font-weight: 700;
+        letter-spacing: 14px; text-indent: 14px; color: var(--parchment);
+        text-shadow: 0 0 18px #c1121f55, 0 2px 8px #000c; margin-top: -8px;
+      }
+      #lobby-copy {
+        min-width: 0 !important; font-size: 14px !important;
+        letter-spacing: 3px; padding: 11px 32px !important;
+      }
+      #lobby-copy.copied { color: #7fe08f !important; animation: copy-pop 0.35s ease; }
+      @keyframes copy-pop { 40% { transform: scale(1.07); } }
+
+      /* branded toast: slides up, holds, slides away */
+      #toast {
+        position: fixed; left: 50%; bottom: 9%; z-index: 20;
+        transform: translate(-50%, 26px); opacity: 0; pointer-events: none;
+        font-family: var(--header-font); font-size: 15px; font-weight: 600; letter-spacing: 3px;
+        color: var(--parchment); padding: 14px 34px; text-transform: uppercase;
+        background:
+          linear-gradient(180deg, #2a2218f2, #150f09f8),
+          url('/textures/linen.jpg') center / 260px;
+        border: 1px solid var(--brass);
+        box-shadow: 0 10px 24px #000d, inset 0 0 22px #000a, 0 0 14px #c1121f33;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+      #toast.show { opacity: 1; transform: translate(-50%, 0); }
     </style>
   </head>
   <body>
@@ -375,6 +412,7 @@
       <div id="prompt"></div>
       <div id="vignette"></div>
       <div id="flash"></div>
+      <div id="toast"></div>
 
       <div id="start" class="overlay">
         <h1 class="aot-title">Wings of Freedom</h1>
@@ -423,8 +461,10 @@
       </div>
 
       <div id="lobby" class="overlay hidden">
-        <h2 class="aot-title" id="lobby-title">Lobby</h2>
+        <h2 class="aot-title">Muster the Squad</h2>
+        <div id="lobby-title" class="lobby-code"></div>
         <div class="sub" id="lobby-share"></div>
+        <button id="lobby-copy">Copy Squad Link</button>
         <div class="roster" id="lobby-roster"></div>
         <div class="coop-error" id="lobby-status"></div>
         <div class="menu-col">
