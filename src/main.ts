@@ -13,6 +13,7 @@ import { SoldierPool } from './render/soldiers'
 import { TitanPool } from './render/titans'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
+import { clockFraction } from './sim/daynight'
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
@@ -67,7 +68,7 @@ const playgroundMode = import.meta.env.DEV && !coopMode && urlParams.get('playgr
 const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 const game = createGame(seed, undefined, modeId)
-const { scene, updateScenery } = buildScene(game.arena)
+const { scene, updateScenery, dayNight } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
 camera.rotation.order = 'YXZ'
 
@@ -94,7 +95,7 @@ let mouseL = false
 let mouseR = false
 let yaw = 0
 let pitch = 0
-const debug = { autopilot: false, silent: false }
+const debug = { autopilot: false, silent: false, clockOverride: null as number | null }
 
 window.addEventListener('keydown', (e) => {
   keys.add(e.code)
@@ -962,6 +963,7 @@ renderer.setAnimationLoop(() => {
 
   titanPool.sync(game.titans, dt)
   updateScenery(dt, camera)
+  dayNight.update(debug.clockOverride ?? clockFraction(seed, game.time), camera)
   blade.update(dt)
   effects.syncRopes(game.player, camera, dt)
   effects.update(dt, camera, game.player.vel)
@@ -1046,6 +1048,7 @@ function snapshot() {
     titansAlive: game.titans.filter((t) => t.hp > 0).length,
     hooks: game.player.hooks.map((h) => h.state),
     buildings: game.arena.buildings.length,
+    clock: Math.round((debug.clockOverride ?? clockFraction(seed, game.time)) * 1000) / 1000,
   }
 }
 
@@ -1072,6 +1075,15 @@ function snapshot() {
       hud.hideStart()
       pauseShown = false
     }
+  },
+  // render-only clock override (0 = midnight, 0.5 = noon, null = follow the sim)
+  setClock(fraction: number | null) {
+    debug.clockOverride = fraction
+  },
+  // aim the camera without pointer lock (headless verification)
+  setView(newYaw: number, newPitch: number) {
+    yaw = newYaw
+    pitch = Math.min(1.45, Math.max(-1.45, newPitch))
   },
   start() {
     hud.hideStart()

@@ -127,24 +127,6 @@ this pins the user's spec for it.
 - **Spectacle**: phase-change roar + camera shake + hitstop, unique music layer while the bar
   is up, and a big multi-burst kill with its own banner ("The Wall Stands") and score bonus.
 
-## Day/night cycle with a realistic sky (user idea, 2026-07-09)
-
-Replace the flat sky color with a realistic skybox that follows a time-of-day simulation, giving
-full day and night cycles.
-
-- **Sky**: either scouted CC0 HDRI/cubemap skies (Poly Haven has day/dusk/night sets; per the
-  repo texture rule they must be sourced, not invented) cross-faded by time of day, or
-  Three.js's built-in `Sky` shader driven by sun elevation, with a sourced star map for night.
-- **Time simulation**: sim-side clock derived from `g.time` (deterministic, persists through
-  the run save automatically), e.g. one full cycle per ~10 minutes of play, possibly seeded so
-  runs start at different hours. The renderer maps clock → sun/moon position, light color and
-  intensity (directional light swings across the sky), fog color, and ambient level.
-- **Night city**: window emissives ramp up as the sun sets — the lit-window overbright tint
-  already exists per instance, so night mostly means raising its intensity and count while
-  darkening everything else; consider warm lamp glow at the resupply plaza and dimmer minimap.
-- **Gameplay flavor** (optional later): titans slow at night per lore (they need sunlight);
-  could become a night-survival wrinkle or a mode on the GameMode registry.
-
 ## Migrate the co-op server to Hono (note to self, 2026-07-09)
 
 Once the Cloudflare deploy of the multiplayer server (ADR 0001) works end to end, migrate the

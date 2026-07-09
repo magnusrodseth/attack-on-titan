@@ -7,11 +7,8 @@ import {
   LoadingManager,
   ConeGeometry,
   CylinderGeometry,
-  DirectionalLight,
   DoubleSide,
-  Fog,
   Group,
-  HemisphereLight,
   InstancedMesh,
   Matrix4,
   Mesh,
@@ -34,8 +31,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { Arena } from '../sim/city'
 import { groundHeightAt } from '../sim/city'
 import { createRng } from '../sim/rng'
+import { DayNightSky } from './daynight'
 
-const SKY = new Color(0xb9cfe2)
 const loader = new TextureLoader()
 
 // KayKit GLBs reference a Textures/colormap.png that ships separately; we flat-color the
@@ -58,6 +55,7 @@ function tex(path: string, repeatX = 1, repeatY = 1, srgb = true): Texture {
 export interface BuiltScene {
   scene: Scene
   updateScenery: (dt: number, camera?: Object3D) => void
+  dayNight: DayNightSky
 }
 
 /** Gable roof prism with planar UVs: unit footprint, ridge along local X at y=1. */
@@ -84,21 +82,7 @@ function gablePrismGeometry(): BufferGeometry {
 
 export function buildScene(arena: Arena): BuiltScene {
   const scene = new Scene()
-  scene.background = SKY
-  scene.fog = new Fog(SKY, 70, 460)
-
-  scene.add(new HemisphereLight(0xd8e8ff, 0x8a7a63, 1.1))
-  const sun = new DirectionalLight(0xfff1da, 2.4)
-  sun.position.set(140, 200, 80)
-  sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
-  sun.shadow.camera.left = -220
-  sun.shadow.camera.right = 220
-  sun.shadow.camera.top = 220
-  sun.shadow.camera.bottom = -220
-  sun.shadow.camera.far = 600
-  sun.shadow.bias = -0.0004
-  scene.add(sun)
+  const dayNight = new DayNightSky(scene)
 
   const ground = new Mesh(
     new CircleGeometry(arena.wallRadius + 60, 48).rotateX(-Math.PI / 2),
@@ -111,18 +95,19 @@ export function buildScene(arena: Arena): BuiltScene {
   ground.receiveShadow = true
   scene.add(ground)
 
-  addHouses(scene, arena)
+  dayNight.onNight(addHouses(scene, arena))
   addTowers(scene, arena)
   addWall(scene, arena)
   addStation(scene, arena)
 
   const scenery = addScenery(scene, arena)
-  return { scene, updateScenery: scenery }
+  dayNight.onNight(scenery.setNight)
+  return { scene, updateScenery: scenery.update, dayNight }
 }
 
-function addHouses(scene: Scene, arena: Arena): void {
+function addHouses(scene: Scene, arena: Arena): (night: number) => void {
   const houses = arena.buildings.filter((b) => b.kind === 'house')
-  if (houses.length === 0) return
+  if (houses.length === 0) return () => {}
 
   const bodyGeometry = new BoxGeometry(1, 1, 1)
   bodyGeometry.translate(0, 0.5, 0)
@@ -167,8 +152,15 @@ function addHouses(scene: Scene, arena: Arena): void {
   let terraCount = 0
   let slateCount = 0
 
-  // emissive-look window quads: shutters dark, ~30% glowing warm
-  const windowSlots: Array<{ pos: Vector3; rotY: number; lit: boolean }> = []
+  // emissive-look window quads: ~30% glow warm all day; more lamps come on as
+  // night deepens (nightAt is each household's lights-on threshold)
+  const windowSlots: Array<{
+    pos: Vector3
+    rotY: number
+    lit: boolean
+    nightAt: number
+    baseGray: number
+  }> = []
 
   const matrix = new Matrix4()
   const quat = new Quaternion()
@@ -220,12 +212,15 @@ function addHouses(scene: Scene, arena: Arena): void {
           const along = ((k + 0.5) / perFloor - 0.5) * (longSpan - 2)
           const y = eave * (0.3 + floor * 0.38)
           const offset = (alongX ? house.d : house.w) / 2 + 0.06
+          const lit = rng() < 0.3
           windowSlots.push({
             pos: alongX
               ? new Vector3(house.x + along, y, house.z + side * offset)
               : new Vector3(house.x + side * offset, y, house.z + along),
             rotY: alongX ? (side > 0 ? 0 : Math.PI) : side > 0 ? Math.PI / 2 : -Math.PI / 2,
-            lit: rng() < 0.3,
+            lit,
+            nightAt: lit ? 0 : rng() < 0.55 ? 0.15 + rng() * 0.65 : Infinity,
+            baseGray: 0.85 + rng() * 0.3,
           })
         }
       }
@@ -248,14 +243,25 @@ function addHouses(scene: Scene, arena: Arena): void {
     windowQuat.setFromAxisAngle(new Vector3(0, 1, 0), slot.rotY)
     matrix.compose(slot.pos, windowQuat, new Vector3(1, 1, 1))
     windows.setMatrixAt(i, matrix)
-    if (slot.lit) {
-      color.setRGB(2.4, 1.9, 1.1) // overbright warm glow through the glass
-    } else {
-      color.setScalar(0.85 + rng() * 0.3)
-    }
-    windows.setColorAt(i, color)
   })
   scene.add(windows)
+
+  const setNight = (night: number): void => {
+    windowSlots.forEach((slot, i) => {
+      if (night >= slot.nightAt) {
+        // overbright warm glow through the glass, stronger against dark streets
+        color.setRGB(2.4, 1.9, 1.1).multiplyScalar(1 + 0.45 * night)
+      } else {
+        // unlit glass is MeshBasicMaterial: it must darken by hand or it would
+        // shine full-bright at midnight
+        color.setScalar(slot.baseGray * (1 - 0.8 * night))
+      }
+      windows.setColorAt(i, color)
+    })
+    if (windows.instanceColor) windows.instanceColor.needsUpdate = true
+  }
+  setNight(0)
+  return setNight
 }
 
 function addTowers(scene: Scene, arena: Arena): void {
@@ -341,7 +347,10 @@ function addStation(scene: Scene, arena: Arena): void {
 }
 
 /** Clouds, birds, trees and a mountain ring: motion and depth beyond the gameplay set. */
-function addScenery(scene: Scene, arena: Arena): (dt: number, camera?: Object3D) => void {
+function addScenery(
+  scene: Scene,
+  arena: Arena,
+): { update: (dt: number, camera?: Object3D) => void; setNight: (night: number) => void } {
   const rng = createRng(0x5eed)
   const clouds = new Group()
   scene.add(clouds)
@@ -349,6 +358,7 @@ function addScenery(scene: Scene, arena: Arena): (dt: number, camera?: Object3D)
   // realistic cloud billboards (CC0 transparent renders); faced to the camera each frame
   const cloudGeometry = new PlaneGeometry(1, 1)
   const cloudBillboards: Mesh[] = []
+  const cloudMats: MeshBasicMaterial[] = []
   for (let i = 0; i < 10; i++) {
     const material = new MeshBasicMaterial({
       map: tex(i % 2 === 0 ? '/textures/cloud1.png' : '/textures/cloud2.png'),
@@ -357,6 +367,7 @@ function addScenery(scene: Scene, arena: Arena): (dt: number, camera?: Object3D)
       depthWrite: false,
       fog: false,
     })
+    cloudMats.push(material)
     const cloud = new Mesh(cloudGeometry, material)
     const radius = 90 + rng() * 260
     const angle = rng() * Math.PI * 2
@@ -448,8 +459,16 @@ function addScenery(scene: Scene, arena: Arena): (dt: number, camera?: Object3D)
     scene.add(mesh)
   }
 
+  // cloud quads are unlit; without a hand dimmer they would stay noon-white at midnight
+  const setNight = (night: number): void => {
+    for (const material of cloudMats) {
+      material.color.setScalar(1 - 0.85 * night)
+      material.opacity = 0.85 - 0.35 * night
+    }
+  }
+
   let time = 0
-  return (dt: number, camera?: Object3D) => {
+  const update = (dt: number, camera?: Object3D) => {
     time += dt
     clouds.rotation.y += dt * 0.004
     if (camera) {
@@ -469,6 +488,7 @@ function addScenery(scene: Scene, arena: Arena): (dt: number, camera?: Object3D)
       bird.mesh.rotation.y = -bird.angle
     }
   }
+  return { update, setNight }
 }
 
 export type SceneRoot = Object3D
