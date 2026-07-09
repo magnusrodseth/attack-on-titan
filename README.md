@@ -46,6 +46,24 @@ to absorb everything.
 **The one rule:** nape damage scales with your speed. At or above the kill threshold
 (crosshair-side speedo turns blue) a nape hit is a one-cut kill. Swing mastery *is* combat mastery.
 
+## Play with friends (co-op multiplayer)
+
+**Play With Friends** in the menu opens squad play: enlist a soldier handle (unique username +
+password, no email), create a lobby, and share the code or the `?lobby=TROST-7K` link. Up to
+four soldiers fight one shared set of titans in the same seeded district; the room code IS the
+city seed, so everyone builds the identical city. Matches end on team wipe: the results screen
+ranks the squad by score and crowns an MVP, and the squad leader can call a rematch (same city,
+fresh waves). Dead soldiers spectate and respawn on wave clear; between waves everyone picks
+their own field modification on a 15-second timer. Finished matches are written to a global
+leaderboard (best squads by waves survived, deadliest soldiers by score) — scores are computed
+server-side, so the board can't be faked from a browser console.
+
+Architecture: a Cloudflare Worker (`server/`, partyserver on Durable Objects) runs the same
+pure sim the solo game uses — titans, waves and scoring are server-authoritative, your own
+movement stays fully local at 120 Hz, and slashes are validated with lag compensation. Durable
+state (accounts, sessions, match history) lives in Neon Postgres via Drizzle ORM. See
+`docs/adr/0001-server-authoritative-multiplayer.md`.
+
 ## Replayability
 
 - **Waves escalate**: more titans, bigger, faster, more leaping abnormals.
@@ -62,10 +80,22 @@ The simulation (`src/sim/`) is pure TypeScript, stepped at a fixed 120 Hz, and f
 the renderer (`src/render/`, `src/hud.ts`, `src/main.ts`) is a thin adapter over sim state.
 
 ```bash
-pnpm test        # vitest (73 tests)
-pnpm typecheck   # tsc --noEmit
+pnpm test        # vitest
+pnpm typecheck   # tsc --noEmit (client) + tsc -p server
 pnpm build       # production bundle in dist/
 ```
+
+The multiplayer backend lives in `server/` (Cloudflare Worker, partyserver + Drizzle):
+
+```bash
+pnpm server:dev     # wrangler dev on localhost:8787 (DATABASE_URL from server/.dev.vars)
+pnpm server:deploy  # deploy to Cloudflare (secret: wrangler secret put DATABASE_URL)
+pnpm db:generate    # emit SQL migrations from server/db/schema.ts
+pnpm db:migrate     # apply migrations (needs DATABASE_URL in the environment)
+```
+
+The client reaches the Worker through `VITE_PARTY_HOST` (defaults to `localhost:8787`; set it in
+Vercel for production).
 
 `window.__aot` exposes a debug hook (`start()`, `step(ticks, input)`, `snapshot()`,
 `setAutopilot()`, `setSilent()`) used for browser automation.
@@ -97,6 +127,7 @@ Music (two tracks alternating in-game):
 
 - Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)
 - Brushed-steel blade texture from [ambientCG](https://ambientcg.com/view?id=Metal012) (Metal012, CC0)
+- Soldier textures (Survey-Corps cloak linen, ODM-harness/boot leather, uniform cloth) from [ambientCG](https://ambientcg.com): [Fabric045](https://ambientcg.com/view?id=Fabric045), [Leather028](https://ambientcg.com/view?id=Leather028), [Fabric062](https://ambientcg.com/view?id=Fabric062) (all CC0)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
 - Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)
 - Mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg
