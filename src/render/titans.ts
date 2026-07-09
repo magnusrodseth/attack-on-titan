@@ -46,13 +46,13 @@ import { SWAT_WINDUP } from '../sim/titan'
  * Procedural "pure titan": nude-look tan humanoid with a creepy grin and slightly wrong
  * proportions, per the user's reference images. Built at unit height and scaled by t.height.
  */
-interface Limb {
+export interface Limb {
   pivot: Group // hip or shoulder
   lower: Group // knee or elbow
 }
 
 /** Two-segment limb with a joint sphere: capsules instead of boxes. */
-function makeLimb(
+export function makeLimb(
   material: MeshStandardMaterial,
   upperR: number,
   upperL: number,
@@ -60,6 +60,7 @@ function makeLimb(
   lowerL: number,
   x: number,
   pivotY: number,
+  lowerMaterial: MeshStandardMaterial = material,
 ): Limb {
   const pivot = new Group()
   pivot.position.set(x, pivotY, 0)
@@ -73,11 +74,11 @@ function makeLimb(
   pivot.add(joint)
   const lower = new Group()
   lower.position.y = jointY
-  const lowerMesh = new Mesh(new CapsuleGeometry(lowerR, lowerL, 3, 8), material)
+  const lowerMesh = new Mesh(new CapsuleGeometry(lowerR, lowerL, 3, 8), lowerMaterial)
   lowerMesh.position.y = -(lowerL / 2 + lowerR)
   lowerMesh.castShadow = true
   lower.add(lowerMesh)
-  const tip = new Mesh(new SphereGeometry(lowerR * 1.1, 8, 6), material)
+  const tip = new Mesh(new SphereGeometry(lowerR * 1.1, 8, 6), lowerMaterial)
   tip.position.y = -(lowerL + lowerR * 1.6)
   lower.add(tip)
   pivot.add(lower)

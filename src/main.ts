@@ -61,6 +61,9 @@ const urlParams = new URLSearchParams(location.search)
 // server) builds the identical district before the match even starts
 const lobbyCode = normalizeRoomCode(urlParams.get('lobby') ?? '')
 const coopMode = lobbyCode !== null
+// dev playground: a statue gallery with free flight and nothing that bites; the
+// import.meta.env.DEV guard makes this a compile-time false in production builds
+const playgroundMode = import.meta.env.DEV && !coopMode && urlParams.get('playground') === '1'
 const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 const game = createGame(seed, undefined, modeId)
@@ -140,6 +143,7 @@ window.addEventListener('keydown', (e) => {
     return
   }
   if (game.phase !== 'playing' || document.pointerLockElement === renderer.domElement) return
+  if (playgroundMode) return // the playground drawer owns unlock; clicking the city resumes
   const wait = Math.max(0, 1350 - (performance.now() - lastUnlockAt))
   window.clearTimeout(resumeTimer)
   resumeTimer = window.setTimeout(() => {
@@ -290,7 +294,7 @@ hud.onPickUpgrade = (id) => {
 // --- run persistence: refreshing the page loses nothing --------------------
 
 function persistRun(): void {
-  if (coopMode) return // co-op state lives on the server, not in the solo save slot
+  if (coopMode || playgroundMode) return // neither belongs in the solo save slot
   if (game.phase !== 'playing' && game.phase !== 'upgrading') return
   try {
     localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun(game, { yaw, pitch })))
@@ -312,7 +316,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') persistRun()
 })
 
-const restored = !coopMode && runSave !== null && restoreRun(runSave, game)
+const restored = !coopMode && !playgroundMode && runSave !== null && restoreRun(runSave, game)
 if (restored) {
   if (runSave?.view) {
     yaw = runSave.view.yaw
@@ -324,7 +328,7 @@ if (restored) {
   } else {
     hud.showStart(true) // straight back to the paused run: one click resumes
   }
-} else if (!coopMode) {
+} else if (!coopMode && !playgroundMode) {
   hud.showStart()
 }
 
@@ -669,6 +673,53 @@ hud.onCloseLeaderboard = () => {
   if (!coopMode) hud.showStart(game.phase === 'playing')
 }
 
+// --- dev playground (compile-time false in production) -----------------------
+
+let devFrame: ((dt: number) => void) | null = null
+if (import.meta.env.DEV) {
+  void import('./dev/playground').then(({ initDev }) => {
+    devFrame = initDev({
+      playground: playgroundMode,
+      game,
+      scene,
+      camera,
+      hud,
+      soldierPool,
+      canvas: renderer.domElement,
+      enterWorld: () => {
+        audio.init()
+        lockPointer()
+      },
+      setView: (y, p) => {
+        yaw = y
+        pitch = p
+      },
+    })
+  })
+}
+
+/** Playground: slashes are pure spectacle and resupply refills locally; nothing judges. */
+function handlePlaygroundIntents(events: GameEvent[]): void {
+  const passthrough: GameEvent[] = []
+  for (const event of events) {
+    if (event.type === 'coopSlash') {
+      blade.slash()
+      audio.play(SLASHES, { volume: 0.55 })
+    } else if (event.type === 'coopResupply') {
+      const p = game.player
+      p.gas = p.config.maxGas
+      p.canisters = p.config.gasCanisters
+      p.blades = p.config.bladePairs
+      p.bladeHp = p.config.bladeDurability
+      hud.showBanner('Resupplied', 900)
+      audio.refill()
+    } else {
+      passthrough.push(event)
+    }
+  }
+  handleEvents(passthrough)
+}
+
 // --- events from the sim ----------------------------------------------------
 
 function handleEvents(events: GameEvent[]): void {
@@ -842,6 +893,18 @@ renderer.setAnimationLoop(() => {
         meSnap?.picked ? 'Waiting for the squad…' : `${Math.ceil(coop.myPickTimer())} s to choose`,
       )
     }
+  } else if (playgroundMode && game.phase === 'playing') {
+    // statue gallery: the local soldier flies via the co-op pilot (no titan AI, no waves)
+    if (locked || debug.autopilot) {
+      const input = buildInput()
+      acc += dt
+      while (acc >= SIM_DT) {
+        stepCoopClient(game, input, SIM_DT)
+        handlePlaygroundIntents(game.events)
+        acc -= SIM_DT
+      }
+    }
+    devFrame?.(dt)
   } else if (simActive) {
     if (pauseShown) {
       hud.hideStart()

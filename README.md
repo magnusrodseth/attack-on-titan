@@ -101,6 +101,12 @@ Vercel for production).
 `window.__aot` exposes a debug hook (`start()`, `step(ticks, input)`, `snapshot()`,
 `setAutopilot()`, `setSilent()`) used for browser automation.
 
+Dev builds also ship a playground (`http://localhost:5173/?playground=1`, or the
+`Playground · Dev` menu button): a statue gallery in the real city with free ODM flight and no
+titan AI, for inspecting the soldier and titan models and styling the Striker/Captain figures
+live (backquote toggles the drawer). It is dynamic-imported behind `import.meta.env.DEV`, so
+production bundles contain none of it.
+
 Design decisions and their history live in `wayfinder/map.md`; mechanics research with sources in
 `docs/research/odm-mechanics.md`.
 
