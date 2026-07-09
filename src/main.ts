@@ -8,7 +8,8 @@ import { TitanPool } from './render/titans'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
 import type { GameEvent } from './sim/game'
-import { chooseUpgrade, createGame, startGame, stepGame } from './sim/game'
+import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, startGame, stepGame } from './sim/game'
+import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
 import { neutralInput } from './sim/player'
 import { napeCenter } from './sim/titan'
@@ -36,7 +37,7 @@ const effects = new Effects(scene)
 const hud = new Hud(seed)
 const blade = new BladeView(camera)
 const audio = new AudioSystem()
-let gasAudible = false
+const minimap = new Minimap(game.arena)
 let roarTimer = 3
 
 // --- input -----------------------------------------------------------------
@@ -98,8 +99,9 @@ function buildInput(): InputState {
   const input = neutralInput()
   input.jump = keys.has('Space')
   input.gas = keys.has('ShiftLeft') || keys.has('ShiftRight')
+  input.focus = keys.has('KeyQ')
   input.slash = keys.has('KeyF')
-  input.hookL = mouseL || keys.has('KeyJ') || keys.has('KeyQ')
+  input.hookL = mouseL || keys.has('KeyJ')
   input.hookR = mouseR || keys.has('KeyK')
   input.resupply = keys.has('KeyR')
   camera.getWorldDirection(input.lookDir)
@@ -217,6 +219,10 @@ function handleEvents(events: GameEvent[]): void {
         hud.showBanner(event.remaining > 0 ? `Canister Swapped · ${event.remaining} Left` : 'Last Canister', 1200)
         audio.refill()
         break
+      case 'boost':
+        audio.gasBurst()
+        effects.addShake(0.08)
+        break
       case 'death':
         effects.addShake(1)
         audio.boom()
@@ -253,19 +259,15 @@ renderer.setAnimationLoop(() => {
       pauseShown = false
     }
     const input = buildInput()
-    acc += dt
+    acc += dt * (game.focusActive ? FOCUS_TIME_SCALE : 1)
     while (acc >= SIM_DT) {
       stepGame(game, input, SIM_DT)
       handleEvents(game.events)
       acc -= SIM_DT
     }
-    gasAudible = input.gas && game.player.gas > 0 && !game.player.onGround
-  } else {
-    gasAudible = false
-    if (game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
-      hud.showStart(true)
-      pauseShown = true
-    }
+  } else if (game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
+    hud.showStart(true)
+    pauseShown = true
   }
 
   if (game.phase !== prevPhase) {
@@ -295,8 +297,10 @@ renderer.setAnimationLoop(() => {
   effects.update(dt, camera, game.player.vel)
 
   audio.setWind(simActive ? speed : 0)
-  audio.setGas(gasAudible)
+  audio.setMuffled(game.focusActive)
   audio.setDucked((game.phase === 'playing' && !simActive && !debug.silent) || game.phase === 'menu')
+  hud.setFocusVignette(game.focusActive)
+  minimap.update(game, yaw)
   // a crippled titan leaving that state alive has regenerated and risen
   const crippledNow = new Set(
     game.titans.filter((t) => t.state === 'crippled').map((t) => t.id),
@@ -343,6 +347,7 @@ renderer.setAnimationLoop(() => {
 interface DebugStepInput {
   gas?: boolean
   jump?: boolean
+  focus?: boolean
   slash?: boolean
   hookL?: boolean
   hookR?: boolean
@@ -412,6 +417,7 @@ function snapshot() {
     const input = neutralInput()
     input.gas = partial.gas ?? false
     input.jump = partial.jump ?? false
+    input.focus = partial.focus ?? false
     input.slash = partial.slash ?? false
     input.hookL = partial.hookL ?? false
     input.hookR = partial.hookR ?? false

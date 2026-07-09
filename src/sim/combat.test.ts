@@ -6,6 +6,7 @@ import { anklePos, createTitan, napeCenter } from './titan'
 function setup(speed: number) {
   const p = createPlayer()
   const t = createTitan({ id: 1, kind: 'normal', height: 15, x: 0, z: 0 })
+  t.facing = 0 // deterministic nape side (spawning at the origin yields atan2(-0,-0) = -π)
   p.pos.copy(napeCenter(t))
   p.vel.set(speed, 0, 0)
   p.onGround = false
@@ -20,6 +21,15 @@ describe('trySlash', () => {
     expect(result.napeHit).toBe(true)
     expect(result.killed).toBe(true)
     expect(t.hp).toBe(0)
+  })
+
+  it('has a generous nape hitbox: a kill lands from 5m off the nape center', () => {
+    const { p, t } = setup(25)
+    p.pos.copy(napeCenter(t))
+    p.pos.y += 5
+    const result = trySlash(p, [t])
+    expect(result.napeHit).toBe(true)
+    expect(result.killed).toBe(true)
   })
 
   it('chips the nape below kill speed without killing', () => {

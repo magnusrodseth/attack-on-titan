@@ -104,12 +104,32 @@ function fillRowHouses(arena: Arena, cx: number, cz: number, rng: () => number):
   }
 }
 
+/** Fraction of total height where the walls end and the roof begins. */
+export function eaveHeight(b: Building): number {
+  return b.h * (b.kind === 'tower' ? 0.78 : 0.7)
+}
+
+/** Height of the building surface (wall top, gable slope, or spire) at a point, 0 outside. */
+export function surfaceHeightAt(b: Building, x: number, z: number): number {
+  const dx = x - b.x
+  const dz = z - b.z
+  if (Math.abs(dx) > b.w / 2 || Math.abs(dz) > b.d / 2) return 0
+  const eave = eaveHeight(b)
+  const rise = b.h - eave
+  if (b.kind === 'tower') {
+    // pyramid spire
+    const t = Math.max(Math.abs(dx) / (b.w / 2), Math.abs(dz) / (b.d / 2))
+    return eave + rise * (1 - t)
+  }
+  const cross = b.ridgeAxis === 'x' ? Math.abs(dz) / (b.d / 2) : Math.abs(dx) / (b.w / 2)
+  return eave + rise * (1 - cross)
+}
+
 export function groundHeightAt(arena: Arena, x: number, z: number): number {
   let ground = 0
   for (const b of arena.buildings) {
-    if (Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2 && b.h > ground) {
-      ground = b.h
-    }
+    const surface = surfaceHeightAt(b, x, z)
+    if (surface > ground) ground = surface
   }
   return ground
 }
@@ -121,7 +141,8 @@ export function resolveBuildingCollision(
   radius: number,
 ): void {
   for (const b of arena.buildings) {
-    if (pos.y >= b.h) continue
+    // walls only push below the eaves; the ground clamp owns roof-slope contact
+    if (pos.y >= eaveHeight(b)) continue
     const ex = b.w / 2 + radius
     const ez = b.d / 2 + radius
     const dx = pos.x - b.x
@@ -167,7 +188,7 @@ export function raycastHookTarget(
   let found = false
 
   for (const b of arena.buildings) {
-    const t = rayVsAabb(origin, dir, b)
+    const t = rayVsBuilding(origin, dir, b)
     if (t !== null && t < bestT && t > 0.01) {
       bestT = t
       found = true
@@ -184,9 +205,63 @@ export function raycastHookTarget(
   return origin.clone().addScaledVector(dir, bestT)
 }
 
-function rayVsAabb(origin: Vector3, dir: Vector3, b: Building): number | null {
+/** Walls up to the eaves, then real gable slopes (houses) or the full box (towers). */
+function rayVsBuilding(origin: Vector3, dir: Vector3, b: Building): number | null {
+  if (b.kind === 'tower') return rayVsAabb(origin, dir, b, b.h)
+  const wallT = rayVsAabb(origin, dir, b, eaveHeight(b))
+  const roofT = rayVsGable(origin, dir, b)
+  if (wallT === null) return roofT
+  if (roofT === null) return wallT
+  return Math.min(wallT, roofT)
+}
+
+function rayVsGable(origin: Vector3, dir: Vector3, b: Building): number | null {
+  const eave = eaveHeight(b)
+  const rise = b.h - eave
+  const alongX = b.ridgeAxis === 'x'
+  const halfA = (alongX ? b.w : b.d) / 2
+  const halfC = (alongX ? b.d : b.w) / 2
+  const oa = (alongX ? origin.x - b.x : origin.z - b.z)
+  const oc = (alongX ? origin.z - b.z : origin.x - b.x)
+  const da = alongX ? dir.x : dir.z
+  const dc = alongX ? dir.z : dir.x
+  const slope = rise / halfC
+  let best: number | null = null
+
+  // two roof planes: y = h - slope * (s * c)
+  for (const s of [-1, 1]) {
+    const denom = dir.y + slope * s * dc
+    if (Math.abs(denom) < 1e-9) continue
+    const t = (b.h - slope * s * oc - origin.y) / denom
+    if (t <= 0.01 || (best !== null && t >= best)) continue
+    const c = oc + t * dc
+    const a = oa + t * da
+    const y = origin.y + t * dir.y
+    if (s * c < -1e-6 || s * c > halfC + 1e-6) continue
+    if (Math.abs(a) > halfA + 1e-6) continue
+    if (y < eave - 1e-6 || y > b.h + 1e-6) continue
+    best = t
+  }
+
+  // triangular gable end walls at a = ±halfA
+  if (Math.abs(da) > 1e-9) {
+    for (const s of [-1, 1]) {
+      const t = (s * halfA - oa) / da
+      if (t <= 0.01 || (best !== null && t >= best)) continue
+      const c = oc + t * dc
+      const y = origin.y + t * dir.y
+      if (Math.abs(c) > halfC + 1e-6) continue
+      if (y < eave - 1e-6) continue
+      if (y > b.h - slope * Math.abs(c) + 1e-6) continue
+      best = t
+    }
+  }
+  return best
+}
+
+function rayVsAabb(origin: Vector3, dir: Vector3, b: Building, maxY: number): number | null {
   const min = [b.x - b.w / 2, 0, b.z - b.d / 2]
-  const max = [b.x + b.w / 2, b.h, b.z + b.d / 2]
+  const max = [b.x + b.w / 2, maxY, b.z + b.d / 2]
   const o = [origin.x, origin.y, origin.z]
   const d = [dir.x, dir.y, dir.z]
   let tNear = -Infinity

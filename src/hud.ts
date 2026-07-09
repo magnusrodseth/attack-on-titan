@@ -21,6 +21,8 @@ export class Hud {
   private best = el('best')
   private gasFill = el('gas-fill')
   private gasCanisters = el('gas-canisters')
+  private focusFill = el('focus-fill')
+  private focusVignette = el('focus-vignette')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
   private meters = el('meters')
@@ -64,6 +66,8 @@ export class Hud {
     this.bladePairs.textContent = `×${p.blades}`
     this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
 
+    this.focusFill.style.width = `${game.focus.toFixed(1)}%`
+
     const kmh = Math.round(frame.speed * 3.6)
     this.speedo.innerHTML =
       frame.speed >= p.config.killSpeed ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
@@ -88,6 +92,10 @@ export class Hud {
     this.popup.classList.remove('pop')
     void this.popup.offsetWidth // restart the CSS animation
     this.popup.classList.add('pop')
+  }
+
+  setFocusVignette(active: boolean): void {
+    this.focusVignette.classList.toggle('on', active)
   }
 
   slashFlash(): void {

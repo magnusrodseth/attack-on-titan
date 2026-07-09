@@ -42,7 +42,7 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
   for (const t of titans) {
     if (t.hp <= 0) continue
     const napeDist = p.pos.distanceTo(napeCenter(t))
-    if (napeDist <= p.config.slashRange * 0.55 + t.height * 0.05 && napeDist < bestDist) {
+    if (napeDist <= p.config.slashRange * 0.75 + t.height * 0.07 && napeDist < bestDist) {
       best = t
       bestDist = napeDist
       napeHit = true

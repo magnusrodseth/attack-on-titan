@@ -47,6 +47,7 @@ export class AudioSystem {
   private windGain: GainNode | null = null
   private windFilter: BiquadFilterNode | null = null
   private gasGain: GainNode | null = null
+  private muffle: BiquadFilterNode | null = null
   private buffers = new Map<string, AudioBuffer>()
 
   /** Idempotent; must be called from a user gesture (DEPLOY / retry / upgrade click). */
@@ -59,7 +60,10 @@ export class AudioSystem {
     this.ctx = ctx
     this.master = ctx.createGain()
     this.master.gain.value = this.duckedState ? 0 : MASTER_VOLUME
-    this.master.connect(ctx.destination)
+    this.muffle = ctx.createBiquadFilter()
+    this.muffle.type = 'lowpass'
+    this.muffle.frequency.value = 20000
+    this.master.connect(this.muffle).connect(ctx.destination)
 
     const noise = this.noiseBuffer(ctx)
 
@@ -178,6 +182,17 @@ export class AudioSystem {
   snap(): void {
     this.noiseBurst(3200, 0.07, 0.6, 'highpass')
     this.noiseBurst(900, 0.05, 0.4, 'bandpass')
+  }
+
+  /** Short gas dash puff. */
+  gasBurst(): void {
+    this.noiseBurst(2600, 0.22, 0.35, 'bandpass')
+  }
+
+  /** Underwater-y lowpass while focus (bullet time) is active. */
+  setMuffled(muffled: boolean): void {
+    if (!this.ctx || !this.muffle) return
+    this.muffle.frequency.setTargetAtTime(muffled ? 650 : 20000, this.ctx.currentTime, 0.08)
   }
 
   /** Resupply hiss-clunk. */

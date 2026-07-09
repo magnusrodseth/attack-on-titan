@@ -164,6 +164,48 @@ describe('hooking titans', () => {
   })
 })
 
+describe('focus (bullet time)', () => {
+  it('activates on press with a full meter, drains, and deactivates on release', () => {
+    const game = playingGame()
+    const input = neutralInput()
+    input.focus = true
+    stepGame(game, input, DT)
+    expect(game.focusActive).toBe(true)
+    const before = game.focus
+    stepGame(game, input, DT)
+    expect(game.focus).toBeLessThan(before)
+    stepGame(game, neutralInput(), DT)
+    expect(game.focusActive).toBe(false)
+  })
+
+  it('will not start below the threshold, and the meter refills on its own', () => {
+    const game = playingGame()
+    game.focus = 10
+    const input = neutralInput()
+    input.focus = true
+    stepGame(game, input, DT)
+    expect(game.focusActive).toBe(false)
+    for (let i = 0; i < 360; i++) stepGame(game, neutralInput(), DT) // 3 sim-seconds
+    expect(game.focus).toBeGreaterThan(40)
+  })
+})
+
+describe('boost burst', () => {
+  it('bursts along the look direction on the press edge, once per click', () => {
+    const game = playingGame()
+    game.player.pos.set(0, 30, 0)
+    game.player.onGround = false
+    const input = neutralInput()
+    input.gas = true
+    input.lookDir = new Vector3(0, 1, 0)
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'boost')).toBe(true)
+    expect(game.player.vel.y).toBeGreaterThan(8)
+    stepGame(game, input, DT) // still held: no second burst
+    expect(game.events.some((e) => e.type === 'boost')).toBe(false)
+  })
+})
+
 describe('resupply', () => {
   it('refills gas and blades only near the station', () => {
     const game = playingGame()

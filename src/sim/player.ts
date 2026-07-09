@@ -61,6 +61,7 @@ export interface InputState {
   lookDir: Vector3
   gas: boolean
   jump: boolean
+  focus: boolean
   slash: boolean
   hookL: boolean
   hookR: boolean
@@ -73,6 +74,7 @@ export function neutralInput(): InputState {
     lookDir: new Vector3(0, 0, -1),
     gas: false,
     jump: false,
+    focus: false,
     slash: false,
     hookL: false,
     hookR: false,
@@ -92,6 +94,7 @@ export interface PlayerState {
   onGround: boolean
   slashTimer: number
   invulnTimer: number
+  boostCooldown: number
   airTime: number
   config: PlayerConfig
 }
@@ -109,9 +112,26 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     onGround: true,
     slashTimer: 0,
     invulnTimer: 0,
+    boostCooldown: 0,
     airTime: 0,
     config,
   }
+}
+
+const BOOST_IMPULSE = 13
+const BOOST_COST = 14
+const BOOST_COOLDOWN = 0.5
+
+/** Click-burst dash along the look direction (full 3D). Airborne only. */
+export function tryBoost(p: PlayerState, lookDir: Vector3): boolean {
+  if (p.onGround || p.boostCooldown > 0 || p.gas < BOOST_COST) return false
+  const dir = lookDir.clone()
+  if (dir.lengthSq() === 0) return false
+  dir.normalize()
+  p.vel.addScaledVector(dir, BOOST_IMPULSE)
+  p.gas -= BOOST_COST
+  p.boostCooldown = BOOST_COOLDOWN
+  return true
 }
 
 export function attachedHooks(p: PlayerState): Hook[] {
@@ -140,6 +160,7 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   const cfg = p.config
   p.slashTimer = Math.max(0, p.slashTimer - dt)
   p.invulnTimer = Math.max(0, p.invulnTimer - dt)
+  p.boostCooldown = Math.max(0, p.boostCooldown - dt)
   const wasOnGround = p.onGround
   const anchors = attachedHooks(p)
 
@@ -156,21 +177,9 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
     p.onGround = false
   }
 
-  // boost is airborne-only: jump or winch off the ground first, then burn gas
-  const boosting = input.gas && p.gas > 0 && !wasOnGround
-  if (boosting) {
-    const dir = new Vector3(input.move.x, 0, input.move.z)
-    if (dir.lengthSq() === 0) dir.set(input.lookDir.x, 0, input.lookDir.z)
-    if (dir.lengthSq() > 0) {
-      dir.normalize()
-      p.vel.addScaledVector(dir, cfg.gasThrust * dt)
-      p.gas = Math.max(0, p.gas - cfg.gasBurn * dt)
-    }
-  }
-
   const move = new Vector3(input.move.x, 0, input.move.z)
   if (move.lengthSq() > 0) move.normalize()
-  if (wasOnGround && !boosting) {
+  if (wasOnGround) {
     const horizSpeed = Math.hypot(p.vel.x, p.vel.z)
     if (move.lengthSq() > 0 && horizSpeed <= cfg.runSpeed + 1) {
       const target = move.clone().multiplyScalar(cfg.runSpeed)
@@ -180,7 +189,8 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
       p.vel.x += delta.x
       p.vel.z += delta.z
     } else {
-      // above run speed (or idle) the ground is a skid, not a brake: momentum survives
+      // above run speed the ground is a skid: steer and bleed, never add — legs can't
+      // outrun momentum; real speed comes from swinging, not from holding W
       const decel = (move.lengthSq() > 0 ? 8 : 12) * dt
       const newSpeed = Math.max(0, horizSpeed - decel)
       if (horizSpeed > 1e-6) {
@@ -188,15 +198,12 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
         p.vel.x *= scale
         p.vel.z *= scale
       }
-      if (move.lengthSq() > 0) {
-        steerHorizontal(p.vel, move, 2.4 * dt)
-        p.vel.x += move.x * 24 * dt
-        p.vel.z += move.z * 24 * dt
-      }
+      if (move.lengthSq() > 0) steerHorizontal(p.vel, move, 2.4 * dt)
     }
   } else if (move.lengthSq() > 0) {
     steerHorizontal(p.vel, move, 1.5 * dt)
-    p.vel.addScaledVector(move, cfg.airControl * dt)
+    // air input adds speed only at low speeds; past that it purely redirects
+    if (Math.hypot(p.vel.x, p.vel.z) < 12) p.vel.addScaledVector(move, cfg.airControl * dt)
   }
 
   if (!wasOnGround) {

@@ -51,9 +51,19 @@
       /* bottom left: gas + blades */
       #meters { position: absolute; left: 24px; bottom: 24px; width: 240px; }
       .meter-label { font-size: 11px; letter-spacing: 2px; opacity: 0.85; margin-bottom: 3px; }
-      #gas-bar, #blade-bar { height: 10px; background: #ffffff22; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
+      #gas-bar, #blade-bar, #focus-bar { height: 10px; background: #ffffff22; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
       #gas-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #6fc3df, #a8e6ff); transition: width 0.1s linear; }
       #blade-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #cfd6dd, #ffffff); transition: width 0.1s linear; }
+      #focus-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #9b7bff, #d3c2ff); transition: width 0.1s linear; }
+      #minimap {
+        position: absolute; top: 118px; right: 24px; border-radius: 50%;
+        background: rgba(10, 14, 18, 0.55); box-shadow: 0 0 0 2px #ffffff2a;
+      }
+      #focus-vignette {
+        position: absolute; inset: 0; opacity: 0; transition: opacity 0.18s;
+        background: radial-gradient(ellipse at center, transparent 45%, #2b1e6bcc 130%);
+      }
+      #focus-vignette.on { opacity: 1; }
       #blade-pairs { font-size: 13px; letter-spacing: 1px; opacity: 0.9; }
       #meters .low { animation: pulse-red 0.8s infinite; }
       @keyframes pulse-red { 50% { filter: drop-shadow(0 0 6px #ff5544) } }
@@ -135,7 +145,11 @@
         <div id="gas-bar"><div id="gas-fill"></div></div>
         <div class="meter-label">BLADE <span id="blade-pairs"></span></div>
         <div id="blade-bar"><div id="blade-fill"></div></div>
+        <div class="meter-label">FOCUS</div>
+        <div id="focus-bar"><div id="focus-fill"></div></div>
       </div>
+      <canvas id="minimap" width="170" height="170"></canvas>
+      <div id="focus-vignette"></div>
       <div id="speedo"></div>
       <div id="banner" class="aot-title"></div>
       <div id="popup"></div>
@@ -148,7 +162,7 @@
         <div class="sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
         <div class="keys">
           <b>Mouse</b> look &nbsp;·&nbsp; <b>LMB / RMB</b> (or <b>J / K</b>) hold to hook &amp; winch in, release to let go<br />
-          <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply at the green ring
+          <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost burst &nbsp;·&nbsp; <b>Q</b> focus (slow time) &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply
         </div>
         <button id="start-btn">DEPLOY</button>
         <div class="seedline" id="seed-line"></div>

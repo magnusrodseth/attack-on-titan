@@ -68,10 +68,19 @@ describe('generateCity — AoT district look (user reference images)', () => {
 })
 
 describe('groundHeightAt', () => {
-  it('returns the roof height inside a building footprint and 0 outside', () => {
+  it('returns ridge height on the ridge line and 0 outside the footprint', () => {
     const arena = singleBuildingArena()
-    expect(groundHeightAt(arena, 0, 0)).toBe(20)
+    expect(groundHeightAt(arena, 0, 0)).toBe(20) // ridge runs along x at z=0
     expect(groundHeightAt(arena, 100, 100)).toBe(0)
+  })
+
+  it('follows the gable slope down toward the eaves', () => {
+    const arena = singleBuildingArena() // ridgeAxis x, w=d=10, h=20, eave = 14
+    const midSlope = groundHeightAt(arena, 0, 2.5) // halfway down the south slope
+    expect(midSlope).toBeCloseTo(17, 0)
+    const nearEave = groundHeightAt(arena, 0, 4.9)
+    expect(nearEave).toBeLessThan(14.5)
+    expect(nearEave).toBeGreaterThan(13.5)
   })
 })
 
@@ -92,6 +101,14 @@ describe('resolveBuildingCollision', () => {
     const vel = new Vector3(1, -1, 0)
     resolveBuildingCollision(arena, pos, vel, 0.5)
     expect(pos.toArray()).toEqual([0, 25, 0])
+  })
+
+  it('does not wall-push in the roof zone above the eaves', () => {
+    const arena = singleBuildingArena() // eave at 14, ridge at 20
+    const pos = new Vector3(4.5, 16, 4.5) // inside footprint, above the eave, off the ridge
+    const vel = new Vector3(-3, 0, 0)
+    resolveBuildingCollision(arena, pos, vel, 0.5)
+    expect(pos.x).toBe(4.5) // no horizontal shove; the ground clamp owns roof contact
   })
 })
 
@@ -132,6 +149,22 @@ describe('raycastHookTarget', () => {
   it('returns null for a shot into the sky', () => {
     const arena = emptyArena()
     const hit = raycastHookTarget(arena, new Vector3(0, 5, 0), new Vector3(0, 1, 0), 500)
+    expect(hit).toBeNull()
+  })
+
+  it('hooks onto the gable slope, not an invisible box above the eaves', () => {
+    const arena = singleBuildingArena() // ridge along x at z=0: slope from eave 14 to ridge 20
+    const hit = raycastHookTarget(arena, new Vector3(0, 16, 20), new Vector3(0, 0, -1), 100)
+    expect(hit).not.toBeNull()
+    // surface height 16 lies at |z| = 5 * (1 - (16-14)/6) ≈ 3.33 on the near slope
+    expect(hit!.z).toBeCloseTo(3.33, 1)
+    expect(hit!.y).toBeCloseTo(16, 1)
+  })
+
+  it('lets rays pass through the air beside the ridge', () => {
+    const arena = singleBuildingArena()
+    // above the eave corner (z=4.9, y=19) the roof surface is ~14.1; a ray there at y 19 misses
+    const hit = raycastHookTarget(arena, new Vector3(0, 19, 4.9), new Vector3(1, 0, 0), 20)
     expect(hit).toBeNull()
   })
 })

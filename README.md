@@ -18,7 +18,8 @@ Click **DEPLOY** (grabs pointer lock), then:
 | Mouse | Look / aim hooks |
 | LMB / RMB (or J / K) | Hold to fire a hook and winch in automatically (faster the faster you move); release to detach |
 | Space | Jump |
-| Shift | Gas boost in your horizontal move/look direction |
+| Shift | Boost burst: a click fires a short gas dash in the direction you're looking (airborne only, short cooldown) |
+| Q | Focus: hold to slow time while the meter drains; refills on its own |
 | F | Blade slash |
 | W A S D | Run / steer momentum |
 | R | Resupply gas, canisters and blades at the green plaza ring |

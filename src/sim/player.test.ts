@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { emptyArena } from './city'
 import { EYE_HEIGHT } from './constants'
 import type { InputState } from './player'
-import { createPlayer, neutralInput, stepPlayer } from './player'
+import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import { attachHook } from './rope'
 
 const DT = 1 / 120
@@ -42,98 +42,45 @@ describe('stepPlayer', () => {
     expect(p.vel.y).toBeGreaterThan(3)
   })
 
-  it('boost thrusts horizontally along the move direction and burns gas', () => {
+  it('boost burst adds an impulse along the full look direction', () => {
     const p = createPlayer()
     p.pos.set(0, 30, 0)
     p.onGround = false
     const gasBefore = p.gas
-    const input = idle()
-    input.gas = true
-    input.move.set(1, 0, 0)
-    stepPlayer(p, input, DT, emptyArena())
-    expect(p.vel.x).toBeGreaterThan(0)
+    const look = new Vector3(0.6, 0.8, 0).normalize()
+    expect(tryBoost(p, look)).toBe(true)
+    expect(p.vel.x).toBeGreaterThan(5)
+    expect(p.vel.y).toBeGreaterThan(7) // looking up boosts up
     expect(p.gas).toBeLessThan(gasBefore)
+    expect(p.boostCooldown).toBeGreaterThan(0)
   })
 
-  it('boost falls back to the horizontal look direction with no move input', () => {
-    const p = createPlayer()
-    p.pos.set(0, 30, 0)
-    p.onGround = false
-    const input = idle()
-    input.gas = true
-    input.lookDir.set(0.6, 0.8, 0).normalize() // steep look: boost must stay horizontal
-    stepPlayer(p, input, DT, emptyArena())
-    expect(p.vel.x).toBeGreaterThan(0)
-    expect(p.vel.y).toBeLessThan(0.01) // gravity only; no vertical thrust from boost
-  })
+  it('boost burst refuses on the ground, on cooldown, or without gas', () => {
+    const grounded = createPlayer()
+    grounded.onGround = true
+    expect(tryBoost(grounded, new Vector3(1, 0, 0))).toBe(false)
 
-  it('boost does nothing on the ground (airborne-only)', () => {
-    const boosted = createPlayer()
-    const baseline = createPlayer()
-    for (const p of [boosted, baseline]) {
-      p.pos.set(0, EYE_HEIGHT, 0)
-      stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
-    }
-    const withGas = idle()
-    withGas.gas = true
-    withGas.move.set(1, 0, 0)
-    const noGas = idle()
-    noGas.move.set(1, 0, 0)
-    stepPlayer(boosted, withGas, DT, emptyArena())
-    stepPlayer(baseline, noGas, DT, emptyArena())
-    expect(boosted.gas).toBe(boosted.config.maxGas) // no burn
-    expect(boosted.vel.toArray()).toEqual(baseline.vel.toArray())
-  })
+    const cooling = createPlayer()
+    cooling.onGround = false
+    cooling.boostCooldown = 0.3
+    expect(tryBoost(cooling, new Vector3(1, 0, 0))).toBe(false)
 
-  it('jump then boost gets a hooked player moving', () => {
-    const p = createPlayer()
-    p.pos.set(0, EYE_HEIGHT, 0)
-    stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
-    attachHook(p.hooks[0], new Vector3(30, 40, 0), p.pos)
-    const jumpInput = idle()
-    jumpInput.jump = true
-    stepPlayer(p, jumpInput, DT, emptyArena())
-    const boostInput = idle()
-    boostInput.gas = true
-    boostInput.move.set(1, 0, 0)
-    for (let i = 0; i < 60; i++) stepPlayer(p, boostInput, DT, emptyArena())
-    expect(p.onGround).toBe(false)
-    expect(p.vel.x).toBeGreaterThan(1)
-  })
-
-  it('makes boost a no-op when tank and all canisters are empty', () => {
-    const withGasHeld = createPlayer()
-    const baseline = createPlayer()
-    for (const p of [withGasHeld, baseline]) {
-      p.pos.set(0, 30, 0)
-      p.gas = 0
-      p.canisters = 0
-      p.onGround = false
-      attachHook(p.hooks[0], new Vector3(40, 50, 0), p.pos)
-    }
-    const input = idle()
-    input.gas = true
-    input.move.set(1, 0, 0)
-    const sameMoveNoGas = idle()
-    sameMoveNoGas.move.set(1, 0, 0)
-    stepPlayer(withGasHeld, input, DT, emptyArena())
-    stepPlayer(baseline, sameMoveNoGas, DT, emptyArena())
-    expect(withGasHeld.vel.toArray()).toEqual(baseline.vel.toArray())
-    expect(withGasHeld.gas).toBe(0)
+    const empty = createPlayer()
+    empty.onGround = false
+    empty.gas = 5
+    empty.canisters = 0
+    expect(tryBoost(empty, new Vector3(1, 0, 0))).toBe(false)
+    expect(empty.vel.x).toBe(0)
   })
 
   it('auto-swaps a spare canister in when the tank runs dry', () => {
     const p = createPlayer()
     p.pos.set(0, 30, 0)
     p.onGround = false
-    p.gas = 0.01
-    const input = idle()
-    input.gas = true
-    input.move.set(1, 0, 0)
-    stepPlayer(p, input, DT, emptyArena())
-    stepPlayer(p, input, DT, emptyArena())
+    p.gas = 0
+    stepPlayer(p, idle(), DT, emptyArena())
     expect(p.canisters).toBe(p.config.gasCanisters - 1)
-    expect(p.gas).toBeGreaterThan(p.config.maxGas * 0.9)
+    expect(p.gas).toBe(p.config.maxGas)
   })
 
   it('preserves tangential speed through a taut swing (pendulum bottom)', () => {
@@ -213,6 +160,18 @@ describe('stepPlayer', () => {
     p.vel.set(500, 0, 0)
     stepPlayer(p, idle(), DT, emptyArena())
     expect(p.vel.length()).toBeLessThanOrEqual(p.config.speedCap + 1e-6)
+  })
+
+  it('holding W on the ground never accelerates beyond run speed', () => {
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT, 0)
+    p.vel.set(12, 0, 0) // landed above run speed
+    stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
+    const input = idle()
+    input.move.set(1, 0, 0)
+    for (let i = 0; i < 360; i++) stepPlayer(p, input, DT, emptyArena()) // 3s of held W
+    const speed = Math.hypot(p.vel.x, p.vel.z)
+    expect(speed).toBeLessThanOrEqual(p.config.runSpeed + 1)
   })
 
   it('runs along the ground toward the move direction', () => {

@@ -1,5 +1,6 @@
 import {
   BoxGeometry,
+  CapsuleGeometry,
   Color,
   Group,
   Mesh,
@@ -37,14 +38,52 @@ import { SWAT_WINDUP } from '../sim/titan'
  * Procedural "pure titan": nude-look tan humanoid with a creepy grin and slightly wrong
  * proportions, per the user's reference images. Built at unit height and scaled by t.height.
  */
+interface Limb {
+  pivot: Group // hip or shoulder
+  lower: Group // knee or elbow
+}
+
+/** Two-segment limb with a joint sphere: capsules instead of boxes. */
+function makeLimb(
+  material: MeshStandardMaterial,
+  upperR: number,
+  upperL: number,
+  lowerR: number,
+  lowerL: number,
+  x: number,
+  pivotY: number,
+): Limb {
+  const pivot = new Group()
+  pivot.position.set(x, pivotY, 0)
+  const upper = new Mesh(new CapsuleGeometry(upperR, upperL, 3, 8), material)
+  upper.position.y = -(upperL / 2 + upperR)
+  upper.castShadow = true
+  pivot.add(upper)
+  const jointY = -(upperL + upperR * 1.7)
+  const joint = new Mesh(new SphereGeometry(upperR * 1.02, 8, 6), material)
+  joint.position.y = jointY
+  pivot.add(joint)
+  const lower = new Group()
+  lower.position.y = jointY
+  const lowerMesh = new Mesh(new CapsuleGeometry(lowerR, lowerL, 3, 8), material)
+  lowerMesh.position.y = -(lowerL / 2 + lowerR)
+  lowerMesh.castShadow = true
+  lower.add(lowerMesh)
+  const tip = new Mesh(new SphereGeometry(lowerR * 1.1, 8, 6), material)
+  tip.position.y = -(lowerL + lowerR * 1.6)
+  lower.add(tip)
+  pivot.add(lower)
+  return { pivot, lower }
+}
+
 class TitanVisual {
   readonly group = new Group()
   private readonly skin: MeshStandardMaterial
   private readonly napeMat: MeshStandardMaterial
-  private readonly legL: Group
-  private readonly legR: Group
-  private readonly armL: Group
-  private readonly armR: Group
+  private readonly legL: Limb
+  private readonly legR: Limb
+  private readonly armL: Limb
+  private readonly armR: Limb
   private readonly torso: Group
   private walkPhase = 0
   private lastPos = { x: 0, z: 0 }
@@ -78,21 +117,28 @@ class TitanVisual {
     const headScale = 1 + quirk() * 0.45 // big heads read "pure titan"
     const bellyScale = 0.85 + quirk() * 0.6
 
-    // legs with hip pivots
-    this.legL = limb(this.skin, 0.1, 0.44, -0.08, 0.44)
-    this.legR = limb(this.skin, 0.1, 0.44, 0.08, 0.44)
+    // two-segment capsule legs with hip pivots and knees
+    this.legL = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, -0.085, 0.44)
+    this.legR = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, 0.085, 0.44)
 
     this.torso = new Group()
     this.torso.position.y = 0.44
-    const belly = new Mesh(new BoxGeometry(0.24 * bellyScale, 0.34, 0.15 * bellyScale), this.skin)
+    const belly = new Mesh(new CapsuleGeometry(0.125, 0.18, 4, 10), this.skin)
+    belly.scale.set(bellyScale, 1, bellyScale * 0.72)
     belly.position.y = 0.17
     belly.castShadow = true
     this.torso.add(belly)
+    for (const side of [-1, 1]) {
+      const shoulder = new Mesh(new SphereGeometry(0.062, 8, 6), this.skin)
+      shoulder.position.set(side * 0.155, 0.32, 0)
+      this.torso.add(shoulder)
+    }
 
-    // arms with shoulder pivots (hang stiff and creepy)
-    this.armL = limb(this.skin, 0.075, 0.4 + quirk() * 0.12, -0.16, 0.32)
-    this.armR = limb(this.skin, 0.075, 0.4 + quirk() * 0.12, 0.16, 0.32)
-    this.torso.add(this.armL, this.armR)
+    // arms with shoulder pivots and elbows (hang loose and creepy)
+    const armLen = 0.08 + quirk() * 0.05
+    this.armL = makeLimb(this.skin, 0.044, armLen, 0.037, armLen, -0.165, 0.32)
+    this.armR = makeLimb(this.skin, 0.044, armLen, 0.037, armLen, 0.165, 0.32)
+    this.torso.add(this.armL.pivot, this.armR.pivot)
 
     // head + face at the top of the torso group
     const head = new Group()
@@ -125,7 +171,7 @@ class TitanVisual {
     nape.position.set(0, 0.38, -0.09)
     this.torso.add(nape)
 
-    this.group.add(this.legL, this.legR, this.torso)
+    this.group.add(this.legL.pivot, this.legR.pivot, this.torso)
     this.group.scale.setScalar(t.height)
     this.syncPose(t, 0)
   }
@@ -164,8 +210,10 @@ class TitanVisual {
       const eased = 1 - (1 - kneel) * (1 - kneel)
       this.group.position.y = t.pos.y - 0.22 * t.height * eased
       this.group.rotation.x = 0.12 * eased // slight forward slump
-      this.legL.rotation.x = this.legR.rotation.x = -1.4 * eased
-      this.armL.rotation.x = this.armR.rotation.x = -0.35 * eased
+      this.legL.pivot.rotation.x = this.legR.pivot.rotation.x = -1.35 * eased
+      this.legL.lower.rotation.x = this.legR.lower.rotation.x = 2.1 * eased
+      this.armL.pivot.rotation.x = this.armR.pivot.rotation.x = -0.35 * eased
+      this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.4 * eased
       this.torso.rotation.x = 0.28 * eased
       this.napeMat.emissiveIntensity = 1 + Math.sin(performance.now() * 0.009) * 0.6 // scream "cut here"
       return
@@ -178,39 +226,31 @@ class TitanVisual {
     this.walkPhase += speed * dt * 1.6
 
     const swing = Math.sin(this.walkPhase) * Math.min(0.55, speed * 0.06)
-    this.legL.rotation.x = swing
-    this.legR.rotation.x = -swing
-    this.armL.rotation.x = -swing * 0.4
-    this.armR.rotation.x = swing * 0.4
+    this.legL.pivot.rotation.x = swing
+    this.legR.pivot.rotation.x = -swing
+    this.legL.lower.rotation.x = Math.max(0, -swing) * 1.2 + 0.05
+    this.legR.lower.rotation.x = Math.max(0, swing) * 1.2 + 0.05
+    this.armL.pivot.rotation.x = -swing * 0.4
+    this.armR.pivot.rotation.x = swing * 0.4
+    this.armL.lower.rotation.x = -0.12 - Math.max(0, swing) * 0.3
+    this.armR.lower.rotation.x = -0.12 - Math.max(0, -swing) * 0.3
     this.torso.rotation.x = t.state === 'chase' ? 0.18 : 0.05
 
     if (t.state === 'attack') {
       const wind = Math.min(1, t.stateTime / SWAT_WINDUP)
-      this.armR.rotation.x = -2.3 * wind + (wind >= 1 ? 1.6 : 0)
+      this.armR.pivot.rotation.x = -2.3 * wind + (wind >= 1 ? 1.6 : 0)
+      this.armR.lower.rotation.x = -0.7 * wind
     } else if (t.state === 'leap') {
-      this.legL.rotation.x = this.legR.rotation.x = 0.9
-      this.armL.rotation.x = this.armR.rotation.x = -1.4
+      this.legL.pivot.rotation.x = this.legR.pivot.rotation.x = 0.9
+      this.legL.lower.rotation.x = this.legR.lower.rotation.x = 1.3
+      this.armL.pivot.rotation.x = this.armR.pivot.rotation.x = -1.4
+      this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.3
     }
 
     this.napeMat.emissiveIntensity = 0.65 + Math.sin(performance.now() * 0.004 + t.id) * 0.35
   }
 }
 
-function limb(
-  material: MeshStandardMaterial,
-  thickness: number,
-  length: number,
-  x: number,
-  pivotY: number,
-): Group {
-  const pivot = new Group()
-  pivot.position.set(x, pivotY, 0)
-  const mesh = new Mesh(new BoxGeometry(thickness, length, thickness), material)
-  mesh.position.y = -length / 2
-  mesh.castShadow = true
-  pivot.add(mesh)
-  return pivot
-}
 
 function easeOut(x: number): number {
   return 1 - (1 - x) * (1 - x)

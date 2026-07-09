@@ -4,7 +4,7 @@ import { generateCity, raycastHookTarget } from './city'
 import { EYE_HEIGHT } from './constants'
 import { trySlash } from './combat'
 import type { InputState, PlayerState } from './player'
-import { createPlayer, neutralInput, stepPlayer } from './player'
+import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import { createRng, hashSeed } from './rng'
 import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from './rope'
 import type { ScoreState } from './score'
@@ -16,6 +16,13 @@ import { applyUpgrade, offerUpgrades } from './upgrades'
 import { waveComposition } from './waves'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead'
+
+// Focus (bullet time): hold to slow the world while the meter drains; refills on its own.
+export const FOCUS_TIME_SCALE = 0.3
+export const FOCUS_MAX = 100
+const FOCUS_DRAIN = 160 // per sim-second: ~2 real seconds of slow-mo per full meter
+const FOCUS_REGEN = 12
+const FOCUS_MIN_START = 25
 
 export type GameEvent =
   | { type: 'hook'; index: 0 | 1; point: Vector3 }
@@ -29,6 +36,7 @@ export type GameEvent =
   | { type: 'waveClear'; wave: number; bonus: number }
   | { type: 'resupply' }
   | { type: 'canisterSwap'; remaining: number }
+  | { type: 'boost' }
   | { type: 'death' }
 
 export interface BestStats {
@@ -57,6 +65,8 @@ export interface GameState {
   rngLive: () => number
   prevInput: InputState
   nextTitanId: number
+  focus: number
+  focusActive: boolean
 }
 
 const BEST_KEY = 'aot-odm-best'
@@ -106,6 +116,8 @@ export function createGame(seed: string, storage: StorageLike | null = defaultSt
     rngLive: createRng(hashSeed(`${seed}:live`)),
     prevInput: neutralInput(),
     nextTitanId: 1,
+    focus: FOCUS_MAX,
+    focusActive: false,
   }
 }
 
@@ -144,6 +156,19 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   }
   g.time += dt
   const p = g.player
+
+  // focus meter: hold to slow time (main loop applies FOCUS_TIME_SCALE while focusActive)
+  if (g.focusActive) {
+    g.focus = Math.max(0, g.focus - FOCUS_DRAIN * dt)
+    if (!input.focus || g.focus <= 0) g.focusActive = false
+  } else {
+    g.focus = Math.min(FOCUS_MAX, g.focus + FOCUS_REGEN * dt)
+    if (input.focus && !g.prevInput.focus && g.focus >= FOCUS_MIN_START) g.focusActive = true
+  }
+
+  if (input.gas && !g.prevInput.gas && tryBoost(p, input.lookDir)) {
+    g.events.push({ type: 'boost' })
+  }
 
   handleHookEdge(g, 0, input.hookL, g.prevInput.hookL, input)
   handleHookEdge(g, 1, input.hookR, g.prevInput.hookR, input)
@@ -286,6 +311,7 @@ function copyInput(dst: InputState, src: InputState): void {
   dst.lookDir.copy(src.lookDir)
   dst.gas = src.gas
   dst.jump = src.jump
+  dst.focus = src.focus
   dst.slash = src.slash
   dst.hookL = src.hookL
   dst.hookR = src.hookR
