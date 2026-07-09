@@ -28,10 +28,13 @@ Objects. The original partykit.io hosted platform still works but is the legacy 
   Scores are therefore server-computed and the leaderboard is cheat-resistant by construction.
 - **Snapshots**: the server broadcasts world snapshots at ~20 Hz; clients interpolate titans and
   remote soldiers between snapshots.
-- **One backend**: the same Worker serves the small HTTP API (register/login/leaderboard) next to
-  the websockets, talking to Neon Postgres through `@neondatabase/serverless` + Drizzle ORM.
-  Ephemeral state (lobby, match) lives in the room; durable state (users, sessions, matches,
-  match_players) lives in Neon.
+- **One backend, one provider**: the same Worker serves the small HTTP API
+  (register/login/leaderboard) next to the websockets. Durable state (users, sessions, matches,
+  match_players) lives in **Cloudflare D1** via Drizzle ORM; D1 is a Worker binding, so there
+  are no connection strings or secrets, and wrangler dev ships a local database. (Amended
+  2026-07-09: originally Neon Postgres; the user chose D1 after seeing the operational cost of
+  a second provider. The Drizzle schema carried over in the SQLite dialect.) Ephemeral state
+  (lobby, match) lives in the room.
 - **Protocol**: versioned JSON messages in `src/net/protocol.ts`, shared by client and Worker.
 
 ## Alternatives rejected
@@ -49,7 +52,7 @@ Objects. The original partykit.io hosted platform still works but is the legacy 
   proxies; slash validation accepts arbitrary sources; wave scaling accounts for player count.
 - The Worker must tick the sim in real time; a Durable Object cannot hibernate during a match
   (acceptable: matches are minutes long, rooms idle back to hibernation in the lobby).
-- Deploys require `wrangler` (Cloudflare) and `neonctl` (Neon) auth; the frontend needs the
-  Worker host in `VITE_PARTY_HOST`.
+- Deploys require only `wrangler` (Cloudflare) auth; the frontend needs the Worker host in
+  `VITE_PARTY_HOST`.
 - Clients are trusted about their own movement (sanity-clamped server-side). Fine at
   friends-lobby stakes; full anti-cheat is explicitly out of scope for v1.

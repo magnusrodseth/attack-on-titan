@@ -23,9 +23,11 @@ browser profiles, ready to share on LinkedIn.
 ## Decisions so far
 
 - [Multiplayer alignment](tickets/mp-001-multiplayer-alignment.md) — shared-world co-op,
-  server-authoritative on Cloudflare partyserver + Neon/Drizzle, code+link lobbies (cap 4),
-  team-wipe + MVP, personal timed upgrades, username+password auth, server-written match
-  leaderboard.
+  server-authoritative on Cloudflare partyserver, code+link lobbies (cap 4), team-wipe + MVP,
+  personal timed upgrades, username+password auth, server-written match leaderboard.
+- Database: Cloudflare D1 over Neon (user decision, 2026-07-09, amending mp-001/ADR 0001) —
+  one provider, one library; D1 is a binding so there are no secrets and local dev needs no
+  extra services. Same Drizzle schema in the SQLite dialect.
 
 ## Not yet specified
 
