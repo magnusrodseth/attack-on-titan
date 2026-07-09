@@ -99,8 +99,8 @@ function buildInput(): InputState {
   input.jump = keys.has('Space')
   input.gas = keys.has('ShiftLeft') || keys.has('ShiftRight')
   input.slash = keys.has('KeyF')
-  input.hookL = mouseL || keys.has('KeyQ')
-  input.hookR = mouseR
+  input.hookL = mouseL || keys.has('KeyJ') || keys.has('KeyQ')
+  input.hookR = mouseR || keys.has('KeyK')
   input.resupply = keys.has('KeyR')
   camera.getWorldDirection(input.lookDir)
 
@@ -371,6 +371,7 @@ function snapshot() {
 ;(window as unknown as Record<string, unknown>).__aot = {
   game,
   seed,
+  scene,
   snapshot,
   setAutopilot(value: boolean) {
     debug.autopilot = value

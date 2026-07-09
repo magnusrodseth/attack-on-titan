@@ -130,7 +130,7 @@ function addHouses(scene: Scene, arena: Arena): void {
   const isBrick = (tint: number) => tint < 0.35
   const plasterBodies = new InstancedMesh(
     bodyGeometry,
-    new MeshStandardMaterial({ map: tex('/textures/plaster.jpg', 2, 1), roughness: 0.95 }),
+    new MeshStandardMaterial({ map: tex('/textures/plaster.jpg', 2, 2), roughness: 0.95 }),
     houses.length,
   )
   const brickBodies = new InstancedMesh(
@@ -187,8 +187,8 @@ function addHouses(scene: Scene, arena: Arena): void {
       brickCount++
     } else {
       plasterBodies.setMatrixAt(plasterCount, matrix)
-      // plaster tones: cream, tan, pale ochre — per-instance tint multiplies the texture
-      color.setHSL(0.07 + house.tint * 0.06, 0.26 + house.tint * 0.12, 0.66 + (house.tint % 0.31) * 0.35)
+      // light tints so the weathered plaster texture shows through: cream, tan, pale ochre
+      color.setHSL(0.07 + house.tint * 0.06, 0.15 + house.tint * 0.12, 0.82 + (house.tint % 0.31) * 0.55)
       plasterBodies.setColorAt(plasterCount, color)
       plasterCount++
     }
@@ -317,10 +317,10 @@ function addStation(scene: Scene, arena: Arena): void {
   const banner = new Mesh(
     new BoxGeometry(4.5, 3, 0.15),
     new MeshStandardMaterial({
-      map: tex('/textures/linen.jpg', 2, 2),
-      color: 0x3f9e5c,
-      emissive: 0x2fa35f,
-      emissiveIntensity: 0.3,
+      map: tex('/textures/linen.jpg', 1.4, 1),
+      color: 0x53b06e,
+      emissive: 0x1d5c38,
+      emissiveIntensity: 0.12,
       side: DoubleSide,
     }),
   )

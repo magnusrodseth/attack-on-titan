@@ -16,7 +16,7 @@ Click **DEPLOY** (grabs pointer lock), then:
 | Input | Action |
 | --- | --- |
 | Mouse | Look / aim hooks |
-| LMB / RMB | Hold to fire a hook and winch in automatically (faster the faster you move); release to detach |
+| LMB / RMB (or J / K) | Hold to fire a hook and winch in automatically (faster the faster you move); release to detach |
 | Space | Jump |
 | Shift | Gas boost in your horizontal move/look direction |
 | F | Blade slash |
@@ -69,7 +69,7 @@ Title font: [Cloister Black](https://www.dafont.com/cloister-black.font) by Diet
 
 ## Art credits (all CC0)
 
-- Textures (plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate) from [Poly Haven](https://polyhaven.com/textures)
+- Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
 - Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)
 - Mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg

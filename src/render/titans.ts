@@ -4,9 +4,31 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
+  RepeatWrapping,
   Scene,
   SphereGeometry,
+  SRGBColorSpace,
+  Texture,
+  TextureLoader,
 } from 'three'
+
+const textureLoader = new TextureLoader()
+
+function skinTexture(repeatX: number, repeatY: number): Texture {
+  const texture = textureLoader.load('/textures/skin.jpg')
+  texture.colorSpace = SRGBColorSpace
+  texture.wrapS = texture.wrapT = RepeatWrapping
+  texture.repeat.set(repeatX, repeatY)
+  return texture
+}
+
+function hairTexture(): Texture {
+  const texture = textureLoader.load('/textures/bark.jpg')
+  texture.colorSpace = SRGBColorSpace
+  texture.wrapS = texture.wrapT = RepeatWrapping
+  texture.repeat.set(2, 2)
+  return texture
+}
 import { createRng } from '../sim/rng'
 import type { TitanState } from '../sim/titan'
 import { SWAT_WINDUP } from '../sim/titan'
@@ -29,9 +51,22 @@ class TitanVisual {
 
   constructor(t: TitanState) {
     const quirk = createRng(t.id * 7919 + 17)
-    const skinTone = new Color().setHSL(0.07 + quirk() * 0.03, 0.35 + quirk() * 0.2, 0.55 + quirk() * 0.14)
-    this.skin = new MeshStandardMaterial({ color: skinTone, roughness: 0.9, transparent: true })
-    const dark = new MeshStandardMaterial({ color: 0x241a14, roughness: 0.9, transparent: true })
+    // aged-leather texture reads as titan flesh; light tint jitter varies each titan
+    // skin.jpg is pre-lifted to flesh tones (ffmpeg gamma); tint adds per-titan variety
+    const lift = 1 + quirk() * 0.3
+    const skinTone = new Color(lift * 1.05, lift, lift * 0.9)
+    this.skin = new MeshStandardMaterial({
+      map: skinTexture(1.5, 1.5),
+      color: skinTone,
+      roughness: 0.9,
+      transparent: true,
+    })
+    const dark = new MeshStandardMaterial({
+      map: hairTexture(),
+      color: 0x4a3826,
+      roughness: 0.9,
+      transparent: true,
+    })
     const white = new MeshStandardMaterial({ color: 0xf5f0e6, roughness: 0.5, transparent: true })
     this.napeMat = new MeshStandardMaterial({
       color: 0xb3202a,
