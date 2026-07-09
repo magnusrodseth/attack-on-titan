@@ -152,7 +152,12 @@ export class Hud {
     this.score.textContent = String(game.score.score)
     this.combo.textContent =
       game.score.combo > 1 ? `×${(1 + 0.25 * Math.min(game.score.combo, 12)).toFixed(2)} chain (${game.score.combo})` : ''
-    this.best.textContent = `BEST ${game.best.bestScore} · WAVE ${game.best.bestWave}`
+    // the record line follows the live run the moment it becomes the record
+    const record = game.score.score > 0 && game.score.score >= game.best.bestScore
+    this.best.textContent = record
+      ? `BEST ${game.score.score} · THIS ROUND`
+      : `BEST ${game.best.bestScore} · WAVE ${game.best.bestWave}`
+    this.best.classList.toggle('record', record)
 
     const gasRatio = p.gas / p.config.maxGas
     this.gasFill.style.width = `${(gasRatio * 100).toFixed(1)}%`

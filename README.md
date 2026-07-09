@@ -80,6 +80,9 @@ is synthesized at runtime with WebAudio.
 
 - Titan roars, grunts, flinches, slice, groans, scream: [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx) by rubberduck (OpenGameArt)
 - Blade whooshes: [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes) by StarNinjas (OpenGameArt)
+- Blade-jam click: [Gun reload, lock or click sound](https://opengameart.org/content/gun-reload-lock-or-click-sound) (OpenGameArt)
+- Empty-gas hiss: [Steam release sounds](https://opengameart.org/content/steam-release-sounds) (OpenGameArt)
+- Aberrant-kill boom: [Various sound effects](https://opengameart.org/content/various-sound-effects-0) (OpenGameArt)
 
 Fonts: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free) for
 titles; [Cinzel](https://fonts.google.com/specimen/Cinzel) and
