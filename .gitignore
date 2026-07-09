@@ -8,3 +8,9 @@ music-candidates/
 # Worker secrets (local dev)
 .dev.vars
 server/.dev.vars
+.env*
+
+# wrangler local dev state (miniflare DO/D1 sqlite)
+server/.wrangler/
+.wrangler/
+.vercel

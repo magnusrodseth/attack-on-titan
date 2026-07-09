@@ -144,3 +144,26 @@ full day and night cycles.
   darkening everything else; consider warm lamp glow at the resupply plaza and dimmer minimap.
 - **Gameplay flavor** (optional later): titans slow at night per lore (they need sunlight);
   could become a night-survival wrinkle or a mode on the GameMode registry.
+
+## Migrate the co-op server to Hono (note to self, 2026-07-09)
+
+Once the Cloudflare deploy of the multiplayer server (ADR 0001) works end to end, migrate the
+plain Worker to [Hono](https://hono.dev). Do not start until the raw deploy is proven; this is
+a refactor, not part of getting co-op live.
+
+- **Why**: real routing and middleware (CORS, logging, auth) instead of a hand-rolled URL
+  switch in the fetch handler, with types for bindings.
+- **Migration shape** (verified against current docs, 2026-07-09): add `hono` to the existing
+  worker package (no rescaffold needed; `create hono` is only for fresh projects). Replace the
+  bare `export default { fetch }` with a Hono app and export `app.fetch`; other handlers and
+  Durable Object class exports stay on the entry module unchanged:
+  `export default { fetch: app.fetch, scheduled: ... }`.
+- **Bindings**: type them once, `const app = new Hono<{ Bindings: Bindings }>()`, then access
+  DO namespaces/KV/vars as `c.env.*` in handlers. Wrangler config is untouched by the
+  migration.
+- **WebSockets**: the DO upgrade passthrough route ports as a normal Hono route that forwards
+  to the Durable Object stub.
+- Docs:
+  - https://developers.cloudflare.com/workers/framework-guides/web-apps/more-web-frameworks/hono/
+  - https://hono.dev/docs/getting-started/cloudflare-workers
+  - https://hono.dev/docs/getting-started/cloudflare-workers#bindings
