@@ -140,5 +140,6 @@ Music (two tracks alternating in-game):
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
 - Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)
 - Mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg
+- Teammate recruit model (rigged + animated Rogue_Hooded) from [KayKit Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) by Kay Lousberg (CC0)
 - Night-sky star map from [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) — NASA/Goddard Space Flight Center Scientific Visualization Studio (public domain; Gaia DR2 data)
 - Moon texture from the [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720) — NASA's Scientific Visualization Studio (public domain; LRO/LROC data)
