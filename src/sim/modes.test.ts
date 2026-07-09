@@ -64,6 +64,26 @@ describe('the mode seam', () => {
   })
 })
 
+describe('matchday mode', () => {
+  it('is registered and fields only footballers, wave after wave', () => {
+    expect(getMode('matchday').id).toBe('matchday')
+    const game = createGame('fixture-list', null, 'matchday')
+    startGame(game)
+    expect(game.titans.length).toBeGreaterThan(0)
+    expect(game.titans.every((t) => t.kind === 'striker' || t.kind === 'captain')).toBe(true)
+
+    for (const t of game.titans) {
+      t.hp = 0
+      t.state = 'dead'
+    }
+    stepGame(game, neutralInput(), DT)
+    expect(game.phase).toBe('upgrading')
+    chooseUpgrade(game, game.offers[0]!.id)
+    expect(game.wave).toBe(2)
+    expect(game.titans.every((t) => t.kind === 'striker' || t.kind === 'captain')).toBe(true)
+  })
+})
+
 describe('waves mode through the seam', () => {
   it('runs wave clear, upgrade offers and the next wave exactly as before', () => {
     const game = createGame('mode-parity')

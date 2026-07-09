@@ -43,7 +43,7 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
   for (const t of titans) {
     if (t.hp <= 0) continue
     const napeDist = p.pos.distanceTo(napeCenter(t))
-    if (napeDist <= p.config.slashRange * 0.85 + t.height * 0.09 && napeDist < bestDist) {
+    if (napeDist <= p.config.slashRange * 0.95 + t.height * 0.11 && napeDist < bestDist) {
       best = t
       bestDist = napeDist
       napeHit = true
@@ -60,7 +60,7 @@ export function trySlash(p: PlayerState, titans: TitanState[]): SlashResult {
       for (const side of [0, 1] as const) {
         if (t.ankles[side]) continue
         const ankleDist = p.pos.distanceTo(anklePos(t, side))
-        if (ankleDist <= p.config.slashRange * 0.5 + t.height * 0.035 && ankleDist < ankleBest) {
+        if (ankleDist <= p.config.slashRange * 0.6 + t.height * 0.05 && ankleDist < ankleBest) {
           ankleTitan = t
           ankleSide = side
           ankleBest = ankleDist

@@ -2,7 +2,16 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { emptyArena, insideBuildingXZ } from './city'
 import { buildNavGrid, isWalkable } from './nav'
-import { createTitan, napeCenter, raycastTitan, STAGGER_DURATION, staggerTitan, stepTitan, TURN_RATE } from './titan'
+import {
+  aggroRange,
+  createTitan,
+  napeCenter,
+  raycastTitan,
+  STAGGER_DURATION,
+  staggerTitan,
+  stepTitan,
+  TURN_RATE,
+} from './titan'
 
 const DT = 1 / 120
 const rngZero = () => 0
@@ -61,6 +70,31 @@ describe('stepTitan', () => {
     expect(t.state).toBe('leap')
     expect(t.vel.y).toBeGreaterThan(0)
     expect(t.vel.x).toBeGreaterThan(0)
+  })
+
+  it('footballers are apex aberrants: they see further and leap higher than abnormals', () => {
+    for (const kind of ['striker', 'captain'] as const) {
+      expect(aggroRange(kind)).toBeGreaterThan(aggroRange('abnormal'))
+      const t = createTitan({ id: 1, kind, height: 14, x: 0, z: 0 })
+      expect(t.leapCooldown).toBeGreaterThan(0) // spawns holding the aberrant leap timer
+      t.state = 'chase'
+      t.leapCooldown = 0
+      stepTitan(t, player(30, 1.7, 0), DT, rngZero)
+      expect(t.state).toBe('leap')
+      expect(t.vel.y).toBeGreaterThan(13) // an abnormal leaps at 13 m/s
+    }
+  })
+
+  it('footballers outrun an abnormal of the same height', () => {
+    const chased = (kind: 'abnormal' | 'striker') => {
+      const t = createTitan({ id: 1, kind, height: 14, x: 0, z: 0 })
+      t.state = 'chase'
+      t.leapCooldown = 999 // keep it on foot
+      const target = player(100, 1.7, 0)
+      for (let i = 0; i < 120; i++) stepTitan(t, target, DT, rngZero)
+      return t.pos.x
+    }
+    expect(chased('striker')).toBeGreaterThan(chased('abnormal'))
   })
 
   it('turns toward the player gradually instead of snapping', () => {

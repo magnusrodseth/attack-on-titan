@@ -1,5 +1,7 @@
 import {
+  AdditiveBlending,
   BoxGeometry,
+  CanvasTexture,
   CapsuleGeometry,
   Color,
   Group,
@@ -10,6 +12,8 @@ import {
   RepeatWrapping,
   Scene,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Texture,
   TextureLoader,
@@ -38,6 +42,75 @@ function decalTexture(path: string): Texture {
   texture.colorSpace = SRGBColorSpace
   return texture
 }
+
+let glowTexture: CanvasTexture | null = null
+
+/**
+ * Soft radial falloff shared by every weak-point bloom. Procedural is fine here:
+ * gameplay indicator glows are an accepted exception to the sourced-texture rule.
+ */
+function weakPointGlowTexture(): CanvasTexture {
+  if (glowTexture) return glowTexture
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  g.addColorStop(0, 'rgba(255,255,255,1)')
+  g.addColorStop(0.3, 'rgba(255,255,255,0.6)')
+  g.addColorStop(0.65, 'rgba(255,255,255,0.2)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, size, size)
+  glowTexture = new CanvasTexture(canvas)
+  return glowTexture
+}
+
+/** One owner's weak-point indicator materials; per-figure so opacity pulses stay independent. */
+export interface WeakPointMats {
+  glow: SpriteMaterial
+  stain: SpriteMaterial
+}
+
+export function makeWeakPointMats(): WeakPointMats {
+  return {
+    glow: new SpriteMaterial({
+      map: weakPointGlowTexture(),
+      color: 0xff2f38,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.85,
+    }),
+    stain: new SpriteMaterial({
+      map: weakPointGlowTexture(),
+      color: 0xc41420,
+      depthWrite: false,
+      opacity: 0.6,
+    }),
+  }
+}
+
+/**
+ * A weak point as a red bloom bleeding out of the flesh, not a painted shape. Anchor the
+ * group ON the skin surface: the additive halo sinks into the body (+z is into the flesh
+ * from every anchor, so the flesh swallows the core and only the soft glow escapes) while
+ * a small normal-blended stain hugs the skin, because additive light disappears against a
+ * brightly lit surface (the flashlight taught us that). Anchoring off the surface leaves
+ * the stain hanging in the air as a floating red bubble — compute the anchor from the
+ * actual body radius, don't hardcode it.
+ */
+export function makeWeakPoint(mats: WeakPointMats, haloScale: number, stainScale: number): Group {
+  const point = new Group()
+  const halo = new Sprite(mats.glow)
+  halo.position.z = 0.04
+  halo.scale.setScalar(haloScale)
+  const stain = new Sprite(mats.stain)
+  stain.position.z = -0.012
+  stain.scale.setScalar(stainScale)
+  point.add(halo, stain)
+  return point
+}
+
 import { createRng } from '../sim/rng'
 import type { TitanState } from '../sim/titan'
 import { SWAT_WINDUP } from '../sim/titan'
@@ -85,19 +158,129 @@ export function makeLimb(
   return { pivot, lower }
 }
 
-class TitanVisual {
+/**
+ * The body parts every titan-shaped visual exposes so one pose state machine (TitanPoser)
+ * can drive them all: flesh titans and matchday footballers share walk, attack, leap,
+ * cripple, and death animation.
+ */
+export interface TitanPuppet {
+  group: Group
+  torso: Group
+  legL: Limb
+  legR: Limb
+  armL: Limb
+  armR: Limb
+  weakMats: WeakPointMats
+  napeGlow: Group
+  /** Heel glows matching sim ankle targets; index 0 = left, 1 = right (like t.ankles). */
+  ankleGlows: [Group, Group]
+  /** Death dissolve: apply 0..1 opacity to every body material. */
+  setFade(fade: number): void
+}
+
+/** Drives a TitanPuppet from TitanState: one animation state machine for every titan kind. */
+export class TitanPoser {
+  private walkPhase = 0
+  private lastPos = { x: 0, z: 0 }
+
+  constructor(private readonly p: TitanPuppet) {}
+
+  syncPose(t: TitanState, dt: number): void {
+    const p = this.p
+    p.group.position.copy(t.pos)
+    p.group.rotation.y = t.facing
+
+    // a cut tendon stops advertising itself; a crippled or dead titan has none to sell
+    const showAnkles = t.state !== 'dead' && t.state !== 'crippled'
+    p.ankleGlows[0].visible = showAnkles && !t.ankles[0]
+    p.ankleGlows[1].visible = showAnkles && !t.ankles[1]
+
+    if (t.state === 'dead') {
+      // fall forward around the feet, then dissolve
+      const fall = Math.min(1, t.stateTime / 0.9)
+      p.group.rotation.x = (Math.PI / 2) * easeOut(fall)
+      const fade = Math.max(0, 1 - Math.max(0, t.stateTime - 1) / 2)
+      p.napeGlow.visible = false // a dead titan has nothing left to sell
+      p.setFade(fade)
+      p.group.visible = fade > 0.01
+      return
+    }
+
+    if (t.state === 'crippled') {
+      // fall to the knees: sink the body and fold the legs back
+      const kneel = Math.min(1, t.stateTime / 0.6)
+      const eased = 1 - (1 - kneel) * (1 - kneel)
+      p.group.position.y = t.pos.y - 0.22 * t.height * eased
+      p.group.rotation.x = 0.12 * eased // slight forward slump
+      p.legL.pivot.rotation.x = p.legR.pivot.rotation.x = -1.35 * eased
+      p.legL.lower.rotation.x = p.legR.lower.rotation.x = 2.1 * eased
+      p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = -0.35 * eased
+      p.armL.lower.rotation.x = p.armR.lower.rotation.x = -0.4 * eased
+      p.torso.rotation.x = 0.28 * eased
+      // scream "cut here"
+      p.weakMats.glow.opacity = 0.75 + Math.sin(performance.now() * 0.009) * 0.25
+      p.weakMats.stain.opacity = 0.65 + Math.sin(performance.now() * 0.009) * 0.2
+      return
+    }
+    if (t.state === 'staggered') {
+      // rocked back on its heels by the blast, arms flung out, reeling in place
+      p.group.rotation.x = -0.07
+      p.legL.pivot.rotation.x = p.legR.pivot.rotation.x = 0.12
+      p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = 0.55
+      p.armL.lower.rotation.x = p.armR.lower.rotation.x = -0.2
+      p.torso.rotation.x = -0.12
+      p.weakMats.glow.opacity = 0.7 // steady, no pulse: the titan is out cold
+      p.weakMats.stain.opacity = 0.5
+      return
+    }
+    p.group.rotation.x = 0
+
+    const moved = Math.hypot(t.pos.x - this.lastPos.x, t.pos.z - this.lastPos.z)
+    this.lastPos = { x: t.pos.x, z: t.pos.z }
+    const speed = dt > 0 ? moved / dt : 0
+    this.walkPhase += speed * dt * 1.6
+
+    const swing = Math.sin(this.walkPhase) * Math.min(0.55, speed * 0.06)
+    p.legL.pivot.rotation.x = swing
+    p.legR.pivot.rotation.x = -swing
+    p.legL.lower.rotation.x = Math.max(0, -swing) * 1.2 + 0.05
+    p.legR.lower.rotation.x = Math.max(0, swing) * 1.2 + 0.05
+    p.armL.pivot.rotation.x = -swing * 0.4
+    p.armR.pivot.rotation.x = swing * 0.4
+    p.armL.lower.rotation.x = -0.12 - Math.max(0, swing) * 0.3
+    p.armR.lower.rotation.x = -0.12 - Math.max(0, -swing) * 0.3
+    p.torso.rotation.x = t.state === 'chase' ? 0.18 : 0.05
+
+    if (t.state === 'attack') {
+      const wind = Math.min(1, t.stateTime / SWAT_WINDUP)
+      p.armR.pivot.rotation.x = -2.3 * wind + (wind >= 1 ? 1.6 : 0)
+      p.armR.lower.rotation.x = -0.7 * wind
+    } else if (t.state === 'leap') {
+      p.legL.pivot.rotation.x = p.legR.pivot.rotation.x = 0.9
+      p.legL.lower.rotation.x = p.legR.lower.rotation.x = 1.3
+      p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = -1.4
+      p.armL.lower.rotation.x = p.armR.lower.rotation.x = -0.3
+    }
+
+    const pulse = Math.sin(performance.now() * 0.004 + t.id)
+    p.weakMats.glow.opacity = 0.8 + pulse * 0.2
+    p.weakMats.stain.opacity = 0.55 + pulse * 0.15
+  }
+}
+
+export class TitanVisual {
   readonly group = new Group()
   private readonly skin: MeshStandardMaterial
-  private readonly napeMat: MeshStandardMaterial
+  private readonly weakMats: WeakPointMats
+  private readonly napeGlow: Group
   private readonly legL: Limb
   private readonly legR: Limb
   private readonly armL: Limb
   private readonly armR: Limb
   private readonly torso: Group
   /** Heel glows matching sim ankle targets; index 0 = left, 1 = right (like t.ankles). */
-  private readonly ankleGlows: [Mesh, Mesh]
-  private walkPhase = 0
-  private lastPos = { x: 0, z: 0 }
+  private readonly ankleGlows: [Group, Group]
+  private readonly poser: TitanPoser
 
   constructor(t: TitanState) {
     const quirk = createRng(t.id * 7919 + 17)
@@ -117,12 +300,7 @@ class TitanVisual {
       roughness: 0.9,
       transparent: true,
     })
-    this.napeMat = new MeshStandardMaterial({
-      color: 0xb3202a,
-      emissive: 0xd42b35,
-      emissiveIntensity: 0.8,
-      transparent: true,
-    })
+    this.weakMats = makeWeakPointMats()
 
     const headScale = 1 + quirk() * 0.45 // big heads read "pure titan"
     const bellyScale = 0.85 + quirk() * 0.6
@@ -133,9 +311,9 @@ class TitanVisual {
 
     // glowing heel tendons, the same red as the nape so both weak points read alike;
     // each hides once its ankle is cut (see syncPose)
-    const heel = (limb: Limb): Mesh => {
-      const glow = new Mesh(new BoxGeometry(0.06, 0.055, 0.03), this.napeMat)
-      glow.position.set(0, -0.175, -0.05) // back of the lower leg, at the sim's anklePos height
+    const heel = (limb: Limb): Group => {
+      const glow = makeWeakPoint(this.weakMats, 0.22, 0.08)
+      glow.position.set(0, -0.175, -0.047) // on the calf surface, at the sim's anklePos height
       limb.lower.add(glow)
       return glow
     }
@@ -200,13 +378,39 @@ class TitanVisual {
     }
     this.torso.add(head)
 
-    // glowing nape weak point, matching sim napeCenter (~0.82h, behind the neck)
-    const nape = new Mesh(new BoxGeometry(0.085, 0.075, 0.035), this.napeMat)
-    nape.position.set(0, 0.38, -0.09)
-    this.torso.add(nape)
+    // glowing nape weak point, matching sim napeCenter (~0.82h): anchored on the back of
+    // THIS titan's skull (heads vary a lot), so the bloom seeps out of the head instead of
+    // hanging behind it as a bubble
+    this.napeGlow = makeWeakPoint(this.weakMats, 0.4, 0.14)
+    const napeDy = 0.03 // glow sits this far below the skull center, at the nape
+    const napeR = r * Math.sqrt(Math.max(0, 1 - (napeDy / (r * 1.15)) ** 2))
+    this.napeGlow.position.set(0, 0.41 - napeDy, -napeR)
+    this.torso.add(this.napeGlow)
 
     this.group.add(this.legL.pivot, this.legR.pivot, this.torso)
     this.group.scale.setScalar(t.height)
+    this.poser = new TitanPoser({
+      group: this.group,
+      torso: this.torso,
+      legL: this.legL,
+      legR: this.legR,
+      armL: this.armL,
+      armR: this.armR,
+      weakMats: this.weakMats,
+      napeGlow: this.napeGlow,
+      ankleGlows: this.ankleGlows,
+      setFade: (fade) => {
+        this.skin.opacity = fade
+        this.group.traverse((obj) => {
+          if (
+            obj instanceof Mesh &&
+            (obj.material instanceof MeshStandardMaterial || obj.material instanceof MeshBasicMaterial)
+          ) {
+            obj.material.opacity = fade
+          }
+        })
+      },
+    })
     this.syncPose(t, 0)
   }
 
@@ -219,118 +423,10 @@ class TitanVisual {
   }
 
   syncPose(t: TitanState, dt: number): void {
-    this.group.position.copy(t.pos)
-    this.group.rotation.y = t.facing
-
-    // a cut tendon stops advertising itself; a crippled or dead titan has none to sell
-    const showAnkles = t.state !== 'dead' && t.state !== 'crippled'
-    this.ankleGlows[0].visible = showAnkles && !t.ankles[0]
-    this.ankleGlows[1].visible = showAnkles && !t.ankles[1]
-
-    if (t.state === 'dead') {
-      // fall forward around the feet, then dissolve
-      const fall = Math.min(1, t.stateTime / 0.9)
-      this.group.rotation.x = (Math.PI / 2) * easeOut(fall)
-      const fade = Math.max(0, 1 - Math.max(0, t.stateTime - 1) / 2)
-      for (const mat of [this.skin, this.napeMat]) mat.opacity = fade
-      this.napeMat.emissiveIntensity = 0
-      this.group.traverse((obj) => {
-        if (
-          obj instanceof Mesh &&
-          (obj.material instanceof MeshStandardMaterial || obj.material instanceof MeshBasicMaterial)
-        ) {
-          obj.material.opacity = fade
-        }
-      })
-      this.group.visible = fade > 0.01
-      return
-    }
-
-    if (t.state === 'crippled') {
-      // fall to the knees: sink the body and fold the legs back
-      const kneel = Math.min(1, t.stateTime / 0.6)
-      const eased = 1 - (1 - kneel) * (1 - kneel)
-      this.group.position.y = t.pos.y - 0.22 * t.height * eased
-      this.group.rotation.x = 0.12 * eased // slight forward slump
-      this.legL.pivot.rotation.x = this.legR.pivot.rotation.x = -1.35 * eased
-      this.legL.lower.rotation.x = this.legR.lower.rotation.x = 2.1 * eased
-      this.armL.pivot.rotation.x = this.armR.pivot.rotation.x = -0.35 * eased
-      this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.4 * eased
-      this.torso.rotation.x = 0.28 * eased
-      this.napeMat.emissiveIntensity = 1 + Math.sin(performance.now() * 0.009) * 0.6 // scream "cut here"
-      return
-    }
-    if (t.state === 'staggered') {
-      // rocked back on its heels by the blast, arms flung out, reeling in place
-      this.group.rotation.x = -0.07
-      this.legL.pivot.rotation.x = this.legR.pivot.rotation.x = 0.12
-      this.armL.pivot.rotation.x = this.armR.pivot.rotation.x = 0.55
-      this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.2
-      this.torso.rotation.x = -0.12
-      this.napeMat.emissiveIntensity = 0.65
-      return
-    }
-    this.group.rotation.x = 0
-
-    const moved = Math.hypot(t.pos.x - this.lastPos.x, t.pos.z - this.lastPos.z)
-    this.lastPos = { x: t.pos.x, z: t.pos.z }
-    const speed = dt > 0 ? moved / dt : 0
-    this.walkPhase += speed * dt * 1.6
-
-    const swing = Math.sin(this.walkPhase) * Math.min(0.55, speed * 0.06)
-    this.legL.pivot.rotation.x = swing
-    this.legR.pivot.rotation.x = -swing
-    this.legL.lower.rotation.x = Math.max(0, -swing) * 1.2 + 0.05
-    this.legR.lower.rotation.x = Math.max(0, swing) * 1.2 + 0.05
-    this.armL.pivot.rotation.x = -swing * 0.4
-    this.armR.pivot.rotation.x = swing * 0.4
-    this.armL.lower.rotation.x = -0.12 - Math.max(0, swing) * 0.3
-    this.armR.lower.rotation.x = -0.12 - Math.max(0, -swing) * 0.3
-    this.torso.rotation.x = t.state === 'chase' ? 0.18 : 0.05
-
-    if (t.state === 'attack') {
-      const wind = Math.min(1, t.stateTime / SWAT_WINDUP)
-      this.armR.pivot.rotation.x = -2.3 * wind + (wind >= 1 ? 1.6 : 0)
-      this.armR.lower.rotation.x = -0.7 * wind
-    } else if (t.state === 'leap') {
-      this.legL.pivot.rotation.x = this.legR.pivot.rotation.x = 0.9
-      this.legL.lower.rotation.x = this.legR.lower.rotation.x = 1.3
-      this.armL.pivot.rotation.x = this.armR.pivot.rotation.x = -1.4
-      this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.3
-    }
-
-    this.napeMat.emissiveIntensity = 0.65 + Math.sin(performance.now() * 0.004 + t.id) * 0.35
+    this.poser.syncPose(t, dt)
   }
 }
-
 
 function easeOut(x: number): number {
   return 1 - (1 - x) * (1 - x)
-}
-
-/** Keeps scene titan visuals in sync with sim titan states across waves. */
-export class TitanPool {
-  private visuals = new Map<number, TitanVisual>()
-
-  constructor(private scene: Scene) {}
-
-  sync(titans: TitanState[], dt: number): void {
-    const alive = new Set<number>()
-    for (const t of titans) {
-      alive.add(t.id)
-      let visual = this.visuals.get(t.id)
-      if (!visual) {
-        visual = new TitanVisual(t)
-        visual.addTo(this.scene)
-        this.visuals.set(t.id, visual)
-      }
-      visual.syncPose(t, dt)
-    }
-    for (const [id, visual] of this.visuals) {
-      if (!alive.has(id)) {
-        visual.removeFrom(this.scene)
-        this.visuals.delete(id)
-      }
-    }
-  }
 }

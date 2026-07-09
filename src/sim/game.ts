@@ -19,7 +19,7 @@ import { createScore, registerKill, registerSpearKill, stepScore } from './score
 import type { SpearPickup, SpearState } from './spear'
 import { collectPickups, fireSpear, stepSpears } from './spear'
 import type { TitanKind, TitanState } from './titan'
-import { aggroRange, raycastTitan, stepTitan } from './titan'
+import { aggroRange, isFootballer, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead'
@@ -230,9 +230,10 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       if (result.killed && result.titanId !== undefined) {
         const killed = g.titans.find((t) => t.id === result.titanId)
         const abnormal = killed?.kind === 'abnormal'
+        const footballer = killed !== undefined && isFootballer(killed.kind)
         const points = registerKill(
           g.score,
-          { speed: result.speed, airborne, oneCut: result.oneCut, abnormal },
+          { speed: result.speed, airborne, oneCut: result.oneCut, abnormal, footballer },
           p.config.killSpeed,
         )
         p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)

@@ -12,7 +12,7 @@ import { createRng, hashSeed } from './rng'
 import type { ScoreState } from './score'
 import { createScore, registerKill, stepScore } from './score'
 import type { TitanBehavior, TitanKind, TitanState } from './titan'
-import { aggroRange, createTitan, stepTitan } from './titan'
+import { aggroRange, createTitan, isFootballer, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 import { applyUpgrade, offerUpgrades } from './upgrades'
 import { waveComposition } from './waves'
@@ -450,9 +450,10 @@ export function coopSlash(w: CoopWorld, playerId: string, rewindS = SLASH_REWIND
   if (result.killed && result.titanId !== undefined) {
     const killed = w.titans.find((t) => t.id === result.titanId)
     const abnormal = killed?.kind === 'abnormal'
+    const footballer = killed !== undefined && isFootballer(killed.kind)
     const points = registerKill(
       p.score,
-      { speed: result.speed, airborne: !p.onGround, oneCut: result.oneCut, abnormal },
+      { speed: result.speed, airborne: !p.onGround, oneCut: result.oneCut, abnormal, footballer },
       p.body.config.killSpeed,
     )
     const heartGained = p.body.hp < p.body.config.maxHp

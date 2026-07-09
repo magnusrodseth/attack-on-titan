@@ -5,7 +5,12 @@ import { GRAVITY } from './constants'
 import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
 
-export type TitanKind = 'normal' | 'abnormal'
+export type TitanKind = 'normal' | 'abnormal' | 'striker' | 'captain'
+
+/** The matchday footballers: rare event titans, one tier above the abnormal. */
+export function isFootballer(kind: TitanKind): boolean {
+  return kind === 'striker' || kind === 'captain'
+}
 export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'crippled' | 'staggered' | 'dead'
 
 export const CRIPPLE_DURATION = 60 // seconds on its knees before it regenerates and rises
@@ -35,8 +40,23 @@ export interface TitanState {
   repathTimer: number
 }
 
+/**
+ * Behavior profile per kind (user decisions, 2026-07-09): footballers see further, run
+ * faster, swing sooner, and leap higher than any other titan; otherwise they follow the
+ * same state machine.
+ */
+const KIND_STATS: Record<
+  TitanKind,
+  { aggro: number; turn: number; walk: number; swatRest: number; leaps: boolean; leapY: number }
+> = {
+  normal: { aggro: 55, turn: 1.4, walk: 0.2, swatRest: 2.2, leaps: false, leapY: 13 },
+  abnormal: { aggro: 130, turn: 2.2, walk: 0.38, swatRest: 1.2, leaps: true, leapY: 13 },
+  striker: { aggro: 160, turn: 2.5, walk: 0.44, swatRest: 0.9, leaps: true, leapY: 17 },
+  captain: { aggro: 160, turn: 2.5, walk: 0.44, swatRest: 0.9, leaps: true, leapY: 17 },
+}
+
 export function aggroRange(kind: TitanKind): number {
-  return kind === 'abnormal' ? 130 : 55
+  return KIND_STATS[kind].aggro
 }
 
 export interface TitanEvent {
@@ -50,7 +70,7 @@ export const SWAT_WINDUP = 0.45
 export const TURN_RATE = { normal: 1.4, abnormal: 2.2 } // rad/s: titans commit to turns
 
 function turnToward(t: TitanState, targetYaw: number, dt: number): void {
-  const rate = t.kind === 'abnormal' ? TURN_RATE.abnormal : TURN_RATE.normal
+  const rate = KIND_STATS[t.kind].turn
   let delta = targetYaw - t.facing
   while (delta > Math.PI) delta -= Math.PI * 2
   while (delta < -Math.PI) delta += Math.PI * 2
@@ -76,7 +96,7 @@ export function createTitan(opts: {
     state: 'wander',
     stateTime: 0,
     attackCooldown: 0,
-    leapCooldown: opts.kind === 'abnormal' ? 2 : 0,
+    leapCooldown: KIND_STATS[opts.kind].leaps ? 2 : 0,
     wanderTimer: 0,
     ankles: [false, false],
     crippleTimer: 0,
@@ -186,7 +206,7 @@ export function stepTitan(
   const horizDist = Math.hypot(dx, dz)
   const aggro = aggroRange(t.kind)
   const reach = t.height * 0.5
-  const walkSpeed = t.height * (t.kind === 'abnormal' ? 0.38 : 0.2)
+  const walkSpeed = t.height * KIND_STATS[t.kind].walk
 
   // deeply embedded in a building (bad spawn, old save): wade straight out. This must
   // check the PHYSICAL footprint, not nav walkability — clearance cells near corners are
@@ -257,12 +277,12 @@ export function stepTitan(
         }
       }
       if (t.avoidTimer <= 0) turnToward(t, Math.atan2(steerX, steerZ), dt)
-      if (t.kind === 'abnormal' && t.leapCooldown <= 0 && horizDist > 12 && horizDist < 80) {
+      if (KIND_STATS[t.kind].leaps && t.leapCooldown <= 0 && horizDist > 12 && horizDist < 80) {
         t.state = 'leap'
         t.stateTime = 0
         const inv = 1 / horizDist
         const speed = Math.min(35, horizDist * 1.2)
-        t.vel.set(dx * inv * speed, 13, dz * inv * speed)
+        t.vel.set(dx * inv * speed, KIND_STATS[t.kind].leapY, dz * inv * speed)
         t.leapCooldown = 3 + rng() * 2
         break
       }
@@ -288,7 +308,7 @@ export function stepTitan(
           .addScaledVector(forwardOf(t), reach * 0.6)
           .add(new Vector3(0, t.height * 0.3, 0))
         events.push({ type: 'swat', titanId: t.id, pos: swatPos, radius: t.height * 0.35 })
-        t.attackCooldown = t.kind === 'abnormal' ? 1.2 : 2.2
+        t.attackCooldown = KIND_STATS[t.kind].swatRest
         t.state = 'chase'
         t.stateTime = 0
       }
