@@ -4,7 +4,8 @@ import { nearestWalkable } from './nav'
 import { createRng, hashSeed } from './rng'
 import { createTitan } from './titan'
 import { applyUpgrade, offerUpgrades } from './upgrades'
-import { waveComposition } from './waves'
+import type { TitanSpawn } from './waves'
+import { matchdayComposition, waveComposition } from './waves'
 
 /**
  * A game mode owns a run's objective: what a fresh run spawns, how it progresses each
@@ -26,13 +27,45 @@ export interface GameMode {
   chooseUpgrade?(g: GameState, id: string): void
 }
 
-function spawnWave(g: GameState): void {
+type Composition = (wave: number, rng: () => number) => TitanSpawn[]
+
+function spawnWave(g: GameState, composition: Composition): void {
   const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
-  g.titans = waveComposition(g.wave, rng).map((s) => {
+  g.titans = composition(g.wave, rng).map((s) => {
     // snap spawns onto walkable streets so no titan starts its life inside a house
     const [x, z] = nearestWalkable(g.nav, s.x, s.z)
     return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
   })
+}
+
+/** The wave-loop skeleton shared by every wave-based mode; only the roster differs. */
+function waveLoop(composition: Composition): Pick<GameMode, 'start' | 'step' | 'chooseUpgrade'> {
+  return {
+    start(g) {
+      g.wave = 1
+      spawnWave(g, composition)
+    },
+
+    step(g) {
+      if (g.titans.length > 0 && g.titans.every((t) => t.hp <= 0)) {
+        const bonus = 250 * g.wave
+        g.score.score += bonus
+        g.offers = offerUpgrades(createRng(hashSeed(`${g.seed}:offers:${g.wave}`)))
+        g.phase = 'upgrading'
+        saveBest(g)
+        g.events.push({ type: 'waveClear', wave: g.wave, bonus })
+      }
+    },
+
+    chooseUpgrade(g, id) {
+      applyUpgrade(g.player, id)
+      g.player.hp = g.player.config.maxHp // a fresh wave starts at full health
+      g.offers = []
+      g.wave += 1
+      spawnWave(g, composition)
+      g.phase = 'playing'
+    },
+  }
 }
 
 /** The original endless run: clear a wave, pick a field modification, repeat. */
@@ -40,34 +73,18 @@ const wavesMode: GameMode = {
   id: 'waves',
   name: 'Wave Survival',
   desc: 'Endless escalating waves. Clear the district, pick a field modification, and hold out as the titans grow bigger, faster and stranger.',
-
-  start(g) {
-    g.wave = 1
-    spawnWave(g)
-  },
-
-  step(g) {
-    if (g.titans.length > 0 && g.titans.every((t) => t.hp <= 0)) {
-      const bonus = 250 * g.wave
-      g.score.score += bonus
-      g.offers = offerUpgrades(createRng(hashSeed(`${g.seed}:offers:${g.wave}`)))
-      g.phase = 'upgrading'
-      saveBest(g)
-      g.events.push({ type: 'waveClear', wave: g.wave, bonus })
-    }
-  },
-
-  chooseUpgrade(g, id) {
-    applyUpgrade(g.player, id)
-    g.player.hp = g.player.config.maxHp // a fresh wave starts at full health
-    g.offers = []
-    g.wave += 1
-    spawnWave(g)
-    g.phase = 'playing'
-  },
+  ...waveLoop(waveComposition),
 }
 
-export const GAME_MODES: GameMode[] = [wavesMode]
+/** Matchday, all ninety minutes of it: nothing takes the pitch but footballers. */
+const matchdayMode: GameMode = {
+  id: 'matchday',
+  name: 'Matchday',
+  desc: 'The fixture list from hell: every titan on the pitch is a Striker or a Captain. Faster, hungrier, higher-leaping, and worth triple score. Survive full time.',
+  ...waveLoop(matchdayComposition),
+}
+
+export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode]
 
 export const DEFAULT_MODE_ID = 'waves'
 

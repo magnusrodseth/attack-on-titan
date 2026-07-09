@@ -205,16 +205,18 @@ function beginRun(): void {
   if (game.phase === 'menu' || game.phase === 'dead') {
     startGame(game)
     prevPhase = game.phase
-    if (game.mode.id === 'waves') announceWave(game.wave)
+    if (waveBased()) announceWave(game.wave)
     else hud.showBanner(game.mode.name)
     persistRun()
   }
   lockPointer()
 }
 
-/** Every 3rd wave the footballers walk: the banner and horn say so. */
+const waveBased = () => game.mode.id === 'waves' || game.mode.id === 'matchday'
+
+/** Every 3rd wave the footballers walk; in Matchday mode, every wave is theirs. */
 function announceWave(wave: number): void {
-  if (isMatchday(wave)) {
+  if (game.mode.id === 'matchday' || isMatchday(wave)) {
     hud.showBanner(`Matchday · Wave ${wave}`, 3000)
     audio.boom()
   } else {
@@ -288,7 +290,7 @@ hud.onRestart = () => {
   clearRun()
   startGame(game)
   prevPhase = game.phase
-  if (game.mode.id === 'waves') announceWave(game.wave)
+  if (waveBased()) announceWave(game.wave)
   else hud.showBanner(game.mode.name)
   persistRun()
   lockPointer()

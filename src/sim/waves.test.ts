@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from './rng'
-import { waveComposition } from './waves'
+import { matchdayComposition, waveComposition } from './waves'
 
 describe('waveComposition', () => {
   it('is deterministic for the same seed', () => {
@@ -50,5 +50,31 @@ describe('waveComposition', () => {
       expect(spawn.height).toBeGreaterThanOrEqual(8)
       expect(spawn.height).toBeLessThanOrEqual(27)
     }
+  })
+})
+
+describe('matchdayComposition', () => {
+  it('fields only footballers, at their signature height, on the spawn ring', () => {
+    for (const wave of [1, 4, 7]) {
+      const roster = matchdayComposition(wave, createRng(wave))
+      expect(roster.length).toBeGreaterThan(0)
+      for (const s of roster) {
+        expect(['striker', 'captain']).toContain(s.kind)
+        expect(s.height).toBeGreaterThanOrEqual(13)
+        expect(s.height).toBeLessThanOrEqual(16)
+        const dist = Math.hypot(s.x, s.z)
+        expect(dist).toBeGreaterThanOrEqual(90)
+        expect(dist).toBeLessThanOrEqual(150)
+      }
+    }
+  })
+
+  it('fields both stars and escalates the roster like the waves mode', () => {
+    const roster = matchdayComposition(5, createRng(9))
+    expect(roster.some((s) => s.kind === 'striker')).toBe(true)
+    expect(roster.some((s) => s.kind === 'captain')).toBe(true)
+    expect(matchdayComposition(6, createRng(1)).length).toBeGreaterThan(
+      matchdayComposition(1, createRng(1)).length,
+    )
   })
 })
