@@ -68,6 +68,10 @@ is synthesized at runtime with WebAudio.
 
 Title font: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free).
 
+Music (two tracks alternating in-game):
+- "Five Armies" by Kevin MacLeod ([incompetech.com](https://incompetech.com)) — licensed under [Creative Commons: By Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
+- "Eclipse Legion" — CC0 (public domain)
+
 ## Art credits (all CC0)
 
 - Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)

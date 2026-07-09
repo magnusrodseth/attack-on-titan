@@ -73,6 +73,17 @@ describe('stepPlayer', () => {
     expect(empty.vel.x).toBe(0)
   })
 
+  it('boost swaps in a spare canister when the tank cannot cover the burst', () => {
+    const p = createPlayer()
+    p.pos.set(0, 30, 0)
+    p.onGround = false
+    p.gas = 5 // below the burst cost, but spares remain
+    expect(tryBoost(p, new Vector3(1, 0, 0))).toBe(true)
+    expect(p.canisters).toBe(p.config.gasCanisters - 1)
+    expect(p.gas).toBeGreaterThan(p.config.maxGas * 0.8) // fresh canister minus one burst
+    expect(p.vel.x).toBeGreaterThan(5)
+  })
+
   it('auto-swaps a spare canister in when the tank runs dry', () => {
     const p = createPlayer()
     p.pos.set(0, 30, 0)

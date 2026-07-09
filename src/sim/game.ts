@@ -166,6 +166,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
     if (input.focus && !g.prevInput.focus && g.focus >= FOCUS_MIN_START) g.focusActive = true
   }
 
+  const canistersBefore = p.canisters
   if (input.gas && !g.prevInput.gas && tryBoost(p, input.lookDir)) {
     g.events.push({ type: 'boost' })
   }
@@ -214,7 +215,6 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
 
   syncTitanHooks(g)
 
-  const canistersBefore = p.canisters
   stepPlayer(p, input, dt, g.arena)
   if (p.canisters < canistersBefore) {
     g.events.push({ type: 'canisterSwap', remaining: p.canisters })

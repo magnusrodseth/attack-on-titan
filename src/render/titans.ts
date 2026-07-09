@@ -4,7 +4,9 @@ import {
   Color,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
+  PlaneGeometry,
   RepeatWrapping,
   Scene,
   SphereGeometry,
@@ -28,6 +30,12 @@ function hairTexture(): Texture {
   texture.colorSpace = SRGBColorSpace
   texture.wrapS = texture.wrapT = RepeatWrapping
   texture.repeat.set(2, 2)
+  return texture
+}
+
+function decalTexture(path: string): Texture {
+  const texture = textureLoader.load(path)
+  texture.colorSpace = SRGBColorSpace
   return texture
 }
 import { createRng } from '../sim/rng'
@@ -106,7 +114,6 @@ class TitanVisual {
       roughness: 0.9,
       transparent: true,
     })
-    const white = new MeshStandardMaterial({ color: 0xf5f0e6, roughness: 0.5, transparent: true })
     this.napeMat = new MeshStandardMaterial({
       color: 0xb3202a,
       emissive: 0xd42b35,
@@ -148,16 +155,30 @@ class TitanVisual {
     skull.castShadow = true
     head.add(skull)
     const r = 0.085 * headScale
+    // photo-decal face: bloodshot eyes and a bared grin (CC0 sprites, see README credits)
+    const eyeMat = new MeshBasicMaterial({
+      map: decalTexture('/textures/eye.png'),
+      transparent: true,
+      alphaTest: 0.25,
+    })
     for (const side of [-1, 1]) {
-      const eye = new Mesh(new BoxGeometry(0.024, 0.012, 0.01), white)
-      eye.position.set(side * r * 0.42, r * 0.25, r * 0.92)
+      const eye = new Mesh(new PlaneGeometry(r * 0.62, r * 0.6), eyeMat)
+      eye.position.set(side * r * 0.4, r * 0.28, r * 0.94)
+      eye.rotation.y = side * 0.18
       head.add(eye)
     }
-    const mouth = new Mesh(new BoxGeometry(r * 1.1, r * 0.34, 0.012), dark)
-    mouth.position.set(0, -r * 0.42, r * 0.92)
+    const mouth = new Mesh(new BoxGeometry(r * 1.05, r * 0.4, 0.012), dark)
+    mouth.position.set(0, -r * 0.42, r * 0.88)
     head.add(mouth)
-    const teeth = new Mesh(new BoxGeometry(r * 0.95, r * 0.2, 0.014), white)
-    teeth.position.set(0, -r * 0.42, r * 0.93)
+    const teeth = new Mesh(
+      new PlaneGeometry(r * 1.25, r * 0.8),
+      new MeshBasicMaterial({
+        map: decalTexture('/textures/teeth.png'),
+        transparent: true,
+        alphaTest: 0.25,
+      }),
+    )
+    teeth.position.set(0, -r * 0.42, r * 0.97)
     head.add(teeth)
     if (quirk() > 0.45) {
       const hair = new Mesh(new BoxGeometry(r * 2.05, r * 0.8, r * 1.9), dark)
@@ -196,7 +217,10 @@ class TitanVisual {
       for (const mat of [this.skin, this.napeMat]) mat.opacity = fade
       this.napeMat.emissiveIntensity = 0
       this.group.traverse((obj) => {
-        if (obj instanceof Mesh && obj.material instanceof MeshStandardMaterial) {
+        if (
+          obj instanceof Mesh &&
+          (obj.material instanceof MeshStandardMaterial || obj.material instanceof MeshBasicMaterial)
+        ) {
           obj.material.opacity = fade
         }
       })

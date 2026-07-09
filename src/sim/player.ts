@@ -42,7 +42,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   runAccel: 40,
   airControl: 14,
   jumpSpeed: 9,
-  drag: 0.06,
+  drag: 0.05,
   reelSpeed: 8,
   hookRange: 90,
   minRopeLength: 3,
@@ -124,7 +124,13 @@ const BOOST_COOLDOWN = 0.5
 
 /** Click-burst dash along the look direction (full 3D). Airborne only. */
 export function tryBoost(p: PlayerState, lookDir: Vector3): boolean {
-  if (p.onGround || p.boostCooldown > 0 || p.gas < BOOST_COST) return false
+  if (p.onGround || p.boostCooldown > 0) return false
+  if (p.gas < BOOST_COST) {
+    // a low tank swaps to the next canister instead of leaving boost dead
+    if (p.canisters <= 0) return false
+    p.canisters -= 1
+    p.gas = p.config.maxGas
+  }
   const dir = lookDir.clone()
   if (dir.lengthSq() === 0) return false
   dir.normalize()
@@ -207,10 +213,10 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   }
 
   if (!wasOnGround) {
-    // linear + quadratic aero drag: a soft ceiling that makes top speed something you
-    // hold onto rather than sit at
+    // mild aero drag: the burst-based boost no longer needs a heavy soft ceiling, and a
+    // swing must carry its speed through to the next hook instead of bleeding out
     const speed = p.vel.length()
-    p.vel.multiplyScalar(Math.max(0, 1 - (cfg.drag + 0.009 * speed) * dt))
+    p.vel.multiplyScalar(Math.max(0, 1 - (cfg.drag + 0.0045 * speed) * dt))
   }
 
   // the winch is automatic: slack ratchets up instantly, and the rope winds in at a
@@ -219,7 +225,9 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   for (const hook of anchors) {
     const dist = p.pos.distanceTo(hook.anchor)
     if (dist < hook.length) hook.length = Math.max(cfg.minRopeLength, dist)
-    const rate = cfg.reelSpeed * Math.min(1, (1.5 + speedNow * 0.18) / 14)
+    // stronger low-speed winch: climbing early in a swing banks the height that the
+    // next pendulum converts back into speed
+    const rate = cfg.reelSpeed * Math.min(1, (3 + speedNow * 0.22) / 14)
     reelHook(hook, rate * dt, cfg.minRopeLength)
   }
 

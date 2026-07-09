@@ -49,6 +49,8 @@ export class AudioSystem {
   private gasGain: GainNode | null = null
   private muffle: BiquadFilterNode | null = null
   private buffers = new Map<string, AudioBuffer>()
+  private musicTracks: HTMLAudioElement[] = []
+  private musicIndex = 0
 
   /** Idempotent; must be called from a user gesture (DEPLOY / retry / upgrade click). */
   init(): void {
@@ -92,6 +94,20 @@ export class AudioSystem {
     gasSrc.connect(gasFilter).connect(this.gasGain).connect(this.master)
     gasSrc.start()
 
+    // background music: two tracks alternating forever, routed through the master
+    // chain so menu ducking and focus muffle apply to it too
+    const musicGain = ctx.createGain()
+    musicGain.gain.value = 0.32
+    musicGain.connect(this.master)
+    this.musicTracks = ['/music/track-1.mp3', '/music/track-2.mp3'].map((url) => {
+      const element = new Audio(url)
+      element.preload = 'auto'
+      ctx.createMediaElementSource(element).connect(musicGain)
+      element.addEventListener('ended', () => this.playNextTrack())
+      return element
+    })
+    void this.musicTracks[0]?.play().catch(() => {})
+
     for (const name of SAMPLE_NAMES) {
       void fetch(`/sounds/${name}.ogg`)
         .then((res) => res.arrayBuffer())
@@ -101,6 +117,11 @@ export class AudioSystem {
           // missing sample just stays silent; synth sounds still work
         })
     }
+  }
+
+  private playNextTrack(): void {
+    this.musicIndex = (this.musicIndex + 1) % this.musicTracks.length
+    void this.musicTracks[this.musicIndex]?.play().catch(() => {})
   }
 
   get loadedCount(): number {
