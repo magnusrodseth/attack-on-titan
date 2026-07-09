@@ -196,8 +196,13 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
       p.vel.z += delta.z
     } else {
       // above run speed the ground is a skid: steer and bleed, never add — legs can't
-      // outrun momentum; real speed comes from swinging, not from holding W
-      const decel = (move.lengthSq() > 0 ? 8 : 12) * dt
+      // outrun momentum; real speed comes from swinging, not from holding W.
+      // Exception: with a hook attached the rope is doing the work and the feet just
+      // cycle under the arc, so a tethered graze keeps its momentum (rolling loss only)
+      // and running past the anchor lets the taut rope scoop the runner back into the
+      // swing. Releasing on the ground hands the speed back to the skid.
+      const friction = anchors.length > 0 ? 2 : move.lengthSq() > 0 ? 8 : 12
+      const decel = friction * dt
       const newSpeed = Math.max(0, horizSpeed - decel)
       if (horizSpeed > 1e-6) {
         const scale = newSpeed / horizSpeed

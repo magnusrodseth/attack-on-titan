@@ -4,7 +4,7 @@ import { emptyArena } from './city'
 import { EYE_HEIGHT } from './constants'
 import type { InputState } from './player'
 import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
-import { attachHook } from './rope'
+import { attachHook, releaseHook } from './rope'
 
 const DT = 1 / 120
 
@@ -140,6 +140,50 @@ describe('stepPlayer', () => {
     const speed = Math.hypot(p.vel.x, p.vel.z)
     expect(speed).toBeGreaterThan(12)
     expect(speed).toBeLessThan(30)
+  })
+
+  it('keeps momentum in a grounded run while a hook is attached (tethered graze)', () => {
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT, 0)
+    stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
+    p.vel.set(30, 0, 0)
+    attachHook(p.hooks[0], new Vector3(60, 50, 0), p.pos) // anchor high, ahead of the run
+    for (let i = 0; i < 120; i++) stepPlayer(p, idle(), DT, emptyArena()) // 1s grounded run
+    expect(p.onGround).toBe(true)
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(26) // rope does the work, not friction
+  })
+
+  it('releasing the hooks on the ground brings back the skid (momentum is lost)', () => {
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT, 0)
+    stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
+    p.vel.set(30, 0, 0)
+    attachHook(p.hooks[0], new Vector3(60, 50, 0), p.pos)
+    stepPlayer(p, idle(), DT, emptyArena())
+    releaseHook(p.hooks[0])
+    for (let i = 0; i < 120; i++) stepPlayer(p, idle(), DT, emptyArena())
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeLessThan(20) // legs absorb it: normal skid decel
+  })
+
+  it('a grounded run past the anchor scoops into an upward swing without jumping', () => {
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT, 0)
+    stepPlayer(p, idle(), DT, emptyArena()) // settle onGround
+    p.vel.set(30, 0, 0)
+    attachHook(p.hooks[0], new Vector3(60, 50, 0), p.pos)
+    let ticks = 0
+    while (p.onGround && ticks < 600) {
+      stepPlayer(p, idle(), DT, emptyArena())
+      ticks++
+    }
+    expect(ticks).toBeLessThan(600) // the taut rope lifted the runner off the street
+    let maxUpward = -Infinity
+    for (let i = 0; i < 240; i++) {
+      stepPlayer(p, idle(), DT, emptyArena())
+      maxUpward = Math.max(maxUpward, p.vel.y)
+    }
+    expect(maxUpward).toBeGreaterThan(3) // momentum pivoted into an upward swing
+    expect(p.pos.y).toBeGreaterThan(10) // climbing the arc, not dribbling along the street
   })
 
   it('steers a ground slide toward the move direction without dumping speed', () => {

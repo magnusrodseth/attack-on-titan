@@ -28,6 +28,11 @@ Click **DEPLOY** (grabs pointer lock), then:
 You carry a gas tank plus 3 spare canisters; an empty tank auto-swaps a canister in.
 When the last one runs dry, only a resupply refills you.
 
+Momentum survives ground touches while you are tethered: with a hook attached you can run the
+bottom of the arc out along the street, and sprinting past your anchor point scoops you back up
+into the swing (jump as it lifts for a steeper launch). Let go while grounded and your legs have
+to absorb everything.
+
 **The one rule:** nape damage scales with your speed. At or above the kill threshold
 (crosshair-side speedo turns blue) a nape hit is a one-cut kill. Swing mastery *is* combat mastery.
 
