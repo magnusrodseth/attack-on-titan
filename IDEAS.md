@@ -65,6 +65,24 @@ viral after Norway vs Iraq at the 2026 World Cup) to an Abnormal/Armored Titan
   repo texture rule requires sourced free assets, and a photo of a living person is not
   one). If it does not read as him without a photo, it stays a fun blond fast titan.
 
+## Day/night cycle with a realistic sky (user idea, 2026-07-09)
+
+Replace the flat sky color with a realistic skybox that follows a time-of-day simulation, giving
+full day and night cycles.
+
+- **Sky**: either scouted CC0 HDRI/cubemap skies (Poly Haven has day/dusk/night sets; per the
+  repo texture rule they must be sourced, not invented) cross-faded by time of day, or
+  Three.js's built-in `Sky` shader driven by sun elevation, with a sourced star map for night.
+- **Time simulation**: sim-side clock derived from `g.time` (deterministic, persists through
+  the run save automatically), e.g. one full cycle per ~10 minutes of play, possibly seeded so
+  runs start at different hours. The renderer maps clock → sun/moon position, light color and
+  intensity (directional light swings across the sky), fog color, and ambient level.
+- **Night city**: window emissives ramp up as the sun sets — the lit-window overbright tint
+  already exists per instance, so night mostly means raising its intensity and count while
+  darkening everything else; consider warm lamp glow at the resupply plaza and dimmer minimap.
+- **Gameplay flavor** (optional later): titans slow at night per lore (they need sunlight);
+  could become a night-survival wrinkle or a mode on the GameMode registry.
+
 ## Multiplayer direction (recorded, not scoped)
 
 Realtime multiplayer on PartyKit (rooms carry ephemeral realtime state over websockets),
