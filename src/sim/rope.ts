@@ -27,6 +27,25 @@ export function attachHook(hook: Hook, anchor: Vector3, playerPos: Vector3): voi
   hook.titanId = null
 }
 
+/** Expresses a world point in the titan's local frame (position + facing), for anchors that ride it. */
+export function worldToTitanLocal(titan: TitanAnchorTarget, point: Vector3, out: Vector3): Vector3 {
+  const rel = point.clone().sub(titan.pos)
+  const cos = Math.cos(-titan.facing)
+  const sin = Math.sin(-titan.facing)
+  return out.set(cos * rel.x + sin * rel.z, rel.y, -sin * rel.x + cos * rel.z)
+}
+
+/** Re-derives the world position of a titan-local point from the titan's current pose. */
+export function titanLocalToWorld(titan: TitanAnchorTarget, local: Vector3, out: Vector3): Vector3 {
+  const cos = Math.cos(titan.facing)
+  const sin = Math.sin(titan.facing)
+  return out.set(
+    titan.pos.x + cos * local.x + sin * local.z,
+    titan.pos.y + local.y,
+    titan.pos.z - sin * local.x + cos * local.z,
+  )
+}
+
 export function attachHookToTitan(
   hook: Hook,
   titan: TitanAnchorTarget,
@@ -35,21 +54,12 @@ export function attachHookToTitan(
 ): void {
   attachHook(hook, point, playerPos)
   hook.titanId = titan.id
-  const rel = point.clone().sub(titan.pos)
-  const cos = Math.cos(-titan.facing)
-  const sin = Math.sin(-titan.facing)
-  hook.local.set(cos * rel.x + sin * rel.z, rel.y, -sin * rel.x + cos * rel.z)
+  worldToTitanLocal(titan, point, hook.local)
 }
 
 /** Re-derives the world anchor from the titan's current position and facing. */
 export function updateTitanAnchor(hook: Hook, titan: TitanAnchorTarget): void {
-  const cos = Math.cos(titan.facing)
-  const sin = Math.sin(titan.facing)
-  hook.anchor.set(
-    titan.pos.x + cos * hook.local.x + sin * hook.local.z,
-    titan.pos.y + hook.local.y,
-    titan.pos.z - sin * hook.local.x + cos * hook.local.z,
-  )
+  titanLocalToWorld(titan, hook.local, hook.anchor)
 }
 
 export function releaseHook(hook: Hook): void {

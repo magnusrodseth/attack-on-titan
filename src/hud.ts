@@ -38,6 +38,9 @@ export class Hud {
   private focusVignette = el('focus-vignette')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
+  private spearBar = el('spear-bar')
+  private spearFill = el('spear-fill')
+  private spearCount = el('spear-count')
   private meters = el('meters')
   private speedo = el('speedo')
   private banner = el('banner')
@@ -221,6 +224,9 @@ export class Hud {
     // segment the gauges into countable uses (upgrades can change both counts)
     this.gasBar.style.setProperty('--segs', String(Math.max(1, Math.floor(p.config.maxGas / BOOST_COST))))
     this.bladeBar.style.setProperty('--segs', String(Math.max(1, p.config.bladeDurability)))
+    this.spearFill.style.width = `${((p.spears / Math.max(1, p.config.spearCapacity)) * 100).toFixed(1)}%`
+    this.spearCount.textContent = `×${p.spears}`
+    this.spearBar.style.setProperty('--segs', String(Math.max(1, p.config.spearCapacity)))
     this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
 
     this.focusFill.style.width = `${game.focus.toFixed(1)}%`

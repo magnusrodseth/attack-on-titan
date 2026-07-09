@@ -2,7 +2,7 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { emptyArena, insideBuildingXZ } from './city'
 import { buildNavGrid, isWalkable } from './nav'
-import { createTitan, napeCenter, raycastTitan, stepTitan, TURN_RATE } from './titan'
+import { createTitan, napeCenter, raycastTitan, STAGGER_DURATION, staggerTitan, stepTitan, TURN_RATE } from './titan'
 
 const DT = 1 / 120
 const rngZero = () => 0
@@ -163,6 +163,55 @@ describe('crippled titans', () => {
     expect(t.state).not.toBe('crippled')
     expect(t.hp).toBe(t.maxHp)
     expect(t.ankles).toEqual([false, false])
+  })
+})
+
+describe('staggered titans', () => {
+  it('freezes in place without swatting, then recovers with wounds intact', () => {
+    const t = createTitan({ id: 1, kind: 'normal', height: 12, x: 0, z: 0 })
+    t.hp = 40
+    t.state = 'chase'
+    expect(staggerTitan(t)).toBe(true)
+    expect(t.state).toBe('staggered')
+
+    const before = t.pos.clone()
+    let swats = 0
+    for (let i = 0; i < Math.ceil((STAGGER_DURATION - 0.1) * 120); i++) {
+      for (const e of stepTitan(t, player(3, 1.7, 0), DT, rngZero)) {
+        if (e.type === 'swat') swats++
+      }
+    }
+    expect(swats).toBe(0)
+    expect(t.pos.toArray()).toEqual(before.toArray())
+    expect(t.state).toBe('staggered')
+
+    for (let i = 0; i < 30; i++) stepTitan(t, player(3, 1.7, 0), DT, rngZero)
+    expect(t.state).not.toBe('staggered')
+    expect(t.hp).toBe(40) // unlike a cripple recovery, the wounds stay
+  })
+
+  it('a second blast refreshes the timer without reporting a fresh stagger', () => {
+    const t = createTitan({ id: 1, kind: 'normal', height: 12, x: 0, z: 0 })
+    t.state = 'chase'
+    staggerTitan(t)
+    t.staggerTimer = 0.5
+    expect(staggerTitan(t)).toBe(false)
+    expect(t.staggerTimer).toBe(STAGGER_DURATION)
+  })
+
+  it('never staggers crippled, leaping or dead titans', () => {
+    const crippledT = createTitan({ id: 1, kind: 'normal', height: 12, x: 0, z: 0 })
+    crippledT.state = 'crippled'
+    expect(staggerTitan(crippledT)).toBe(false)
+    expect(crippledT.state).toBe('crippled')
+
+    const leaper = createTitan({ id: 2, kind: 'abnormal', height: 12, x: 0, z: 0 })
+    leaper.state = 'leap'
+    expect(staggerTitan(leaper)).toBe(false)
+
+    const dead = createTitan({ id: 3, kind: 'normal', height: 12, x: 0, z: 0 })
+    dead.hp = 0
+    expect(staggerTitan(dead)).toBe(false)
   })
 })
 

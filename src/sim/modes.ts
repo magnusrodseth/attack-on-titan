@@ -2,6 +2,7 @@ import type { GameState } from './game'
 import { saveBest } from './game'
 import { nearestWalkable } from './nav'
 import { createRng, hashSeed } from './rng'
+import { spawnPickups } from './spear'
 import { createTitan } from './titan'
 import { applyUpgrade, offerUpgrades } from './upgrades'
 import { waveComposition } from './waves'
@@ -33,6 +34,9 @@ function spawnWave(g: GameState): void {
     const [x, z] = nearestWalkable(g.nav, s.x, s.z)
     return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
   })
+  // fresh spear caches each wave; spears riding last wave's corpses go with them
+  g.pickups = spawnPickups(g.seed, g.wave, g.nav)
+  g.spears = g.spears.filter((s) => s.titanId === null)
 }
 
 /** The original endless run: clear a wave, pick a field modification, repeat. */

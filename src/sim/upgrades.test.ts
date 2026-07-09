@@ -44,6 +44,17 @@ describe('applyUpgrade', () => {
     expect(p.hp).toBe(baseMax + 1)
   })
 
+  it('spear-racks grows capacity toward the canon eight when stacked', () => {
+    const p = createPlayer()
+    applyUpgrade(p, 'spear-racks')
+    expect(p.config.spearCapacity).toBe(4)
+    expect(p.spears).toBe(4)
+    applyUpgrade(p, 'spear-racks')
+    applyUpgrade(p, 'spear-racks')
+    expect(p.config.spearCapacity).toBe(8)
+    expect(p.spears).toBe(8)
+  })
+
   it('every pool upgrade applies without throwing', () => {
     for (const upgrade of UPGRADE_POOL) {
       const p = createPlayer()

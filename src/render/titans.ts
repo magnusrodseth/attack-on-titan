@@ -242,6 +242,16 @@ class TitanVisual {
       this.napeMat.emissiveIntensity = 1 + Math.sin(performance.now() * 0.009) * 0.6 // scream "cut here"
       return
     }
+    if (t.state === 'staggered') {
+      // rocked back on its heels by the blast, arms flung out, reeling in place
+      this.group.rotation.x = -0.07
+      this.legL.pivot.rotation.x = this.legR.pivot.rotation.x = 0.12
+      this.armL.pivot.rotation.x = this.armR.pivot.rotation.x = 0.55
+      this.armL.lower.rotation.x = this.armR.lower.rotation.x = -0.2
+      this.torso.rotation.x = -0.12
+      this.napeMat.emissiveIntensity = 0.65
+      return
+    }
     this.group.rotation.x = 0
 
     const moved = Math.hypot(t.pos.x - this.lastPos.x, t.pos.z - this.lastPos.z)

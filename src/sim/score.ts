@@ -26,7 +26,20 @@ export function registerKill(s: ScoreState, info: KillInfo, killSpeed: number): 
   const cutMult = info.oneCut ? 1.5 : 1
   const rareMult = info.abnormal ? 1.75 : 1
   const chainMult = 1 + 0.25 * Math.min(s.combo, 12)
-  const points = Math.round(100 * speedMult * airMult * cutMult * rareMult * chainMult)
+  return bankKill(s, Math.round(100 * speedMult * airMult * cutMult * rareMult * chainMult))
+}
+
+/**
+ * A spear kill is guaranteed, so it pays a flat base below the blade's 100 and none of the
+ * execution multipliers — only rarity (target choice) and the chain (spears can bridge one).
+ */
+export function registerSpearKill(s: ScoreState, info: { abnormal?: boolean }): number {
+  const rareMult = info.abnormal ? 1.75 : 1
+  const chainMult = 1 + 0.25 * Math.min(s.combo, 12)
+  return bankKill(s, Math.round(75 * rareMult * chainMult))
+}
+
+function bankKill(s: ScoreState, points: number): number {
   s.score += points
   s.combo += 1
   s.comboTimer = COMBO_WINDOW

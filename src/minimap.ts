@@ -53,6 +53,17 @@ export class Minimap {
     ctx.clearRect(0, 0, SIZE, SIZE)
     ctx.drawImage(this.background, 0, 0)
 
+    // spear caches: amber diamonds so they read apart from the round titan blips
+    for (const pickup of game.pickups) {
+      if (pickup.taken) continue
+      ctx.save()
+      ctx.translate(CENTER + pickup.x * this.scale, CENTER + pickup.z * this.scale)
+      ctx.rotate(Math.PI / 4)
+      ctx.fillStyle = '#ffb347'
+      ctx.fillRect(-2.4, -2.4, 4.8, 4.8)
+      ctx.restore()
+    }
+
     for (const t of game.titans) {
       if (t.hp <= 0) continue
       const x = CENTER + t.pos.x * this.scale

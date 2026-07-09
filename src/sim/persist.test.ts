@@ -8,13 +8,15 @@ import { neutralInput } from './player'
 
 const DT = 1 / 120
 
-/** Deterministic per-tick input script exercising hooks, movement and slashes. */
+/** Deterministic per-tick input script exercising hooks, movement, slashes and spears. */
 function scriptedInput(tick: number): InputState {
   const input = neutralInput()
   input.lookDir.set(0.4, 0.35, -0.85).normalize()
   input.hookL = tick > 30 && tick < 220
   input.jump = tick === 10
   input.slash = tick % 90 === 0
+  // the second launch puts a live fuse right on the save boundary at tick 300
+  input.fire = tick === 40 || tick === 280
   if (tick > 5) input.move.set(0, 0, -1)
   return input
 }
@@ -46,6 +48,11 @@ describe('serializeRun / restoreRun', () => {
     expect(revived.titans.map((t) => t.state)).toEqual(uninterrupted.titans.map((t) => t.state))
     expect(revived.score).toEqual(uninterrupted.score)
     expect(revived.wave).toBe(uninterrupted.wave)
+    expect(revived.player.spears).toBe(uninterrupted.player.spears)
+    expect(revived.spears.map((s) => [s.phase, s.fuse, ...s.pos.toArray()])).toEqual(
+      uninterrupted.spears.map((s) => [s.phase, s.fuse, ...s.pos.toArray()]),
+    )
+    expect(revived.pickups).toEqual(uninterrupted.pickups)
   })
 
   it('round-trips every gameplay field of a mid-run snapshot', () => {
@@ -55,6 +62,18 @@ describe('serializeRun / restoreRun', () => {
     g.player.hp = 2
     g.player.canisters = 1
     g.focus = 41.5
+    g.player.spears = 1
+    g.spears.push({
+      id: 3,
+      phase: 'stuck',
+      pos: new Vector3(1, 2, 3),
+      vel: new Vector3(),
+      traveled: 12,
+      titanId: g.titans[0]!.id,
+      local: new Vector3(0.5, 1, 0),
+      fuse: 1.25,
+    })
+    g.pickups[0]!.taken = true
     const save = JSON.parse(JSON.stringify(serializeRun(g, { yaw: 1.2, pitch: -0.3 })))
     expect(save.v).toBe(SAVE_VERSION)
     expect(save.view).toEqual({ yaw: 1.2, pitch: -0.3 })
@@ -82,6 +101,14 @@ describe('serializeRun / restoreRun', () => {
     expect(fresh.titans.length).toBe(g.titans.length)
     expect(fresh.titans[0]!.ankles).toEqual(g.titans[0]!.ankles)
     expect(fresh.titans[0]!.hp).toBe(g.titans[0]!.hp)
+    expect(fresh.player.spears).toBe(1)
+    const spear = fresh.spears.find((s) => s.id === 3)!
+    expect(spear.phase).toBe('stuck')
+    expect(spear.titanId).toBe(g.titans[0]!.id)
+    expect(spear.local.toArray()).toEqual([0.5, 1, 0])
+    expect(spear.fuse).toBe(1.25)
+    expect(fresh.pickups).toEqual(g.pickups)
+    expect(fresh.nextSpearId).toBe(g.nextSpearId)
   })
 
   it('restores the upgrade intermission with the same offers, still pickable', () => {

@@ -13,7 +13,9 @@ import type { Rng } from './rng'
 import { createRng, hashSeed } from './rng'
 import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from './rope'
 import type { ScoreState } from './score'
-import { createScore, registerKill, stepScore } from './score'
+import { createScore, registerKill, registerSpearKill, stepScore } from './score'
+import type { SpearPickup, SpearState } from './spear'
+import { collectPickups, fireSpear, stepSpears } from './spear'
 import type { TitanKind, TitanState } from './titan'
 import { aggroRange, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
@@ -33,9 +35,15 @@ export type GameEvent =
   | { type: 'slash'; hit: boolean; napeHit: boolean }
   | { type: 'ankleSliced'; titanId: number; remaining: number; side: 0 | 1 }
   | { type: 'crippled'; titanId: number }
-  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean; kind: TitanKind }
-  | { type: 'empty'; kind: 'blades' | 'gas' }
+  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean; kind: TitanKind; weapon: 'blade' | 'spear' }
+  | { type: 'empty'; kind: 'blades' | 'gas' | 'spears' }
   | { type: 'bladeBroke' }
+  | { type: 'spearFired'; remaining: number }
+  | { type: 'spearStuck'; titanId: number | null }
+  | { type: 'spearFizzled' }
+  | { type: 'spearDetonated'; pos: Vector3 }
+  | { type: 'staggered'; titanId: number }
+  | { type: 'spearPickup'; remaining: number }
   | { type: 'playerHit'; hp: number }
   | { type: 'waveClear'; wave: number; bonus: number }
   | { type: 'resupply' }
@@ -63,6 +71,10 @@ export interface GameState {
   time: number
   player: PlayerState
   titans: TitanState[]
+  /** Thunder spears in flight or stuck-and-fusing; despawn on blast or fizzle. */
+  spears: SpearState[]
+  /** The current wave's spear caches; replaced wholesale when a wave spawns. */
+  pickups: SpearPickup[]
   arena: Arena
   /** Walkable street grid derived from the arena; never persisted, rebuilt from seed. */
   nav: NavGrid
@@ -74,6 +86,7 @@ export interface GameState {
   rngLive: Rng
   prevInput: InputState
   nextTitanId: number
+  nextSpearId: number
   focus: number
   focusActive: boolean
   mode: GameMode
@@ -122,6 +135,8 @@ export function createGame(
     time: 0,
     player: createPlayer(),
     titans: [],
+    spears: [],
+    pickups: [],
     arena,
     nav: buildNavGrid(arena),
     score: createScore(),
@@ -132,6 +147,7 @@ export function createGame(
     rngLive: createRng(hashSeed(`${seed}:live`)),
     prevInput: neutralInput(),
     nextTitanId: 1,
+    nextSpearId: 1,
     focus: FOCUS_MAX,
     focusActive: false,
     mode: getMode(modeId),
@@ -146,6 +162,8 @@ export function startGame(g: GameState): void {
   g.time = 0
   g.offers = []
   g.titans = []
+  g.spears = []
+  g.pickups = []
   g.phase = 'playing' // set first so the mode may override it from start()
   g.mode.start(g)
 }
@@ -223,7 +241,21 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
           speed: result.speed,
           heartGained,
           kind: killed?.kind ?? 'normal',
+          weapon: 'blade',
         })
+      }
+    }
+  }
+
+  if (input.fire && !g.prevInput.fire) {
+    if (p.spears <= 0) {
+      g.events.push({ type: 'empty', kind: 'spears' }) // rack is dry: find a pickup
+    } else {
+      const spear = fireSpear(p, g.nextSpearId, input.lookDir)
+      if (spear) {
+        g.nextSpearId += 1
+        g.spears.push(spear)
+        g.events.push({ type: 'spearFired', remaining: p.spears })
       }
     }
   }
@@ -245,6 +277,56 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   stepPlayer(p, input, dt, g.arena)
   if (p.canisters < canistersBefore) {
     g.events.push({ type: 'canisterSwap', remaining: p.canisters })
+  }
+
+  for (const _id of collectPickups(g.pickups, p)) {
+    g.events.push({ type: 'spearPickup', remaining: p.spears })
+  }
+
+  // spears resolve before titan AI so a fresh stagger suppresses this tick's swat
+  const spearResult = stepSpears(g.spears, g.titans, p.pos, g.arena, dt)
+  for (const stuck of spearResult.stuck) {
+    g.events.push({ type: 'spearStuck', titanId: stuck.titanId })
+  }
+  for (const _id of spearResult.fizzled) {
+    g.events.push({ type: 'spearFizzled' })
+  }
+  for (const blast of spearResult.blasts) {
+    g.events.push({ type: 'spearDetonated', pos: blast.pos.clone() })
+    for (const titanId of blast.staggered) {
+      g.events.push({ type: 'staggered', titanId })
+    }
+    for (const kill of blast.kills) {
+      const points = registerSpearKill(g.score, { abnormal: kill.kind === 'abnormal' })
+      p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+      const heartGained = p.hp < p.config.maxHp
+      if (heartGained) p.hp += 1 // a kill is a kill: the heart comes back
+      g.events.push({
+        type: 'kill',
+        titanId: kill.titanId,
+        points,
+        oneCut: false,
+        speed: 0,
+        heartGained,
+        kind: kill.kind,
+        weapon: 'spear',
+      })
+    }
+    if (blast.playerInBlast && p.invulnTimer <= 0) {
+      p.hp -= 1
+      p.invulnTimer = 1.2
+      const away = new Vector3(p.pos.x - blast.pos.x, 0, p.pos.z - blast.pos.z)
+      if (away.lengthSq() > 0) away.normalize()
+      else away.set(0, 0, 1) // standing exactly on the spear: any direction will do
+      p.vel.addScaledVector(away, 22)
+      p.vel.y += 10
+      g.events.push({ type: 'playerHit', hp: p.hp })
+      if (p.hp <= 0) {
+        g.phase = 'dead'
+        saveBest(g)
+        g.events.push({ type: 'death' })
+      }
+    }
   }
 
   const chasers = pickChasers(g)
@@ -286,7 +368,7 @@ function pickChasers(g: GameState): Set<number> {
   const p = g.player
   const candidates: { id: number; key: number }[] = []
   for (const t of g.titans) {
-    if (t.hp <= 0 || t.state === 'crippled' || t.state === 'dead') continue
+    if (t.hp <= 0 || t.state === 'crippled' || t.state === 'staggered' || t.state === 'dead') continue
     const dist = Math.hypot(p.pos.x - t.pos.x, p.pos.z - t.pos.z)
     const engaged = t.state === 'chase' || t.state === 'attack' || t.state === 'leap'
     if (!engaged && dist >= aggroRange(t.kind)) continue
@@ -355,6 +437,7 @@ export function copyInput(dst: InputState, src: InputState): void {
   dst.jump = src.jump
   dst.focus = src.focus
   dst.slash = src.slash
+  dst.fire = src.fire
   dst.hookL = src.hookL
   dst.hookR = src.hookR
   dst.resupply = src.resupply

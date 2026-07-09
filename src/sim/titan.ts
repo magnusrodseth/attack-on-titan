@@ -6,9 +6,10 @@ import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
 
 export type TitanKind = 'normal' | 'abnormal'
-export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'crippled' | 'dead'
+export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'crippled' | 'staggered' | 'dead'
 
 export const CRIPPLE_DURATION = 60 // seconds on its knees before it regenerates and rises
+export const STAGGER_DURATION = 3 // seconds frozen by a spear blast; wounds are kept
 
 export interface TitanState {
   id: number
@@ -26,6 +27,7 @@ export interface TitanState {
   wanderTimer: number
   ankles: [boolean, boolean]
   crippleTimer: number
+  staggerTimer: number
   avoidTimer: number
   /** Street-grid waypoints toward the player while chasing (world x/z pairs). */
   path: [number, number][] | null
@@ -78,6 +80,7 @@ export function createTitan(opts: {
     wanderTimer: 0,
     ankles: [false, false],
     crippleTimer: 0,
+    staggerTimer: 0,
     avoidTimer: 0,
     path: null,
     pathIndex: 0,
@@ -121,6 +124,23 @@ export function crippleTitan(t: TitanState): boolean {
 
 export function bodyCenter(t: TitanState): Vector3 {
   return t.pos.clone().add(new Vector3(0, t.height * 0.55, 0))
+}
+
+/**
+ * A spear blast freezes a titan without the cripple's heal-on-rise. Kneeling, leaping and
+ * dead titans are exempt: cripple already has the titan helpless (and rising would erase
+ * it), and freezing a leap would leave the titan hanging mid-air. A second blast refreshes
+ * the timer but reports false so callers do not double-announce it.
+ */
+export function staggerTitan(t: TitanState): boolean {
+  if (t.hp <= 0 || t.state === 'crippled' || t.state === 'leap' || t.state === 'dead') return false
+  const already = t.state === 'staggered'
+  t.state = 'staggered'
+  t.staggerTimer = STAGGER_DURATION
+  t.stateTime = 0
+  t.vel.set(0, 0, 0)
+  t.path = null
+  return !already
 }
 
 /** Walks the titan forward and slides it out of any building it hits; corridors only. */
@@ -282,6 +302,17 @@ export function stepTitan(
         t.vel.set(0, 0, 0)
         t.state = 'chase'
         t.stateTime = 0
+      }
+      break
+    }
+    case 'staggered': {
+      // blast-frozen: no movement, no attacks; hp stays wherever the blast left it
+      t.staggerTimer -= dt
+      if (t.staggerTimer <= 0) {
+        t.state = 'chase'
+        t.stateTime = 0
+        t.repathTimer = 0
+        t.attackCooldown = Math.max(t.attackCooldown, 0.5)
       }
       break
     }

@@ -4,6 +4,7 @@ import type { PlayerConfig } from './player'
 import { neutralInput } from './player'
 import { resumeRng } from './rng'
 import type { ScoreState } from './score'
+import type { SpearPickup, SpearState } from './spear'
 import type { TitanState } from './titan'
 import type { Upgrade } from './upgrades'
 import { UPGRADE_POOL } from './upgrades'
@@ -13,8 +14,11 @@ import { UPGRADE_POOL } from './upgrades'
  * bit-for-bit after a page reload. The arena is NOT saved — it re-derives from the seed —
  * and the live rng stream is captured by its internal state, so a restored run replays
  * exactly like one that was never interrupted (pinned by the divergence test).
+ *
+ * v2 (thunder spears): rack count, fire cooldown, live/stuck spears with fuses and
+ * titan-local anchors, and the wave's pickups. v1 saves are discarded, not migrated.
  */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 type V3 = [number, number, number]
 
@@ -30,6 +34,8 @@ interface SavedHook {
 
 type SavedTitan = Omit<TitanState, 'pos' | 'vel'> & { pos: V3; vel: V3 }
 
+type SavedSpear = Omit<SpearState, 'pos' | 'vel' | 'local'> & { pos: V3; vel: V3; local: V3 }
+
 interface SavedPlayer {
   pos: V3
   vel: V3
@@ -39,8 +45,10 @@ interface SavedPlayer {
   blades: number
   bladeHp: number
   hp: number
+  spears: number
   onGround: boolean
   slashTimer: number
+  fireTimer: number
   invulnTimer: number
   boostCooldown: number
   airTime: number
@@ -58,11 +66,14 @@ export interface SavedRun {
   focus: number
   focusActive: boolean
   nextTitanId: number
+  nextSpearId: number
   rngLiveState: number
   score: ScoreState
   offerIds: string[]
   player: SavedPlayer
   titans: SavedTitan[]
+  spears: SavedSpear[]
+  pickups: SpearPickup[]
   view?: { yaw: number; pitch: number }
 }
 
@@ -78,6 +89,7 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     focus: g.focus,
     focusActive: g.focusActive,
     nextTitanId: g.nextTitanId,
+    nextSpearId: g.nextSpearId,
     rngLiveState: g.rngLive.state(),
     score: { ...g.score },
     offerIds: g.offers.map((o) => o.id),
@@ -90,8 +102,10 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
       blades: p.blades,
       bladeHp: p.bladeHp,
       hp: p.hp,
+      spears: p.spears,
       onGround: p.onGround,
       slashTimer: p.slashTimer,
+      fireTimer: p.fireTimer,
       invulnTimer: p.invulnTimer,
       boostCooldown: p.boostCooldown,
       airTime: p.airTime,
@@ -99,6 +113,8 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
       config: { ...p.config },
     },
     titans: g.titans.map((t) => ({ ...t, pos: v3(t.pos), vel: v3(t.vel), ankles: [...t.ankles] as [boolean, boolean] })),
+    spears: g.spears.map((s) => ({ ...s, pos: v3(s.pos), vel: v3(s.vel), local: v3(s.local) })),
+    pickups: g.pickups.map((pk) => ({ ...pk })),
     ...(view ? { view: { ...view } } : {}),
   }
 }
@@ -127,6 +143,7 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
   g.focus = save.focus
   g.focusActive = save.focusActive
   g.nextTitanId = save.nextTitanId
+  g.nextSpearId = save.nextSpearId
   g.rngLive = resumeRng(save.rngLiveState)
   g.score = { ...save.score }
   g.offers = save.offerIds
@@ -152,8 +169,10 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
   p.blades = sp.blades
   p.bladeHp = sp.bladeHp
   p.hp = sp.hp
+  p.spears = sp.spears
   p.onGround = sp.onGround
   p.slashTimer = sp.slashTimer
+  p.fireTimer = sp.fireTimer
   p.invulnTimer = sp.invulnTimer
   p.boostCooldown = sp.boostCooldown
   p.airTime = sp.airTime
@@ -166,5 +185,12 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
     vel: new Vector3(...t.vel),
     ankles: [t.ankles[0], t.ankles[1]] as [boolean, boolean],
   }))
+  g.spears = save.spears.map((s) => ({
+    ...s,
+    pos: new Vector3(...s.pos),
+    vel: new Vector3(...s.vel),
+    local: new Vector3(...s.local),
+  }))
+  g.pickups = save.pickups.map((pk) => ({ ...pk }))
   return true
 }

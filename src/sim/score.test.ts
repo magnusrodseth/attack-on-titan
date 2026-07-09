@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createScore, registerKill, stepScore } from './score'
+import { createScore, registerKill, registerSpearKill, stepScore } from './score'
 
 const KILL_SPEED = 22
 
@@ -30,6 +30,24 @@ describe('registerKill', () => {
     const second = registerKill(s, { speed: KILL_SPEED, airborne: false, oneCut: false }, KILL_SPEED)
     expect(second).toBe(125) // 100 * (1 + 0.25 * combo of 1)
     expect(s.combo).toBe(2)
+  })
+})
+
+describe('registerSpearKill', () => {
+  it('pays a flat base below the blade baseline, ignoring speed entirely', () => {
+    const s = createScore()
+    expect(registerSpearKill(s, {})).toBe(75)
+    expect(s.kills).toBe(1)
+  })
+
+  it('keeps the rarity bonus and extends the chain like any kill', () => {
+    const s = createScore()
+    expect(registerSpearKill(s, { abnormal: true })).toBe(Math.round(75 * 1.75))
+
+    const chained = createScore()
+    registerKill(chained, { speed: KILL_SPEED, airborne: false, oneCut: false }, KILL_SPEED)
+    expect(registerSpearKill(chained, {})).toBe(Math.round(75 * 1.25)) // combo of 1 carried in
+    expect(chained.combo).toBe(2)
   })
 })
 

@@ -27,6 +27,7 @@ export interface PlayerConfig {
   maxHp: number
   gasKillRefund: number
   speedCap: number
+  spearCapacity: number
 }
 
 // Balance anchored in swing physics (see docs/research/odm-mechanics.md): a natural
@@ -54,6 +55,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   maxHp: 5,
   gasKillRefund: 0,
   speedCap: 40,
+  spearCapacity: 2, // two thunder spears, one per arm mount, like the source material
 }
 
 export interface InputState {
@@ -63,6 +65,7 @@ export interface InputState {
   jump: boolean
   focus: boolean
   slash: boolean
+  fire: boolean
   hookL: boolean
   hookR: boolean
   resupply: boolean
@@ -76,6 +79,7 @@ export function neutralInput(): InputState {
     jump: false,
     focus: false,
     slash: false,
+    fire: false,
     hookL: false,
     hookR: false,
     resupply: false,
@@ -91,8 +95,10 @@ export interface PlayerState {
   blades: number
   bladeHp: number
   hp: number
+  spears: number
   onGround: boolean
   slashTimer: number
+  fireTimer: number
   invulnTimer: number
   boostCooldown: number
   airTime: number
@@ -111,8 +117,10 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     blades: config.bladePairs,
     bladeHp: config.bladeDurability,
     hp: config.maxHp,
+    spears: config.spearCapacity,
     onGround: true,
     slashTimer: 0,
+    fireTimer: 0,
     invulnTimer: 0,
     boostCooldown: 0,
     airTime: 0,
@@ -168,6 +176,7 @@ function steerHorizontal(vel: Vector3, dir: Vector3, maxAngle: number): void {
 export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena: Arena): void {
   const cfg = p.config
   p.slashTimer = Math.max(0, p.slashTimer - dt)
+  p.fireTimer = Math.max(0, p.fireTimer - dt)
   p.invulnTimer = Math.max(0, p.invulnTimer - dt)
   p.boostCooldown = Math.max(0, p.boostCooldown - dt)
   const wasOnGround = p.onGround

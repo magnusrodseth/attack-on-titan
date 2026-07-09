@@ -282,6 +282,68 @@ export class AudioSystem {
     }
   }
 
+  /** Thunder spear leaving the arm mount: bright rocket whoosh with a low kick. */
+  spearLaunch(): void {
+    this.noiseBurst(2200, 0.3, 0.5, 'bandpass')
+    this.thud(0.35)
+  }
+
+  /** Armed-spear beep; urgency 0..1 raises the pitch as the fuse runs down. */
+  spearBeep(urgency: number, distance: number): void {
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    const falloff = 1 / (1 + distance / 35)
+    const osc = ctx.createOscillator()
+    osc.type = 'square'
+    osc.frequency.value = 880 + urgency * 720
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.11 * falloff, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07)
+    osc.connect(gain).connect(this.sfx)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.08)
+  }
+
+  /** Spear detonation: sub drop with a low blast body and a high debris crack. */
+  spearBoom(distance: number): void {
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    const volume = 1 / (1 + distance / 50)
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(90, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(24, ctx.currentTime + 0.6)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(1.1 * volume, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8)
+    osc.connect(gain).connect(this.sfx)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.85)
+    this.noiseBurst(500, 0.5, 0.7 * volume, 'lowpass')
+    this.noiseBurst(3200, 0.18, 0.45 * volume, 'highpass')
+  }
+
+  /** A dud spear giving up past max range. */
+  fizzle(): void {
+    this.noiseBurst(1400, 0.15, 0.2, 'bandpass')
+  }
+
+  /** Single soft partial for racking a picked-up spear. */
+  pickupChime(): void {
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = 784
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+    osc.connect(gain).connect(this.sfx)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.55)
+  }
+
   /** Player-death sub boom. */
   boom(): void {
     const ctx = this.ctx

@@ -11,6 +11,13 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 - **Ankle slice** — cutting both ankles kneels a titan, lowering its nape.
 - **Upgrade** — a pick-1-of-3 perk offered between waves.
 - **Resupply** — refilling gas, blades, and health at a station in the city.
+- **Thunder Spear** — the explosive consumable secondary weapon every soldier carries alongside
+  blades; fired at titans, it sticks where it hits and detonates after a fuse.
+  _Avoid_: weapon class (there is no class system; spears augment the one standard kit).
+- **Spear pickup** — a seeded cache in the city that restocks Thunder Spears; blipped on the
+  minimap.
+- **Staggered** — a titan briefly frozen by a spear blast; unlike a crippled titan it keeps
+  its wounds when it recovers.
 - **Focus** — the slow-motion meter (Q).
 - **Seed** — the string that determines the whole city and every random stream; same seed, same world.
 

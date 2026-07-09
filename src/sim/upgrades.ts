@@ -71,6 +71,15 @@ export const UPGRADE_POOL: Upgrade[] = [
     },
   },
   {
+    id: 'spear-racks',
+    name: 'Reinforced Spear Racks',
+    desc: '+2 spear capacity, +2 spears now',
+    apply(p) {
+      p.config.spearCapacity += 2
+      p.spears += 2
+    },
+  },
+  {
     id: 'gas-refund',
     name: 'Combat Scavenging',
     desc: 'Each kill refunds 12 gas',

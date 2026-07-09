@@ -10,6 +10,7 @@ import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
+import { SpearsView } from './render/spears'
 import { TitanPool } from './render/titans'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
@@ -26,6 +27,7 @@ import type { InputState } from './sim/player'
 import { createPlayer, neutralInput } from './sim/player'
 import { releaseHook } from './sim/rope'
 import { createScore } from './sim/score'
+import { SPEAR_FUSE } from './sim/spear'
 import { anklePos, napeCenter } from './sim/titan'
 import { UPGRADE_POOL, applyUpgrade } from './sim/upgrades'
 
@@ -82,12 +84,14 @@ const hud = new Hud(seed)
 const blade = new BladeView(camera)
 const audio = new AudioSystem()
 const minimap = new Minimap(game.arena)
+const spearsView = new SpearsView(scene)
 let roarTimer = 3
 
 // --- input -----------------------------------------------------------------
 
 const keys = new Set<string>()
 let mouseL = false
+let mouseM = false
 let mouseR = false
 let yaw = 0
 let pitch = 0
@@ -100,10 +104,15 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => keys.delete(e.code))
 renderer.domElement.addEventListener('mousedown', (e) => {
   if (e.button === 0) mouseL = true
+  if (e.button === 1) {
+    mouseM = true
+    e.preventDefault() // middle-click must fire a spear, not start autoscroll
+  }
   if (e.button === 2) mouseR = true
 })
 window.addEventListener('mouseup', (e) => {
   if (e.button === 0) mouseL = false
+  if (e.button === 1) mouseM = false
   if (e.button === 2) mouseR = false
 })
 window.addEventListener('contextmenu', (e) => e.preventDefault())
@@ -157,6 +166,7 @@ function buildInput(): InputState {
   input.gas = keys.has('ShiftLeft') || keys.has('ShiftRight')
   input.focus = keys.has('KeyQ')
   input.slash = keys.has('KeyF')
+  input.fire = keys.has('KeyE') || mouseM
   input.hookL = mouseL || keys.has('KeyJ')
   input.hookR = mouseR || keys.has('KeyK')
   input.resupply = keys.has('KeyR')
@@ -721,6 +731,9 @@ function handleEvents(events: GameEvent[]): void {
           if (audio.has('empty-click')) audio.play('empty-click', { volume: 0.8 })
           else audio.click()
           hud.popText('Out of Blades · Resupply!')
+        } else if (event.kind === 'spears') {
+          audio.click()
+          hud.popText('No Spears · Find a Cache!')
         } else {
           if (audio.has('gas-empty')) audio.play('gas-empty', { volume: 0.8 })
           else audio.click()
@@ -773,7 +786,49 @@ function handleEvents(events: GameEvent[]): void {
         break
       case 'unhook':
         break // ropes render straight from state
+      case 'spearFired':
+        audio.spearLaunch()
+        effects.addShake(0.1)
+        break
+      case 'spearStuck':
+        audio.thud(0.35)
+        break
+      case 'spearFizzled':
+        audio.fizzle()
+        break
+      case 'spearDetonated':
+        effects.burst(event.pos, 0xffb347, 60) // fireball
+        effects.burst(event.pos.clone().add(new Vector3(0, 1.5, 0)), 0x8a8a90, 40) // smoke
+        effects.addShake(0.7)
+        audio.spearBoom(event.pos.distanceTo(game.player.pos))
+        break
+      case 'staggered':
+        hud.popText('Staggered!')
+        break
+      case 'spearPickup':
+        hud.showBanner(`Thunder Spear Racked · ${event.remaining}`, 1200)
+        audio.pickupChime()
+        break
     }
+  }
+}
+
+// armed spears beep faster and higher as their fuses run down
+const beepTimers = new Map<number, number>()
+function updateSpearBeeps(dt: number): void {
+  for (const spear of game.spears) {
+    if (spear.phase !== 'stuck') continue
+    const timer = (beepTimers.get(spear.id) ?? 0) - dt
+    if (timer > 0) {
+      beepTimers.set(spear.id, timer)
+      continue
+    }
+    const urgency = 1 - Math.max(0, spear.fuse) / SPEAR_FUSE
+    audio.spearBeep(urgency, spear.pos.distanceTo(game.player.pos))
+    beepTimers.set(spear.id, 0.45 - 0.33 * urgency)
+  }
+  for (const id of beepTimers.keys()) {
+    if (!game.spears.some((s) => s.id === id)) beepTimers.delete(id)
   }
 }
 
@@ -898,6 +953,8 @@ renderer.setAnimationLoop(() => {
   effects.applyShake(camera)
 
   titanPool.sync(game.titans, dt)
+  spearsView.sync(game.spears, game.pickups, dt)
+  updateSpearBeeps(dt)
   updateScenery(dt, camera)
   blade.update(dt)
   effects.syncRopes(game.player, camera, dt)
@@ -962,6 +1019,7 @@ interface DebugStepInput {
   jump?: boolean
   focus?: boolean
   slash?: boolean
+  fire?: boolean
   hookL?: boolean
   hookR?: boolean
   resupply?: boolean
@@ -978,6 +1036,9 @@ function snapshot() {
     gas: Math.round(game.player.gas),
     canisters: game.player.canisters,
     blades: game.player.blades,
+    spears: game.player.spears,
+    spearsLive: game.spears.map((s) => ({ id: s.id, phase: s.phase, fuse: Math.round(s.fuse * 100) / 100 })),
+    pickupsLeft: game.pickups.filter((pk) => !pk.taken).length,
     pos: game.player.pos.toArray().map((v) => Math.round(v * 10) / 10),
     speed: Math.round(game.player.vel.length() * 10) / 10,
     titansAlive: game.titans.filter((t) => t.hp > 0).length,
@@ -1032,6 +1093,7 @@ function snapshot() {
     input.jump = partial.jump ?? false
     input.focus = partial.focus ?? false
     input.slash = partial.slash ?? false
+    input.fire = partial.fire ?? false
     input.hookL = partial.hookL ?? false
     input.hookR = partial.hookR ?? false
     input.resupply = partial.resupply ?? false

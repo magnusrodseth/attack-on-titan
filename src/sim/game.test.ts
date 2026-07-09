@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
 import { isWalkable } from './nav'
 import { neutralInput } from './player'
+import type { SpearState } from './spear'
 import { anklePos, createTitan, napeCenter } from './titan'
 
 const DT = 1 / 120
@@ -369,5 +370,129 @@ describe('health', () => {
     expect(game.player.hp).toBe(game.player.config.maxHp)
     const kill = game.events.find((e) => e.type === 'kill')
     expect(kill && 'heartGained' in kill && kill.heartGained).toBe(false)
+  })
+})
+
+describe('thunder spears', () => {
+  function fireInput() {
+    const input = neutralInput()
+    input.fire = true
+    input.lookDir.set(0, 0, -1)
+    return input
+  }
+
+  function stuckAt(pos: Vector3, fuse = 0.001): SpearState {
+    return {
+      id: 99,
+      phase: 'stuck',
+      pos: pos.clone(),
+      vel: new Vector3(),
+      traveled: 0,
+      titanId: null,
+      local: new Vector3(),
+      fuse,
+    }
+  }
+
+  it('fires on the fire edge, spending a spear and announcing the rack count', () => {
+    const game = playingGame()
+    stepGame(game, fireInput(), DT)
+    expect(game.spears).toHaveLength(1)
+    expect(game.player.spears).toBe(game.player.config.spearCapacity - 1)
+    expect(game.events).toContainEqual({ type: 'spearFired', remaining: game.player.spears })
+
+    // held, not re-pressed: no second launch
+    stepGame(game, fireInput(), DT)
+    expect(game.spears).toHaveLength(1)
+  })
+
+  it('clicks empty when the rack is dry', () => {
+    const game = playingGame()
+    game.player.spears = 0
+    stepGame(game, fireInput(), DT)
+    expect(game.spears).toHaveLength(0)
+    expect(game.events).toContainEqual({ type: 'empty', kind: 'spears' })
+  })
+
+  it('a nape blast kills at zero speed, pays flat spear points and returns a heart', () => {
+    const game = playingGame()
+    game.titans.splice(1)
+    const titan = game.titans[0]!
+    titan.pos.set(0, 0, -40)
+    titan.facing = 0
+    game.player.pos.set(0, 1.7, 60) // well outside the blast
+    game.player.vel.set(0, 0, 0)
+    game.player.hp = 2
+    game.spears.push(stuckAt(napeCenter(titan)))
+    stepGame(game, neutralInput(), DT)
+    expect(titan.hp).toBe(0)
+    const kill = game.events.find((e) => e.type === 'kill')
+    expect(kill && 'weapon' in kill && kill.weapon).toBe('spear')
+    expect(kill && 'points' in kill && kill.points).toBe(75)
+    expect(game.player.hp).toBe(3)
+    expect(game.events.some((e) => e.type === 'spearDetonated')).toBe(true)
+  })
+
+  it('a body blast staggers and surfaces the event', () => {
+    const game = playingGame()
+    game.titans.splice(1)
+    const titan = game.titans[0]!
+    titan.pos.set(0, 0, -40)
+    titan.facing = 0
+    titan.state = 'chase'
+    game.player.pos.set(0, 1.7, 60)
+    game.spears.push(stuckAt(new Vector3(0, 1, -40)))
+    stepGame(game, neutralInput(), DT)
+    expect(titan.state).toBe('staggered')
+    expect(game.events).toContainEqual({ type: 'staggered', titanId: titan.id })
+  })
+
+  it('standing beside the blast costs a heart and flings the player away', () => {
+    const game = playingGame()
+    game.titans.splice(0)
+    game.player.pos.set(2, 1.7, 8)
+    game.player.vel.set(0, 0, 0)
+    game.spears.push(stuckAt(new Vector3(0, 1, 8)))
+    stepGame(game, neutralInput(), DT)
+    expect(game.player.hp).toBe(game.player.config.maxHp - 1)
+    expect(game.player.vel.x).toBeGreaterThan(0)
+    expect(game.events.some((e) => e.type === 'playerHit')).toBe(true)
+  })
+
+  it('flying through a cache restocks one spear', () => {
+    const game = playingGame()
+    game.player.spears = 0
+    const pickup = game.pickups[0]!
+    game.player.pos.set(pickup.x, 1.7, pickup.z)
+    game.player.vel.set(0, 0, 0)
+    stepGame(game, neutralInput(), DT)
+    expect(game.player.spears).toBe(1)
+    expect(pickup.taken).toBe(true)
+    expect(game.events).toContainEqual({ type: 'spearPickup', remaining: 1 })
+  })
+
+  it('each wave replaces the caches and sheds spears stuck in last wave corpses', () => {
+    const game = playingGame()
+    expect(game.pickups).toHaveLength(3)
+    const firstWave = game.pickups.map((pk) => [pk.x, pk.z])
+
+    const corpse = game.titans[0]!
+    const inTitan = stuckAt(napeCenter(corpse), 100)
+    inTitan.titanId = corpse.id
+    const inWall = stuckAt(new Vector3(5, 1, 5), 100)
+    inWall.id = 55 // distinct from the titan-stuck spear so the survivor is unambiguous
+    game.spears.push(inTitan, inWall)
+
+    for (const t of game.titans) {
+      t.hp = 0
+      t.state = 'dead'
+    }
+    stepGame(game, neutralInput(), DT)
+    expect(game.phase).toBe('upgrading')
+    chooseUpgrade(game, game.offers[0]!.id)
+
+    expect(game.pickups).toHaveLength(3)
+    expect(game.pickups.map((pk) => [pk.x, pk.z])).not.toEqual(firstWave)
+    expect(game.spears.map((s) => s.id)).toEqual([inWall.id])
   })
 })
