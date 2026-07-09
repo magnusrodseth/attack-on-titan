@@ -51,9 +51,17 @@ browser profiles, ready to share on LinkedIn.
 - Custom domain for the Worker (workers.dev first).
 - Per-mode / per-week leaderboard slices; posting solo runs when logged in.
 - In-lobby text chat.
-- Hardening: the same account joining a room twice in the same instant can slip past the
-  duplicate-handle check (async token validation between check and insert); snapshot bandwidth
-  at high waves could drop long-dead titans; register/login rate limiting.
+- Hardening still open (post-review, 2026-07-09): session token rides the websocket query
+  string and lands in Workers observability logs (accepted at friends-scale; move to a first
+  WS message to close it); snapshot bandwidth at high waves could drop long-dead titans and
+  stop re-sending static titan fields; register/login rate limiting; spectate camera has no
+  fallback when no teammate is alive; `server/room.ts` phase machine has no unit tests.
+- Review pass (adversarial subagent + self-review, 2026-07-09) — fixed before/at merge:
+  non-finite input reports rejected (could NaN-poison the shared world), reconnect now
+  replaces a stale same-handle connection instead of locking the player out, finishMatch is
+  idempotent, fully abandoned matches still persist their cleared waves, CORS pinned to this
+  project's previews, per-soldier leaderboard dedupe with deterministic tiebreak, wrangler
+  local state untracked from git, co-op pause banner admits the world keeps running.
 
 ## Out of scope
 
