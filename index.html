@@ -76,6 +76,8 @@
       #gas-fill { background: linear-gradient(180deg, #f0cb6b, #a97c2c); }
       #blade-fill { background: linear-gradient(180deg, #f4f8fb, #93a1ad); }
       #focus-fill { background: linear-gradient(180deg, #c3adff, #6d4fd0); }
+      /* lamp gauge only appears at night, while the flashlight is running its battery */
+      #lamp-fill { background: linear-gradient(180deg, #ffe9b0, #cf9435); }
       /* segmented gauges read as countable uses; separators overlay the fill */
       .bar.segmented::after {
         content: ''; position: absolute; inset: 0; pointer-events: none;
@@ -401,6 +403,10 @@
         <div id="gas-bar" class="bar segmented"><div id="gas-fill" class="fill"></div></div>
         <div class="meter-label">BLADE <span id="blade-pairs"></span></div>
         <div id="blade-bar" class="bar segmented"><div id="blade-fill" class="fill"></div></div>
+        <div id="lamp-row" class="hidden">
+          <div class="meter-label">LAMP</div>
+          <div id="lamp-bar" class="bar"><div id="lamp-fill" class="fill"></div></div>
+        </div>
         <div class="meter-label">FOCUS</div>
         <div id="focus-bar" class="bar"><div id="focus-fill" class="fill"></div></div>
       </div>

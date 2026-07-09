@@ -1,7 +1,7 @@
 import { Vector3 } from 'three'
 import type { CoopSnapshot, HookAnchor } from './coop'
 import type { GameState } from './game'
-import { copyInput, handleHookEdge, syncTitanHooks } from './game'
+import { copyInput, handleHookEdge, stepLamp, syncTitanHooks } from './game'
 import type { InputState } from './player'
 import { BOOST_COST, stepPlayer, tryBoost } from './player'
 import type { TitanState } from './titan'
@@ -21,6 +21,7 @@ export function stepCoopClient(g: GameState, input: InputState, dt: number): voi
   g.events = []
   g.time += dt
   g.focusActive = false // a shared world cannot slow down for one soldier
+  stepLamp(g, dt) // the flashlight is personal: drained locally, refilled by the server's resupply ack
   const p = g.player
 
   const canistersBefore = p.canisters

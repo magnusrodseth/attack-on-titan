@@ -1,4 +1,5 @@
 import { Vector3 } from 'three'
+import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { GamePhase, GameState } from './game'
 import type { PlayerConfig } from './player'
 import { neutralInput } from './player'
@@ -39,6 +40,7 @@ interface SavedPlayer {
   blades: number
   bladeHp: number
   hp: number
+  lamp?: number // absent in saves from before the flashlight existed
   onGround: boolean
   slashTimer: number
   invulnTimer: number
@@ -90,6 +92,7 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
       blades: p.blades,
       bladeHp: p.bladeHp,
       hp: p.hp,
+      lamp: p.lamp,
       onGround: p.onGround,
       slashTimer: p.slashTimer,
       invulnTimer: p.invulnTimer,
@@ -152,6 +155,7 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
   p.blades = sp.blades
   p.bladeHp = sp.bladeHp
   p.hp = sp.hp
+  p.lamp = sp.lamp ?? LAMP_BATTERY_SECONDS
   p.onGround = sp.onGround
   p.slashTimer = sp.slashTimer
   p.invulnTimer = sp.invulnTimer

@@ -2,10 +2,13 @@ import type { PerspectiveCamera, Scene } from 'three'
 import { Vector3 } from 'three'
 import type { Hud } from '../hud'
 import type { SoldierPool } from '../render/soldiers'
+import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
 import type { FigureKind, FootballerFigure } from '../render/strikers'
 import { buildFootballer, KIT_DEFAULTS } from '../render/strikers'
 import { EYE_HEIGHT } from '../sim/constants'
 import type { RemoteSoldier } from '../sim/coopClient'
+import { clockFraction } from '../sim/daynight'
+import { LAMP_BATTERY_SECONDS } from '../sim/flashlight'
 import type { GameState } from '../sim/game'
 import type { TitanKind } from '../sim/titan'
 import { createTitan } from '../sim/titan'
@@ -29,6 +32,8 @@ export interface DevCtx {
   canvas: HTMLCanvasElement
   enterWorld(): void
   setView(yaw: number, pitch: number): void
+  /** Render-only clock override (0 = midnight, 0.5 = noon); null returns to the sim clock. */
+  setClock(fraction: number | null): void
 }
 
 const DRAWER_CSS = `
@@ -198,10 +203,24 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       <label class="dv-check"><input type="checkbox" id="dv-hud"> Hide HUD</label>
     </div>
     <div class="dv-section">
+      <div class="dv-label">Time of day</div>
+      <label class="dv-check"><input type="checkbox" id="dv-clock-on"> Override the sim clock</label>
+      <div class="dv-row" style="align-items:center">
+        <input type="range" id="dv-clock" min="0" max="1" step="0.005">
+        <span id="dv-clock-val"></span>
+      </div>
+      <div class="dv-hint">The flashlight is automatic: it lights once the sun is down and runs on its battery.</div>
+      <div class="dv-row" style="align-items:center">
+        <label>Battery <input type="range" id="dv-lamp" min="0" max="${LAMP_BATTERY_SECONDS}" step="1"></label>
+        <span id="dv-lamp-val"></span>
+      </div>
+    </div>
+    <div class="dv-section">
       <div class="dv-label">Kit styling</div>
       <select id="dv-kind">
         <option value="striker">Striker · Haaland</option>
         <option value="captain">Captain · Kane</option>
+        <option value="recruit">Recruit · Soldier</option>
       </select>
       <div id="dv-slots"></div>
       <div class="dv-row" style="align-items:center">
@@ -270,6 +289,40 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     location.search = params.toString()
   })
 
+  // --- time of day + flashlight battery ---------------------------------------
+
+  const clockOn = q<HTMLInputElement>('#dv-clock-on')
+  const clockSlider = q<HTMLInputElement>('#dv-clock')
+  const clockVal = q<HTMLSpanElement>('#dv-clock-val')
+  const lampSlider = q<HTMLInputElement>('#dv-lamp')
+  const lampVal = q<HTMLSpanElement>('#dv-lamp-val')
+
+  function clockLabel(fraction: number): string {
+    const hours = fraction * 24
+    const hh = String(Math.floor(hours)).padStart(2, '0')
+    const mm = String(Math.floor((hours % 1) * 60)).padStart(2, '0')
+    return `${hh}:${mm}`
+  }
+
+  function pushClock(): void {
+    ctx.setClock(clockOn.checked ? clockSlider.valueAsNumber : null)
+    clockVal.textContent = clockOn.checked ? clockLabel(clockSlider.valueAsNumber) : 'sim'
+  }
+
+  // start the slider where the sky currently stands, so ticking the box changes nothing
+  clockSlider.value = String(clockFraction(game.seed, game.time))
+  clockOn.addEventListener('change', pushClock)
+  clockSlider.addEventListener('input', () => {
+    clockOn.checked = true // dragging the sun implies taking the wheel
+    pushClock()
+  })
+  pushClock()
+
+  lampSlider.value = String(game.player.lamp)
+  lampSlider.addEventListener('input', () => {
+    game.player.lamp = lampSlider.valueAsNumber
+  })
+
   // --- kit styling -------------------------------------------------------------
 
   const kindSelect = q<HTMLSelectElement>('#dv-kind')
@@ -281,18 +334,41 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     return kindSelect.value as FigureKind
   }
 
+  const isRecruit = (): boolean => kindSelect.value === 'recruit'
+
   function applySlot(kind: FigureKind, slot: string, hex: string): void {
     styles[kind][slot] = hex
     for (const figure of figures) {
-      if (figure.kind !== kind) continue
-      if (slot === 'number') figure.setNumberColor(hex)
-      else figure.slots[slot]?.color.set(hex)
+      if (figure.kind === kind) figure.setColor(slot, hex)
     }
   }
 
   function renderStyleRows(): void {
-    const kind = currentKind()
     slotsRoot.innerHTML = ''
+    if (isRecruit()) {
+      // one shared tint layered over the KayKit atlas; height is metres, not statue units
+      const row = document.createElement('div')
+      row.className = 'dv-slot'
+      const label = document.createElement('span')
+      label.textContent = 'tint'
+      const input = document.createElement('input')
+      input.type = 'color'
+      input.value = getRecruitStyle().tint ?? '#ffffff'
+      input.addEventListener('input', () => setRecruitStyle({ tint: input.value }))
+      row.append(label, input)
+      slotsRoot.appendChild(row)
+      heightInput.min = '1.5'
+      heightInput.max = '6'
+      heightInput.step = '0.1'
+      const { height } = getRecruitStyle()
+      heightInput.value = String(height)
+      heightVal.textContent = `${height}m`
+      return
+    }
+    heightInput.min = '6'
+    heightInput.max = '16'
+    heightInput.step = '0.5'
+    const kind = currentKind()
     for (const [slot, hex] of Object.entries(styles[kind])) {
       const row = document.createElement('div')
       row.className = 'dv-slot'
@@ -311,6 +387,11 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
 
   kindSelect.addEventListener('change', renderStyleRows)
   heightInput.addEventListener('input', () => {
+    if (isRecruit()) {
+      setRecruitStyle({ height: heightInput.valueAsNumber })
+      heightVal.textContent = `${heightInput.value}m`
+      return
+    }
     const kind = currentKind()
     figureHeights[kind] = heightInput.valueAsNumber
     heightVal.textContent = heightInput.value
@@ -319,6 +400,13 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     }
   })
   q<HTMLButtonElement>('#dv-copy').addEventListener('click', () => {
+    if (isRecruit()) {
+      const json = JSON.stringify({ kind: 'recruit', ...getRecruitStyle() }, null, 2)
+      void navigator.clipboard
+        .writeText(json)
+        .finally(() => hud.toast('recruit style copied to clipboard'))
+      return
+    }
     const kind = currentKind()
     const json = JSON.stringify({ kind, height: figureHeights[kind], colors: styles[kind] }, null, 2)
     void navigator.clipboard
@@ -344,6 +432,9 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
 
   return (dt: number) => {
     soldierPool.sync(dummies, dt)
+    // mirror the live battery so drain (and refills at the station) read on the slider
+    lampVal.textContent = `${Math.round(game.player.lamp)}s`
+    if (document.activeElement !== lampSlider) lampSlider.value = String(game.player.lamp)
     if (turntable) {
       for (const titan of game.titans) titan.facing += dt * 0.4
       for (const figure of figures) figure.group.rotation.y += dt * 0.4

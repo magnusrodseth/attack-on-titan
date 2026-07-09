@@ -94,6 +94,8 @@ class TitanVisual {
   private readonly armL: Limb
   private readonly armR: Limb
   private readonly torso: Group
+  /** Heel glows matching sim ankle targets; index 0 = left, 1 = right (like t.ankles). */
+  private readonly ankleGlows: [Mesh, Mesh]
   private walkPhase = 0
   private lastPos = { x: 0, z: 0 }
 
@@ -128,6 +130,16 @@ class TitanVisual {
     // two-segment capsule legs with hip pivots and knees
     this.legL = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, -0.085, 0.44)
     this.legR = makeLimb(this.skin, 0.058, 0.11, 0.047, 0.1, 0.085, 0.44)
+
+    // glowing heel tendons, the same red as the nape so both weak points read alike;
+    // each hides once its ankle is cut (see syncPose)
+    const heel = (limb: Limb): Mesh => {
+      const glow = new Mesh(new BoxGeometry(0.06, 0.055, 0.03), this.napeMat)
+      glow.position.set(0, -0.175, -0.05) // back of the lower leg, at the sim's anklePos height
+      limb.lower.add(glow)
+      return glow
+    }
+    this.ankleGlows = [heel(this.legL), heel(this.legR)]
 
     this.torso = new Group()
     this.torso.position.y = 0.44
@@ -209,6 +221,11 @@ class TitanVisual {
   syncPose(t: TitanState, dt: number): void {
     this.group.position.copy(t.pos)
     this.group.rotation.y = t.facing
+
+    // a cut tendon stops advertising itself; a crippled or dead titan has none to sell
+    const showAnkles = t.state !== 'dead' && t.state !== 'crippled'
+    this.ankleGlows[0].visible = showAnkles && !t.ankles[0]
+    this.ankleGlows[1].visible = showAnkles && !t.ankles[1]
 
     if (t.state === 'dead') {
       // fall forward around the feet, then dissolve

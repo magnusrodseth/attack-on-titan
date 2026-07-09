@@ -14,6 +14,8 @@ export interface HudFrame {
   speed: number
   nearStation: boolean
   hookInRange: boolean
+  /** Flashlight battery 0..1 while the night lamp window is open; null hides the gauge by day. */
+  lamp: number | null
 }
 
 export interface SettingsValues {
@@ -38,6 +40,8 @@ export class Hud {
   private focusVignette = el('focus-vignette')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
+  private lampRow = el('lamp-row')
+  private lampFill = el('lamp-fill')
   private meters = el('meters')
   private speedo = el('speedo')
   private banner = el('banner')
@@ -221,7 +225,14 @@ export class Hud {
     // segment the gauges into countable uses (upgrades can change both counts)
     this.gasBar.style.setProperty('--segs', String(Math.max(1, Math.floor(p.config.maxGas / BOOST_COST))))
     this.bladeBar.style.setProperty('--segs', String(Math.max(1, p.config.bladeDurability)))
-    this.meters.classList.toggle('low', (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1)
+    // the lamp gauge only exists at night; an empty or dying battery joins the red pulse
+    this.lampRow.classList.toggle('hidden', frame.lamp === null)
+    if (frame.lamp !== null) this.lampFill.style.width = `${(frame.lamp * 100).toFixed(1)}%`
+
+    this.meters.classList.toggle(
+      'low',
+      (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1 || (frame.lamp !== null && frame.lamp < 0.2),
+    )
 
     this.focusFill.style.width = `${game.focus.toFixed(1)}%`
 

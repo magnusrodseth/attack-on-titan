@@ -8,12 +8,14 @@ import type { Leaderboard } from './net/protocol'
 import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
+import { FlashlightBeam } from './render/flashlight'
 import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
 import { TitanPool } from './render/titans'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
 import { clockFraction } from './sim/daynight'
+import { LAMP_BATTERY_SECONDS, lampGlow, lampOn } from './sim/flashlight'
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
@@ -82,6 +84,7 @@ scene.add(camera) // camera children (blade viewmodel) need the camera in the sc
 const titanPool = new TitanPool(scene)
 const soldierPool = new SoldierPool(scene)
 const effects = new Effects(scene)
+const flashlight = new FlashlightBeam(scene)
 const hud = new Hud(seed)
 const blade = new BladeView(camera)
 const audio = new AudioSystem()
@@ -541,6 +544,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
         if (event.playerId === me) {
           game.player.gas = game.player.config.maxGas
           game.player.canisters = game.player.config.gasCanisters
+          game.player.lamp = LAMP_BATTERY_SECONDS
           hud.showBanner('Resupplied', 900)
           audio.refill()
         }
@@ -695,6 +699,9 @@ if (import.meta.env.DEV) {
         yaw = y
         pitch = p
       },
+      setClock: (f) => {
+        debug.clockOverride = f
+      },
     })
   })
 }
@@ -712,6 +719,7 @@ function handlePlaygroundIntents(events: GameEvent[]): void {
       p.canisters = p.config.gasCanisters
       p.blades = p.config.bladePairs
       p.bladeHp = p.config.bladeDurability
+      p.lamp = LAMP_BATTERY_SECONDS
       hud.showBanner('Resupplied', 900)
       audio.refill()
     } else {
@@ -805,6 +813,14 @@ function handleEvents(events: GameEvent[]): void {
       case 'resupply':
         hud.showBanner('Resupplied', 900)
         audio.refill()
+        break
+      case 'lampLow':
+        hud.showBanner('Lamp Fading · Recharge at the Station', 2200)
+        audio.click()
+        break
+      case 'lampDead':
+        hud.showBanner('Lamp Dead · Recharge at the Station', 2600)
+        audio.click()
         break
       case 'canisterSwap':
         hud.showBanner(event.remaining > 0 ? `Canister Swapped · ${event.remaining} Left` : 'Last Canister', 1200)
@@ -963,7 +979,9 @@ renderer.setAnimationLoop(() => {
 
   titanPool.sync(game.titans, dt)
   updateScenery(dt, camera)
-  dayNight.update(debug.clockOverride ?? clockFraction(seed, game.time), camera)
+  const clock = debug.clockOverride ?? clockFraction(seed, game.time)
+  dayNight.update(clock, camera)
+  flashlight.update(camera, game.phase === 'menu' ? 0 : lampGlow(clock, game.player.lamp), now)
   blade.update(dt)
   effects.syncRopes(game.player, camera, dt)
   effects.update(dt, camera, game.player.vel)
@@ -1009,7 +1027,9 @@ renderer.setAnimationLoop(() => {
     raycastHookTarget(game.arena, game.player.pos, lookDir, game.player.config.hookRange) !== null
   const nearStation =
     Math.hypot(game.player.pos.x - game.arena.station.x, game.player.pos.z - game.arena.station.z) <= 10
-  hud.update(game, { speed, nearStation, hookInRange })
+  const lamp =
+    lampOn(clock) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
+  hud.update(game, { speed, nearStation, hookInRange, lamp })
 
   saveTimer += dt
   if (saveTimer >= 1) {
@@ -1049,6 +1069,7 @@ function snapshot() {
     hooks: game.player.hooks.map((h) => h.state),
     buildings: game.arena.buildings.length,
     clock: Math.round((debug.clockOverride ?? clockFraction(seed, game.time)) * 1000) / 1000,
+    lamp: Math.round(game.player.lamp),
   }
 }
 

@@ -19,17 +19,19 @@ import { Sky } from 'three/addons/objects/Sky.js'
 import { nightFactor, sunElevation } from '../sim/daynight'
 
 // Daylight matches the game's original fixed look; night and dusk are graded
-// off it so the district reads as the same place at every hour.
+// off it so the district reads as the same place at every hour. Night is pinned
+// at a deep-dusk brightness — dark enough to sell the hour, light enough to stay
+// playable (user mandate 2026-07-09); the flashlight carries the drama on top.
 const FOG_DAY = new Color(0xb9cfe2)
-const FOG_NIGHT = new Color(0x0c1120)
+const FOG_NIGHT = new Color(0x2e3a55)
 const FOG_DUSK = new Color(0xd99f6c)
 const SUN_NOON = new Color(0xfff1da)
 const SUN_HORIZON = new Color(0xff9550)
 const MOON_TINT = new Color(0x93a7c8)
 const HEMI_SKY_DAY = new Color(0xd8e8ff)
-const HEMI_SKY_NIGHT = new Color(0x1a2338)
+const HEMI_SKY_NIGHT = new Color(0x45557c)
 const HEMI_GROUND_DAY = new Color(0x8a7a63)
-const HEMI_GROUND_NIGHT = new Color(0x1f1d22)
+const HEMI_GROUND_NIGHT = new Color(0x3c3a45)
 
 const smooth = (x: number): number => {
   const t = Math.min(1, Math.max(0, x))
@@ -160,16 +162,16 @@ export class DayNightSky {
     } else {
       this.celestial.position.copy(this.sunDir).multiplyScalar(-240)
       this.celestial.color.copy(MOON_TINT)
-      this.celestial.intensity = Math.max(0.02, 0.4 * moonStrength)
+      this.celestial.intensity = Math.max(0.02, 0.95 * moonStrength)
     }
 
     this.hemi.color.copy(HEMI_SKY_DAY).lerp(HEMI_SKY_NIGHT, night)
     this.hemi.groundColor.copy(HEMI_GROUND_DAY).lerp(HEMI_GROUND_NIGHT, night)
-    this.hemi.intensity = 1.1 - 0.8 * night
+    this.hemi.intensity = 1.1 - 0.42 * night
 
     this.fog.color.copy(FOG_DAY).lerp(FOG_NIGHT, night).lerp(FOG_DUSK, dusk * 0.65)
     this.fog.near = 70 - 15 * night
-    this.fog.far = 460 - 90 * night
+    this.fog.far = 460 - 50 * night
     this.background.copy(this.fog.color)
 
     // stars and moon ride with the camera so the domes never clip the far plane
