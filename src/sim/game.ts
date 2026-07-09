@@ -42,6 +42,9 @@ export type GameEvent =
   | { type: 'canisterSwap'; remaining: number }
   | { type: 'boost' }
   | { type: 'death' }
+  // client intents in co-op: the net layer forwards these to the room server
+  | { type: 'coopSlash' }
+  | { type: 'coopResupply' }
 
 export interface BestStats {
   bestScore: number
@@ -293,7 +296,7 @@ function pickChasers(g: GameState): Set<number> {
   return new Set(candidates.slice(0, MAX_CHASERS).map((c) => c.id))
 }
 
-function handleHookEdge(
+export function handleHookEdge(
   g: GameState,
   index: 0 | 1,
   held: boolean,
@@ -332,7 +335,7 @@ function handleHookEdge(
 }
 
 /** Titan-attached anchors follow their titan; hooks in dead titans tear free. */
-function syncTitanHooks(g: GameState): void {
+export function syncTitanHooks(g: GameState): void {
   for (const [index, hook] of g.player.hooks.entries()) {
     if (hook.state !== 'attached' || hook.titanId === null) continue
     const titan = g.titans.find((t) => t.id === hook.titanId)
@@ -345,7 +348,7 @@ function syncTitanHooks(g: GameState): void {
   }
 }
 
-function copyInput(dst: InputState, src: InputState): void {
+export function copyInput(dst: InputState, src: InputState): void {
   dst.move.copy(src.move)
   dst.lookDir.copy(src.lookDir)
   dst.gas = src.gas

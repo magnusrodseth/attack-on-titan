@@ -1,5 +1,6 @@
 import { desc, inArray } from 'drizzle-orm'
 import { asc, eq } from 'drizzle-orm'
+import type { Leaderboard, LeaderboardTeam } from '../../src/net/protocol'
 import type { MatchResults } from '../../src/sim/coop'
 import type { Db } from './client'
 import { matchPlayers, matches, users } from './schema'
@@ -39,26 +40,6 @@ export async function writeMatch(
       }),
     ),
   ] as unknown as Parameters<Db['batch']>[0])
-}
-
-export interface LeaderboardTeam {
-  wavesCleared: number
-  durationS: number
-  endedAt: string
-  players: { username: string; score: number; mvp: boolean }[]
-}
-
-export interface LeaderboardSoldier {
-  username: string
-  score: number
-  kills: number
-  wavesCleared: number
-  endedAt: string
-}
-
-export interface Leaderboard {
-  teams: LeaderboardTeam[]
-  soldiers: LeaderboardSoldier[]
 }
 
 export async function readLeaderboard(db: Db): Promise<Leaderboard> {

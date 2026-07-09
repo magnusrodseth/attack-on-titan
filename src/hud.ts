@@ -1,3 +1,5 @@
+import type { Leaderboard, LobbyMsg } from './net/protocol'
+import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
@@ -53,6 +55,14 @@ export class Hud {
   private modeCards = el('mode-cards')
   private bannerTimer: number | undefined
 
+  private coopPanel = el('coop')
+  private lobbyPanel = el('lobby')
+  private resultsPanel = el('results')
+  private leaderboardPanel = el('leaderboard')
+  private squad = el('squad')
+  private feed = el('feed')
+  private pickStatus = el('pick-status')
+
   onStart: () => void = () => {}
   onRestart: () => void = () => {}
   onRetry: () => void = () => {}
@@ -63,6 +73,18 @@ export class Hud {
   onOpenModes: () => void = () => {}
   onCloseModes: () => void = () => {}
   onPickMode: (id: string) => void = () => {}
+  onOpenCoop: () => void = () => {}
+  onCloseCoop: () => void = () => {}
+  onAuth: (mode: 'register' | 'login', username: string, password: string) => void = () => {}
+  onSignOut: () => void = () => {}
+  onCreateLobby: () => void = () => {}
+  onJoinLobby: (code: string) => void = () => {}
+  onReadyToggle: () => void = () => {}
+  onStartMatch: () => void = () => {}
+  onLeaveLobby: () => void = () => {}
+  onRematch: () => void = () => {}
+  onOpenLeaderboard: () => void = () => {}
+  onCloseLeaderboard: () => void = () => {}
 
   constructor(seed: string) {
     el('seed-line').textContent = `seed: ${seed} — share the URL with ?seed=${encodeURIComponent(seed)} to race the same city`
@@ -74,12 +96,38 @@ export class Hud {
     el<HTMLButtonElement>('settings-back').addEventListener('click', () => this.onCloseSettings())
     el<HTMLButtonElement>('modes-btn').addEventListener('click', () => this.onOpenModes())
     el<HTMLButtonElement>('modes-back').addEventListener('click', () => this.onCloseModes())
+    el<HTMLButtonElement>('coop-btn').addEventListener('click', () => this.onOpenCoop())
+    el<HTMLButtonElement>('coop-back').addEventListener('click', () => this.onCloseCoop())
+    el<HTMLButtonElement>('coop-register').addEventListener('click', () => this.submitAuth('register'))
+    el<HTMLButtonElement>('coop-login').addEventListener('click', () => this.submitAuth('login'))
+    el<HTMLInputElement>('coop-password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.submitAuth('login')
+    })
+    el<HTMLButtonElement>('coop-signout').addEventListener('click', () => this.onSignOut())
+    el<HTMLButtonElement>('coop-create').addEventListener('click', () => this.onCreateLobby())
+    el<HTMLButtonElement>('coop-join').addEventListener('click', () =>
+      this.onJoinLobby(el<HTMLInputElement>('coop-join-code').value),
+    )
+    el<HTMLInputElement>('coop-join-code').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.onJoinLobby(el<HTMLInputElement>('coop-join-code').value)
+    })
+    el<HTMLButtonElement>('lobby-ready').addEventListener('click', () => this.onReadyToggle())
+    el<HTMLButtonElement>('lobby-start').addEventListener('click', () => this.onStartMatch())
+    el<HTMLButtonElement>('lobby-leave').addEventListener('click', () => this.onLeaveLobby())
+    el<HTMLButtonElement>('results-rematch').addEventListener('click', () => this.onRematch())
+    el<HTMLButtonElement>('results-leave').addEventListener('click', () => this.onLeaveLobby())
+    el<HTMLButtonElement>('leaderboard-btn').addEventListener('click', () => this.onOpenLeaderboard())
+    el<HTMLButtonElement>('leaderboard-back').addEventListener('click', () => this.onCloseLeaderboard())
     for (const id of SLIDER_IDS) {
       el<HTMLInputElement>(id).addEventListener('input', () => {
         this.refreshSettingsDisplay()
         this.onSettingsChange(this.readSettings())
       })
     }
+  }
+
+  private submitAuth(mode: 'register' | 'login'): void {
+    this.onAuth(mode, el<HTMLInputElement>('coop-username').value, el<HTMLInputElement>('coop-password').value)
   }
 
   initSettings(values: SettingsValues): void {
@@ -239,6 +287,177 @@ export class Hud {
 
   hideUpgrades(): void {
     this.upgrade.classList.add('hidden')
+  }
+
+  // --- co-op panels ----------------------------------------------------------
+
+  /** Toggles the co-op chrome: hides solo-only menu items while in a squad. */
+  setCoopUi(active: boolean): void {
+    document.body.classList.toggle('coop', active)
+  }
+
+  showCoop(view: 'auth' | 'room', username = ''): void {
+    this.start.classList.add('hidden')
+    this.coopPanel.classList.remove('hidden')
+    el('coop-auth').classList.toggle('hidden', view !== 'auth')
+    el('coop-room').classList.toggle('hidden', view !== 'room')
+    el('coop-whoami').textContent = username
+    this.coopError('')
+  }
+
+  hideCoop(): void {
+    this.coopPanel.classList.add('hidden')
+  }
+
+  get coopOpen(): boolean {
+    return !this.coopPanel.classList.contains('hidden')
+  }
+
+  coopError(message: string, view: 'auth' | 'room' = 'auth'): void {
+    el(view === 'auth' ? 'coop-auth-error' : 'coop-room-error').textContent = message
+  }
+
+  showLobby(lobby: LobbyMsg, joinUrl: string): void {
+    this.start.classList.add('hidden')
+    this.resultsPanel.classList.add('hidden')
+    this.lobbyPanel.classList.remove('hidden')
+    el('lobby-title').textContent = lobby.code.toUpperCase()
+    el('lobby-share').innerHTML =
+      `Share this district with your squad: <b style="color: var(--brass-bright)">${joinUrl}</b><br />` +
+      `${lobby.players.length} / ${lobby.maxPlayers} soldiers mustered`
+    const roster = el('lobby-roster')
+    roster.innerHTML = ''
+    for (const player of lobby.players) {
+      const row = document.createElement('div')
+      row.className = player.ready ? 'roster-row ready' : 'roster-row'
+      const you = player.id === lobby.you ? ' <span class="you">· you</span>' : ''
+      const crown = player.id === lobby.creator ? '<span class="r-crown">♛</span>' : ''
+      const state = lobby.phase !== 'lobby' && player.inMatch ? 'IN BATTLE' : player.ready ? 'READY' : 'MUSTERING'
+      row.innerHTML = `<span class="r-name">${crown}${player.id}${you}</span><span class="r-state">${state}</span>`
+      roster.appendChild(row)
+    }
+    const me = lobby.players.find((p) => p.id === lobby.you)
+    const isCreator = lobby.creator === lobby.you
+    el<HTMLButtonElement>('lobby-ready').textContent = me?.ready ? 'Not Ready' : 'Ready'
+    el<HTMLButtonElement>('lobby-ready').classList.toggle('hidden', isCreator)
+    const allReady = lobby.players.every((p) => p.ready)
+    const startBtn = el<HTMLButtonElement>('lobby-start')
+    startBtn.classList.toggle('hidden', !isCreator)
+    startBtn.disabled = !allReady
+    startBtn.style.opacity = allReady ? '1' : '0.45'
+    el('lobby-status').textContent =
+      lobby.phase !== 'lobby'
+        ? 'A battle is under way. You will muster with the squad when it ends.'
+        : isCreator && !allReady && lobby.players.length > 1
+          ? 'Waiting for the squad to ready up…'
+          : ''
+  }
+
+  hideLobby(): void {
+    this.lobbyPanel.classList.add('hidden')
+  }
+
+  get lobbyOpen(): boolean {
+    return !this.lobbyPanel.classList.contains('hidden')
+  }
+
+  showResults(results: MatchResults, me: string, isCreator: boolean): void {
+    this.lobbyPanel.classList.add('hidden')
+    this.resultsPanel.classList.remove('hidden')
+    const minutes = Math.floor(results.durationS / 60)
+    const seconds = Math.round(results.durationS % 60)
+    el('results-sub').textContent =
+      `The squad held ${results.wavesCleared} ${results.wavesCleared === 1 ? 'wave' : 'waves'} for ` +
+      `${minutes}:${String(seconds).padStart(2, '0')} before the wall fell.`
+    const rows = el('result-rows')
+    rows.innerHTML = ''
+    results.players.forEach((player, index) => {
+      const row = document.createElement('div')
+      row.className = player.mvp ? 'result-row mvp' : 'result-row'
+      const name = player.id === me ? `${player.id} · you` : player.id
+      row.innerHTML =
+        `<span class="rr-rank">${player.mvp ? '♛' : index + 1}</span>` +
+        `<span class="rr-name">${name}${player.mvp ? ' — MVP' : ''}</span>` +
+        `<span class="rr-stats">${player.kills} kills · ${player.deaths} deaths</span>` +
+        `<span class="rr-score">${player.score}</span>`
+      rows.appendChild(row)
+    })
+    el('results-rematch').classList.toggle('hidden', !isCreator)
+    el('results-wait').classList.toggle('hidden', isCreator)
+  }
+
+  hideResults(): void {
+    this.resultsPanel.classList.add('hidden')
+  }
+
+  updateSquad(rows: { id: string; hp: number; maxHp: number; score: number; alive: boolean; me: boolean }[]): void {
+    if (rows.length === 0) {
+      this.squad.innerHTML = ''
+      return
+    }
+    this.squad.innerHTML = rows
+      .map(
+        (r) =>
+          `<div class="sq-row${r.me ? ' me' : ''}${r.alive ? '' : ' dead'}">` +
+          `<span class="sq-name">${r.id}</span>` +
+          `<span class="sq-hearts">${'♥'.repeat(Math.max(0, r.hp))}${'·'.repeat(Math.max(0, r.maxHp - r.hp))}</span>` +
+          `<span class="sq-score">${r.score}</span></div>`,
+      )
+      .join('')
+  }
+
+  addFeedLine(html: string): void {
+    const line = document.createElement('div')
+    line.className = 'feed-line'
+    line.innerHTML = html
+    this.feed.prepend(line)
+    while (this.feed.children.length > 4) this.feed.lastChild?.remove()
+    window.setTimeout(() => line.remove(), 5000)
+  }
+
+  setPickStatus(text: string): void {
+    this.pickStatus.textContent = text
+  }
+
+  showLeaderboard(data: Leaderboard | null): void {
+    this.start.classList.add('hidden')
+    this.leaderboardPanel.classList.remove('hidden')
+    const teams = el('lb-teams')
+    const soldiers = el('lb-soldiers')
+    if (!data) {
+      teams.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
+      soldiers.innerHTML = ''
+      return
+    }
+    teams.innerHTML =
+      data.teams.length === 0
+        ? '<div class="lb-empty">No squads on record yet. Be the first.</div>'
+        : data.teams
+            .map(
+              (t) =>
+                `<div class="lb-row"><span><b>${t.wavesCleared} waves</b> · ${t.players
+                  .map((p) => p.username)
+                  .join(', ')}</span><span class="lb-sub">${Math.round(t.durationS / 60)} min</span></div>`,
+            )
+            .join('')
+    soldiers.innerHTML =
+      data.soldiers.length === 0
+        ? '<div class="lb-empty">No soldiers on record yet.</div>'
+        : data.soldiers
+            .map(
+              (s) =>
+                `<div class="lb-row"><span><b>${s.score}</b> · ${s.username}</span>` +
+                `<span class="lb-sub">${s.kills} kills · wave ${s.wavesCleared}</span></div>`,
+            )
+            .join('')
+  }
+
+  hideLeaderboard(): void {
+    this.leaderboardPanel.classList.add('hidden')
+  }
+
+  get leaderboardOpen(): boolean {
+    return !this.leaderboardPanel.classList.contains('hidden')
   }
 
   showDeath(game: GameState): void {

@@ -128,12 +128,16 @@ export interface CoopWorld {
   results: MatchResults | null
 }
 
-function musterPos(index: number, count: number): Vector3 {
+export function musterPos(index: number, count: number): Vector3 {
   return new Vector3(MUSTER.x + (index - (count - 1) / 2) * 2, EYE_HEIGHT, MUSTER.z)
 }
 
-export function createCoopWorld(seed: string, playerIds: string[]): CoopWorld {
-  const arena = generateCity(createRng(hashSeed(`${seed}:city`)))
+/**
+ * citySeed defaults to seed but may be pinned separately: a room keeps one city across
+ * rematches (clients pre-build it from the room code) while waves/offers vary per match.
+ */
+export function createCoopWorld(seed: string, playerIds: string[], citySeed = seed): CoopWorld {
+  const arena = generateCity(createRng(hashSeed(`${citySeed}:city`)))
   const w: CoopWorld = {
     seed,
     phase: 'playing',
@@ -545,6 +549,7 @@ export interface CoopSnapshot {
     kills: number
     combo: number
     blades: number
+    bladeHp: number
     picked: boolean
   }[]
   results: MatchResults | null
@@ -591,6 +596,7 @@ export function coopSnapshot(w: CoopWorld): CoopSnapshot {
       kills: p.score.kills,
       combo: p.score.combo,
       blades: p.body.blades,
+      bladeHp: p.body.bladeHp,
       picked: p.picked,
     })),
     results: w.results,

@@ -268,6 +268,82 @@
         background: radial-gradient(circle at 35% 30%, var(--brass-bright), #7a5c22);
         border: 1px solid #241b0e; transform: rotate(45deg);
       }
+
+      /* co-op: enlistment form, lobby roster, squad HUD, mission report */
+      .coop-rows { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+      .coop-rows input[type='text'], .coop-rows input[type='password'] {
+        pointer-events: auto; width: 320px; padding: 13px 18px;
+        font-family: var(--body-font); font-size: 19px; color: var(--parchment);
+        background: linear-gradient(180deg, #1c1610f0, #120d08f6);
+        border: 1px solid var(--brass); outline: none; letter-spacing: 1px;
+        box-shadow: inset 0 0 18px #000c;
+      }
+      .coop-rows input:focus { border-color: var(--brass-bright); box-shadow: inset 0 0 18px #000c, 0 0 10px #c1121f44; }
+      .coop-error { color: #ff8a7a; font-size: 17px; min-height: 24px; text-shadow: 0 1px 2px #000; }
+      .coop-note { color: var(--parchment); opacity: 0.7; font-size: 16px; }
+      .coop-note b { color: var(--brass-bright); font-weight: 600; }
+      .join-row { display: flex; gap: 12px; align-items: stretch; }
+      .join-row input { width: 220px !important; text-transform: uppercase; }
+      .join-row button { min-width: 150px !important; padding: 13px 24px; font-size: 16px; }
+      .textlink { pointer-events: auto; cursor: pointer; background: none !important; border: none; filter: none !important;
+        font-family: var(--header-font); font-size: 13px !important; letter-spacing: 3px; color: #9b8a68 !important;
+        min-width: 0 !important; padding: 6px 10px !important; text-decoration: underline; text-underline-offset: 4px; }
+      .textlink::before { display: none; }
+      .textlink:hover { color: var(--brass-bright) !important; transform: none !important; }
+
+      .roster { display: flex; flex-direction: column; gap: 10px; min-width: 460px; }
+      .roster-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 18px;
+        padding: 13px 22px; position: relative;
+        background: linear-gradient(180deg, #241d15eb, #120d08f4);
+        border: 1px solid #6b5124; box-shadow: inset 0 0 20px #000a;
+      }
+      .roster-row .r-name { font-family: var(--header-font); font-size: 19px; font-weight: 700; letter-spacing: 3px; color: var(--parchment); text-transform: uppercase; }
+      .roster-row .r-name .you { color: var(--brass-bright); font-size: 13px; letter-spacing: 2px; }
+      .roster-row .r-state { font-family: var(--header-font); font-size: 13px; letter-spacing: 3px; color: #8f8471; }
+      .roster-row.ready .r-state { color: #7fe08f; text-shadow: 0 0 8px #7fe08f66; }
+      .roster-row .r-crown { color: var(--brass-bright); margin-right: 8px; }
+
+      #squad { position: absolute; left: 24px; top: 20px; display: flex; flex-direction: column; gap: 6px; }
+      #squad .sq-row { display: flex; gap: 10px; align-items: baseline; font-family: var(--header-font); font-size: 14px; letter-spacing: 2px; text-shadow: 0 1px 3px #000c; }
+      #squad .sq-name { color: var(--parchment); text-transform: uppercase; min-width: 110px; }
+      #squad .sq-row.me .sq-name { color: var(--brass-bright); }
+      #squad .sq-row.dead { opacity: 0.45; }
+      #squad .sq-hearts { color: #ff5566; font-size: 12px; letter-spacing: 2px; }
+      #squad .sq-score { color: #ffd57a; }
+
+      #feed { position: absolute; right: 24px; top: 118px; text-align: right; display: flex; flex-direction: column; gap: 4px; }
+      #feed .feed-line { font-size: 15px; color: var(--parchment); opacity: 0.9; text-shadow: 0 1px 3px #000c; animation: feedfade 5s forwards; }
+      #feed .feed-line b { color: #ffd57a; font-weight: 600; }
+      @keyframes feedfade { 0% { opacity: 0.95 } 75% { opacity: 0.8 } 100% { opacity: 0 } }
+
+      #pick-status { font-family: var(--header-font); font-size: 17px; letter-spacing: 3px; color: var(--brass-bright); min-height: 24px; }
+
+      .result-rows { display: flex; flex-direction: column; gap: 10px; min-width: 540px; }
+      .result-row {
+        display: grid; grid-template-columns: 44px 1fr auto auto; gap: 18px; align-items: center;
+        padding: 14px 24px; background: linear-gradient(180deg, #241d15eb, #120d08f4);
+        border: 1px solid #6b5124; box-shadow: inset 0 0 20px #000a;
+        font-family: var(--header-font);
+      }
+      .result-row.mvp { border-color: var(--brass-bright); box-shadow: inset 0 0 20px #000a, 0 0 14px #c1121f55; }
+      .result-row .rr-rank { font-size: 20px; color: #8f8471; }
+      .result-row.mvp .rr-rank { color: var(--brass-bright); }
+      .result-row .rr-name { font-size: 19px; font-weight: 700; letter-spacing: 3px; color: var(--parchment); text-transform: uppercase; text-align: left; }
+      .result-row .rr-stats { font-size: 14px; letter-spacing: 2px; color: #b9ac90; }
+      .result-row .rr-score { font-size: 22px; font-weight: 700; color: #ffd57a; }
+
+      .lb-cols { display: flex; gap: 34px; align-items: flex-start; }
+      .lb-col h3 { font-family: var(--header-font); font-size: 17px; letter-spacing: 4px; color: var(--brass-bright); margin-bottom: 12px; text-transform: uppercase; }
+      .lb-rows { display: flex; flex-direction: column; gap: 8px; min-width: 360px; }
+      .lb-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 18px;
+        background: linear-gradient(180deg, #241d15eb, #120d08f4); border: 1px solid #4d3d1f;
+        font-size: 16px; color: var(--parchment); }
+      .lb-row b { color: #ffd57a; font-family: var(--header-font); letter-spacing: 1px; }
+      .lb-row .lb-sub { color: #9b8a68; font-size: 13px; letter-spacing: 1px; }
+      .lb-empty { color: #9b8a68; font-size: 16px; padding: 12px; }
+
+      body.coop .solo-only { display: none !important; }
     </style>
   </head>
   <body>
@@ -289,6 +365,8 @@
         <div id="focus-bar" class="bar"><div id="focus-fill" class="fill"></div></div>
       </div>
       <canvas id="minimap" width="170" height="170"></canvas>
+      <div id="squad"></div>
+      <div id="feed"></div>
       <div id="focus-vignette"></div>
       <div id="speedo"></div>
       <div id="banner" class="aot-title"></div>
@@ -306,11 +384,79 @@
         </div>
         <div class="menu-col">
           <button id="start-btn" class="primary">Deploy Your Soldier</button>
-          <button id="restart-btn" class="hidden">Restart Run</button>
-          <button id="modes-btn">Game Mode</button>
+          <button id="restart-btn" class="hidden solo-only">Restart Run</button>
+          <button id="coop-btn" class="solo-only">Play With Friends</button>
+          <button id="modes-btn" class="solo-only">Game Mode</button>
+          <button id="leaderboard-btn">Leaderboard</button>
           <button id="settings-btn">Settings</button>
         </div>
         <div class="seedline" id="seed-line"></div>
+      </div>
+
+      <div id="coop" class="overlay hidden">
+        <h2 class="aot-title">Play With Friends</h2>
+        <div id="coop-auth" class="hidden">
+          <div class="sub">Enlist a soldier name to muster with your squad. No email, just a handle and a password.</div>
+          <div class="coop-rows">
+            <input id="coop-username" type="text" maxlength="16" placeholder="Soldier handle" autocomplete="username" />
+            <input id="coop-password" type="password" placeholder="Password" autocomplete="current-password" />
+            <div class="coop-error" id="coop-auth-error"></div>
+            <button id="coop-register" class="primary">Enlist</button>
+            <button id="coop-login">Sign In</button>
+          </div>
+        </div>
+        <div id="coop-room" class="hidden">
+          <div class="sub">Open a lobby and share the code, or join a friend's squad. Up to four soldiers per district.</div>
+          <div class="coop-rows">
+            <div class="coop-note">Signed in as <b id="coop-whoami"></b></div>
+            <button id="coop-create" class="primary">Create Lobby</button>
+            <div class="join-row">
+              <input id="coop-join-code" type="text" maxlength="12" placeholder="TROST-7K" />
+              <button id="coop-join">Join</button>
+            </div>
+            <div class="coop-error" id="coop-room-error"></div>
+            <button id="coop-signout" class="textlink">Sign out</button>
+          </div>
+        </div>
+        <button id="coop-back">Back</button>
+      </div>
+
+      <div id="lobby" class="overlay hidden">
+        <h2 class="aot-title" id="lobby-title">Lobby</h2>
+        <div class="sub" id="lobby-share"></div>
+        <div class="roster" id="lobby-roster"></div>
+        <div class="coop-error" id="lobby-status"></div>
+        <div class="menu-col">
+          <button id="lobby-ready" class="primary">Ready</button>
+          <button id="lobby-start" class="hidden">Begin the Mission</button>
+          <button id="lobby-leave">Leave Squad</button>
+        </div>
+      </div>
+
+      <div id="results" class="overlay hidden">
+        <h2 class="aot-title">Mission Report</h2>
+        <div class="sub" id="results-sub"></div>
+        <div class="result-rows" id="result-rows"></div>
+        <div class="menu-col">
+          <button id="results-rematch" class="primary hidden">Rematch</button>
+          <button id="results-wait" class="coop-note hidden textlink">Waiting for the squad leader…</button>
+          <button id="results-leave">Leave Squad</button>
+        </div>
+      </div>
+
+      <div id="leaderboard" class="overlay hidden">
+        <h2 class="aot-title">Hall of the Fallen</h2>
+        <div class="lb-cols">
+          <div class="lb-col">
+            <h3>Longest Stands · Squads</h3>
+            <div class="lb-rows" id="lb-teams"></div>
+          </div>
+          <div class="lb-col">
+            <h3>Deadliest Soldiers</h3>
+            <div class="lb-rows" id="lb-soldiers"></div>
+          </div>
+        </div>
+        <button id="leaderboard-back">Back</button>
       </div>
 
       <div id="modes" class="overlay hidden">
@@ -345,6 +491,7 @@
       <div id="upgrade" class="overlay hidden">
         <h2 class="aot-title">Wave Cleared</h2>
         <div class="sub">Choose one field modification</div>
+        <div id="pick-status"></div>
         <div id="upgrade-cards"></div>
       </div>
 

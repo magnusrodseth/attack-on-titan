@@ -59,6 +59,7 @@ export class MatchRoom extends Server<Env> {
   private acc = 0
   private lastSnap = 0
   private matchWritten = false
+  private matchIndex = 0
 
   async onConnect(conn: Connection, ctx: ConnectionContext): Promise<void> {
     const token = new URL(ctx.request.url).searchParams.get('token') ?? ''
@@ -162,8 +163,12 @@ export class MatchRoom extends Server<Env> {
   private startMatch(): void {
     const roster = [...this.members.values()].map((m) => m.handle)
     this.rosterIds = new Map([...this.members.values()].map((m) => [m.handle, m.userId]))
-    this.seed = `${this.name}-${crypto.randomUUID().slice(0, 8)}`.toLowerCase()
-    this.world = createCoopWorld(this.seed, roster)
+    // the city is pinned to the room code (clients pre-build it from the URL);
+    // the match seed varies per rematch so waves and offers stay fresh
+    this.matchIndex += 1
+    const citySeed = `coop-${this.name.toLowerCase()}`
+    this.seed = `${citySeed}#${this.matchIndex}`
+    this.world = createCoopWorld(this.seed, roster, citySeed)
     for (const member of this.members.values()) member.spectator = false
     this.phase = 'match'
     this.matchWritten = false

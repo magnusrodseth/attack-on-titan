@@ -77,6 +77,30 @@ export type ErrorCode =
   | 'not-creator' // start/rematch from someone else
   | 'bad-message' // unparseable or wrong version
 
+// ---------------------------------------------------------------------------
+// HTTP API shapes (register/login/leaderboard)
+// ---------------------------------------------------------------------------
+
+export interface LeaderboardTeam {
+  wavesCleared: number
+  durationS: number
+  endedAt: string
+  players: { username: string; score: number; mvp: boolean }[]
+}
+
+export interface LeaderboardSoldier {
+  username: string
+  score: number
+  kills: number
+  wavesCleared: number
+  endedAt: string
+}
+
+export interface Leaderboard {
+  teams: LeaderboardTeam[]
+  soldiers: LeaderboardSoldier[]
+}
+
 export const MAX_ROOM_PLAYERS = 4
 
 /** Room codes read like Wall districts: TROST-7K. Generated client-side on Create Lobby. */

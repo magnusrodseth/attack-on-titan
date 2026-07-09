@@ -1,12 +1,20 @@
 import { PerspectiveCamera, Vector3, WebGLRenderer } from 'three'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
+import { CoopSession } from './coopSession'
 import { Hud } from './hud'
+import type { Account } from './net/client'
+import { clearAccount, fetchLeaderboard, loadAccount, login, register } from './net/client'
+import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { buildScene } from './render/scene'
+import { SoldierPool } from './render/soldiers'
 import { TitanPool } from './render/titans'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
+import type { CoopEvent } from './sim/coop'
+import { musterPos } from './sim/coop'
+import { stepCoopClient } from './sim/coopClient'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, startGame, stepGame } from './sim/game'
 import { DEFAULT_MODE_ID, GAME_MODES } from './sim/modes'
@@ -14,8 +22,11 @@ import type { SavedRun } from './sim/persist'
 import { restoreRun, serializeRun } from './sim/persist'
 import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
-import { neutralInput } from './sim/player'
+import { createPlayer, neutralInput } from './sim/player'
+import { releaseHook } from './sim/rope'
+import { createScore } from './sim/score'
 import { anklePos, napeCenter } from './sim/titan'
+import { UPGRADE_POOL, applyUpgrade } from './sim/upgrades'
 
 function dailySeed(): string {
   const d = new Date()
@@ -45,8 +56,12 @@ function loadRunSave(): SavedRun | null {
 const runSave = loadRunSave()
 
 const urlParams = new URLSearchParams(location.search)
-const seed = urlParams.get('seed') ?? runSave?.seed ?? dailySeed()
-const modeId = urlParams.get('mode') ?? runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID
+// ?lobby=CODE means co-op: the room code pins the city seed so every client (and the
+// server) builds the identical district before the match even starts
+const lobbyCode = normalizeRoomCode(urlParams.get('lobby') ?? '')
+const coopMode = lobbyCode !== null
+const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
+const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 const game = createGame(seed, undefined, modeId)
 const { scene, updateScenery } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
@@ -60,6 +75,7 @@ document.body.appendChild(renderer.domElement)
 
 scene.add(camera) // camera children (blade viewmodel) need the camera in the scene graph
 const titanPool = new TitanPool(scene)
+const soldierPool = new SoldierPool(scene)
 const effects = new Effects(scene)
 const hud = new Hud(seed)
 const blade = new BladeView(camera)
@@ -111,11 +127,15 @@ document.addEventListener('pointerlockchange', () => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Escape') return
-  if (hud.settingsOpen || hud.modesOpen) {
+  if (hud.settingsOpen || hud.modesOpen || hud.leaderboardOpen || (hud.coopOpen && !coopMode)) {
     // Escape backs out of a panel to the menu underneath instead of resuming
     hud.hideSettings()
     hud.hideModes()
-    hud.showStart(game.phase === 'playing')
+    hud.hideLeaderboard()
+    if (!coopMode) {
+      hud.hideCoop()
+      hud.showStart(game.phase === 'playing')
+    }
     return
   }
   if (game.phase !== 'playing' || document.pointerLockElement === renderer.domElement) return
@@ -254,6 +274,10 @@ hud.onRestart = () => {
 hud.onPickUpgrade = (id) => {
   audio.init()
   audio.chime()
+  if (coopMode) {
+    coop?.sendPick(id) // the server confirms with an upgradePicked event
+    return
+  }
   chooseUpgrade(game, id)
   prevPhase = game.phase
   hud.hideUpgrades()
@@ -265,6 +289,7 @@ hud.onPickUpgrade = (id) => {
 // --- run persistence: refreshing the page loses nothing --------------------
 
 function persistRun(): void {
+  if (coopMode) return // co-op state lives on the server, not in the solo save slot
   if (game.phase !== 'playing' && game.phase !== 'upgrading') return
   try {
     localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun(game, { yaw, pitch })))
@@ -286,7 +311,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') persistRun()
 })
 
-const restored = runSave !== null && restoreRun(runSave, game)
+const restored = !coopMode && runSave !== null && restoreRun(runSave, game)
 if (restored) {
   if (runSave?.view) {
     yaw = runSave.view.yaw
@@ -298,8 +323,329 @@ if (restored) {
   } else {
     hud.showStart(true) // straight back to the paused run: one click resumes
   }
-} else {
+} else if (!coopMode) {
   hud.showStart()
+}
+
+// --- co-op: lobby flow, match mirrors, server events -------------------------
+
+let coop: CoopSession | null = null
+let spectating = false
+let coopInputTimer = 0
+const COOP_ERROR_KEY = 'aot-coop-error'
+
+function coopJoinUrl(code: string): string {
+  return `${location.origin}${location.pathname}?lobby=${encodeURIComponent(code)}`
+}
+
+function gotoLobby(code: string | null): void {
+  const params = new URLSearchParams(location.search)
+  params.delete('seed') // a lobby's city comes from its code
+  if (code) params.set('lobby', code)
+  else params.delete('lobby')
+  location.search = params.toString()
+}
+
+function connectCoop(account: Account): void {
+  if (!lobbyCode) return
+  hud.hideCoop()
+  hud.setCoopUi(true)
+  coop = new CoopSession(lobbyCode, account, {
+    onLobby(lobby) {
+      // never pop the lobby overlay over a running fight I am part of
+      if (lobby.phase === 'lobby' || !(coop?.playing && lobby.phase === 'match')) {
+        if (lobby.phase !== 'results') hud.showLobby(lobby, coopJoinUrl(lobby.code))
+      }
+      if (lobby.phase === 'lobby') {
+        hud.hideResults()
+        spectating = false
+        soldierPool.clear()
+        game.titans = []
+        hud.updateSquad([])
+      }
+    },
+    onMatchStart(roster) {
+      startCoopMatch(roster)
+    },
+    onEvents(events) {
+      handleCoopEvents(events)
+    },
+    onResults(results) {
+      document.exitPointerLock()
+      hud.hideUpgrades()
+      hud.setPickStatus('')
+      hud.hideLobby()
+      hud.showResults(results, coop?.me ?? '', coop?.isCreator ?? false)
+    },
+    onFatal(message) {
+      try {
+        sessionStorage.setItem(COOP_ERROR_KEY, message)
+      } catch {
+        // the message is a nicety; losing it is fine
+      }
+      gotoLobby(null)
+    },
+  })
+}
+
+function startCoopMatch(roster: string[]): void {
+  hud.hideLobby()
+  hud.hideResults()
+  hud.hideUpgrades()
+  hud.hideStart()
+  hud.setPickStatus('')
+  pauseShown = false
+  spectating = false
+  soldierPool.clear()
+  game.titans = []
+  game.phase = 'playing'
+  game.wave = 1
+  game.time = 0
+  game.score = createScore()
+  game.offers = []
+  game.player = createPlayer()
+  const index = Math.max(0, roster.indexOf(coop?.me ?? ''))
+  game.player.pos.copy(musterPos(index, Math.max(1, roster.length)))
+  prevPhase = game.phase
+  audio.init()
+  if (coop?.playing) {
+    hud.showBanner('Wave 1')
+    lockPointer()
+  }
+}
+
+/** Local intents from stepCoopClient: swing/whoosh instantly, let the server judge. */
+function handleCoopIntents(events: GameEvent[]): void {
+  const passthrough: GameEvent[] = []
+  for (const event of events) {
+    if (event.type === 'coopSlash') {
+      blade.slash()
+      audio.play(SLASHES, { volume: 0.55 })
+      coop?.sendSlash()
+    } else if (event.type === 'coopResupply') {
+      coop?.sendResupply()
+    } else {
+      passthrough.push(event)
+    }
+  }
+  handleEvents(passthrough)
+}
+
+function handleCoopEvents(events: CoopEvent[]): void {
+  if (!coop) return
+  const me = coop.me
+  for (const event of events) {
+    switch (event.type) {
+      case 'slash': {
+        if (event.playerId !== me) break
+        if (event.hit && event.napeHit) {
+          hud.slashFlash()
+          effects.addShake(0.12)
+          audio.play('slice', { volume: 0.9 })
+        } else if (event.hit) {
+          effects.addShake(0.06)
+          audio.thud(0.3)
+          audio.play(FLINCHES, { volume: 0.4 })
+        }
+        break
+      }
+      case 'kill': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        const aberrant = event.kind === 'abnormal'
+        if (titan) {
+          const nape = napeCenter(titan)
+          effects.burst(nape, 0xd42b35, aberrant ? 52 : 40)
+          effects.burst(nape.clone().add(new Vector3(0, 2.2, 0)), 0xbfc7cc, 26)
+          audio.playAt('death-groan', titan.pos.distanceTo(game.player.pos), { volume: 1.2 })
+        }
+        if (event.playerId === me) {
+          effects.addShake(aberrant ? 0.6 : 0.45)
+          hitstop = aberrant ? 0.14 : 0.09
+          audio.killHit(aberrant ? 0.85 : 0.65)
+          if (audio.has('aberrant-slain')) {
+            audio.play('aberrant-slain', { volume: aberrant ? 0.95 : 0.4, rate: aberrant ? 1 : 1.25 })
+          }
+          if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
+          hud.popPoints(event.points, event.oneCut, event.heartGained)
+        } else {
+          audio.killHit(0.25)
+          hud.addFeedLine(`<b>${event.playerId}</b> slew ${aberrant ? 'an aberrant' : 'a titan'} +${event.points}`)
+        }
+        break
+      }
+      case 'ankleSliced': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        if (titan) effects.burst(anklePos(titan, event.side), 0xd42b35, 18)
+        if (event.playerId === me) {
+          hud.popText(event.remaining > 0 ? 'Ankle!' : 'Both Ankles!')
+          audio.play('slice', { volume: 0.7, rate: 1.25 })
+          effects.addShake(0.15)
+        }
+        break
+      }
+      case 'crippled': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        if (titan) audio.playAt(ROARS, titan.pos.distanceTo(game.player.pos), { volume: 1.4, rate: 0.75 })
+        hud.showBanner('Crippled — Take the Nape!', 1800)
+        break
+      }
+      case 'bladeBroke':
+        if (event.playerId === me) {
+          hud.showBanner('Blade Shattered', 900)
+          audio.snap()
+        }
+        break
+      case 'playerHit': {
+        if (event.playerId !== me) break
+        game.player.vel.x += event.knockback.x
+        game.player.vel.y += event.knockback.y
+        game.player.vel.z += event.knockback.z
+        game.player.invulnTimer = 1.2
+        hud.showHit()
+        effects.addShake(0.6)
+        audio.thud(0.9)
+        audio.play(GRUNTS, { volume: 0.8, rate: 0.7 })
+        break
+      }
+      case 'playerDied':
+        if (event.playerId === me) {
+          spectating = true
+          for (const hook of game.player.hooks) releaseHook(hook)
+          document.exitPointerLock()
+          effects.addShake(1)
+          audio.play('player-death', { volume: 0.7, rate: 0.85 })
+          hud.showBanner('Devoured — Watching the Squad', 2600)
+        } else {
+          hud.addFeedLine(`<b>${event.playerId}</b> was devoured`)
+        }
+        break
+      case 'respawn':
+        if (event.playerId === me) {
+          spectating = false
+          game.player.pos.set(event.pos.x, event.pos.y, event.pos.z)
+          game.player.vel.set(0, 0, 0)
+          hud.showBanner('Back in the Fight', 1600)
+          lockPointer()
+        } else {
+          hud.addFeedLine(`<b>${event.playerId}</b> returned to the fight`)
+        }
+        break
+      case 'resupply':
+        if (event.playerId === me) {
+          game.player.gas = game.player.config.maxGas
+          game.player.canisters = game.player.config.gasCanisters
+          hud.showBanner('Resupplied', 900)
+          audio.refill()
+        }
+        break
+      case 'waveClear':
+        hud.showBanner(`Wave ${event.wave} Cleared  +${event.bonus}`, 2400)
+        audio.chime()
+        break
+      case 'offers': {
+        if (event.playerId !== me || !coop.playing) break
+        document.exitPointerLock()
+        const offers = event.upgradeIds
+          .map((id) => UPGRADE_POOL.find((u) => u.id === id))
+          .filter((u): u is NonNullable<typeof u> => u !== undefined)
+        hud.hideStart()
+        pauseShown = false
+        hud.showUpgrades(offers)
+        break
+      }
+      case 'upgradePicked':
+        if (event.playerId === me) {
+          applyUpgrade(game.player, event.upgradeId) // movement config; hp/blades mirror the server
+          hud.showUpgrades([])
+          hud.setPickStatus('Waiting for the squad…')
+        }
+        break
+      case 'waveStart':
+        hud.hideUpgrades()
+        hud.setPickStatus('')
+        hud.showBanner(`Wave ${event.wave}`)
+        if (coop.playing && !spectating) lockPointer()
+        break
+      case 'teamWipe':
+        effects.addShake(1)
+        audio.boom()
+        break
+    }
+  }
+}
+
+if (coopMode) {
+  hud.setCoopUi(true)
+  hud.hideStart()
+  const account = loadAccount()
+  if (account) connectCoop(account)
+  else hud.showCoop('auth')
+} else {
+  try {
+    const coopError = sessionStorage.getItem(COOP_ERROR_KEY)
+    if (coopError) {
+      sessionStorage.removeItem(COOP_ERROR_KEY)
+      const account = loadAccount()
+      hud.showCoop(account ? 'room' : 'auth', account?.username ?? '')
+      hud.coopError(coopError, account ? 'room' : 'auth')
+    }
+  } catch {
+    // sessionStorage unavailable: skip the notice
+  }
+}
+
+hud.onOpenCoop = () => {
+  const account = loadAccount()
+  hud.showCoop(account ? 'room' : 'auth', account?.username ?? '')
+}
+hud.onCloseCoop = () => {
+  hud.hideCoop()
+  if (coopMode) gotoLobby(null)
+  else hud.showStart(game.phase === 'playing')
+}
+hud.onAuth = (mode, username, password) => {
+  const request = mode === 'register' ? register(username, password) : login(username, password)
+  void request.then((result) => {
+    if (!result.ok) {
+      hud.coopError(result.error, 'auth')
+      return
+    }
+    if (coopMode) connectCoop(result.account)
+    else hud.showCoop('room', result.account.username)
+  })
+}
+hud.onSignOut = () => {
+  clearAccount()
+  hud.showCoop('auth')
+}
+hud.onCreateLobby = () => gotoLobby(generateRoomCode())
+hud.onJoinLobby = (raw) => {
+  const code = normalizeRoomCode(raw)
+  if (!code) {
+    hud.coopError('Codes look like TROST-7K', 'room')
+    return
+  }
+  gotoLobby(code)
+}
+hud.onReadyToggle = () => {
+  const meNow = coop?.lobby?.players.find((p) => p.id === coop?.me)
+  coop?.sendReady(!(meNow?.ready ?? false))
+}
+hud.onStartMatch = () => coop?.sendStart()
+hud.onLeaveLobby = () => {
+  coop?.leave()
+  gotoLobby(null)
+}
+hud.onRematch = () => coop?.sendRematch()
+hud.onOpenLeaderboard = () => {
+  hud.showLeaderboard(null)
+  void fetchLeaderboard().then((data) => {
+    if (hud.leaderboardOpen) hud.showLeaderboard(data)
+  })
+}
+hud.onCloseLeaderboard = () => {
+  hud.hideLeaderboard()
+  if (!coopMode) hud.showStart(game.phase === 'playing')
 }
 
 // --- events from the sim ----------------------------------------------------
@@ -425,9 +771,56 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(now - last, 100) / 1000
   last = now
   const locked = document.pointerLockElement === renderer.domElement
-  const simActive = game.phase === 'playing' && (locked || debug.autopilot)
+  const coopBattle = coop !== null && coop.phase === 'match'
+  const piloting = coopBattle && (coop?.playing ?? false) && !spectating
+  const simActive = !coopMode && game.phase === 'playing' && (locked || debug.autopilot)
+  const inAction = coopBattle ? piloting && locked : simActive
 
-  if (simActive) {
+  if (coopBattle && coop) {
+    const intermission = coop.buf.b?.phase === 'upgrading'
+    if (piloting && locked) {
+      if (pauseShown) {
+        hud.hideStart()
+        pauseShown = false
+      }
+      const input = buildInput()
+      if (hitstop > 0) hitstop -= dt
+      else acc += dt
+      while (acc >= SIM_DT) {
+        stepCoopClient(game, input, SIM_DT)
+        handleCoopIntents(game.events)
+        acc -= SIM_DT
+      }
+    } else if (piloting && !intermission && !debug.silent && !pauseShown) {
+      hud.showStart(true)
+      pauseShown = true
+    }
+    coop.syncFrame(game, now, dt)
+    game.wave = coop.buf.b?.wave ?? game.wave
+    soldierPool.sync(coop.soldiers, dt)
+    coopInputTimer += dt
+    if (piloting && coopInputTimer >= 0.05) {
+      coopInputTimer = 0
+      coop.sendInput(game, yaw, pitch)
+    }
+    const snapPlayers = (coop.buf.b?.players ?? []).filter((p) => p.connected)
+    hud.updateSquad(
+      snapPlayers.map((p) => ({
+        id: p.id,
+        hp: p.hp,
+        maxHp: p.maxHp,
+        score: p.score,
+        alive: p.alive,
+        me: p.id === coop?.me,
+      })),
+    )
+    if (intermission && piloting) {
+      const meSnap = snapPlayers.find((p) => p.id === coop?.me)
+      hud.setPickStatus(
+        meSnap?.picked ? 'Waiting for the squad…' : `${Math.ceil(coop.myPickTimer())} s to choose`,
+      )
+    }
+  } else if (simActive) {
     if (pauseShown) {
       hud.hideStart()
       pauseShown = false
@@ -440,7 +833,7 @@ renderer.setAnimationLoop(() => {
       handleEvents(game.events)
       acc -= SIM_DT
     }
-  } else if (game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
+  } else if (!coopMode && game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
     hud.showStart(true)
     pauseShown = true
   }
@@ -465,7 +858,17 @@ renderer.setAnimationLoop(() => {
 
   camera.rotation.y = yaw
   camera.rotation.x = pitch
-  camera.position.copy(game.player.pos)
+  if (coopBattle && coop && (spectating || !coop.playing)) {
+    // dead or late to the muster: orbit a living teammate instead of a corpse
+    const target = coop.livingTeammate()
+    if (target) {
+      const dir = camera.getWorldDirection(new Vector3())
+      camera.position.copy(target.pos).addScaledVector(dir, -9)
+      camera.position.y += 2.5
+    }
+  } else {
+    camera.position.copy(game.player.pos)
+  }
   const speed = game.player.vel.length()
   const targetFov = 75 + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
   camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8)
@@ -478,9 +881,9 @@ renderer.setAnimationLoop(() => {
   effects.syncRopes(game.player, camera, dt)
   effects.update(dt, camera, game.player.vel)
 
-  audio.setWind(simActive ? speed : 0)
+  audio.setWind(inAction ? speed : 0)
   audio.setMuffled(game.focusActive)
-  audio.setDucked((game.phase === 'playing' && !simActive && !debug.silent) || game.phase === 'menu')
+  audio.setDucked((game.phase === 'playing' && !inAction && !debug.silent) || game.phase === 'menu')
   hud.setFocusVignette(game.focusActive)
   minimap.update(game, yaw)
   // a crippled titan leaving that state alive has regenerated and risen
@@ -501,7 +904,7 @@ renderer.setAnimationLoop(() => {
   roarTimer -= dt
   if (roarTimer <= 0) {
     roarTimer = 4 + Math.random() * 6
-    if (simActive) {
+    if (inAction) {
       const alive = game.titans.filter((t) => t.hp > 0)
       const titan = alive[Math.floor(Math.random() * alive.length)]
       if (titan) {
@@ -614,5 +1017,25 @@ function snapshot() {
     if (partial.move) input.move.set(partial.move[0], 0, partial.move[1])
     for (let i = 0; i < ticks; i++) stepGame(game, input, SIM_DT)
     return snapshot()
+  },
+  coop() {
+    if (!coop) return { active: false as const, mode: coopMode }
+    return {
+      active: true as const,
+      mode: coopMode,
+      code: coop.code,
+      me: coop.me,
+      phase: coop.phase,
+      playing: coop.playing,
+      spectating,
+      roster: coop.roster,
+      lobby: coop.lobby,
+      results: coop.results,
+      snapshotTick: coop.buf.b?.tick ?? -1,
+      snapshotWave: coop.buf.b?.wave ?? 0,
+      titans: game.titans.length,
+      teammates: [...coop.soldiers.keys()],
+      squad: coop.buf.b?.players ?? [],
+    }
   },
 }
