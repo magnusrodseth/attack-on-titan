@@ -24,6 +24,15 @@ describe('registerKill', () => {
     expect(points).toBe(Math.round(100 * 1.25 * 1.5))
   })
 
+  it('pays 3x for a footballer, above the abnormal 1.75x', () => {
+    const s = createScore()
+    const star = registerKill(s, { speed: KILL_SPEED, airborne: false, oneCut: false, footballer: true }, KILL_SPEED)
+    expect(star).toBe(Math.round(100 * 3 * (1 + 0.25 * 0))) // first kill of the chain
+    const s2 = createScore()
+    const rare = registerKill(s2, { speed: KILL_SPEED, airborne: false, oneCut: false, abnormal: true }, KILL_SPEED)
+    expect(star).toBeGreaterThan(rare)
+  })
+
   it('builds a kill-chain multiplier', () => {
     const s = createScore()
     registerKill(s, { speed: KILL_SPEED, airborne: false, oneCut: false }, KILL_SPEED)

@@ -16,7 +16,9 @@ import {
   TubeGeometry,
   Vector3,
 } from 'three'
-import { makeLimb, makeWeakPoint, makeWeakPointMats } from './titans'
+import type { TitanState } from '../sim/titan'
+import type { Limb, TitanPuppet } from './titans'
+import { makeLimb, makeWeakPoint, makeWeakPointMats, TitanPoser } from './titans'
 
 /**
  * The two rare footballer titans from IDEAS.md: the Striker (Haaland homage, Norway home
@@ -85,6 +87,8 @@ export const KIT_DEFAULTS: Record<FigureKind, Record<string, string>> = {
 export interface FootballerFigure {
   kind: FigureKind
   group: Group
+  /** The body parts the shared TitanPoser drives when this figure walks as a live titan. */
+  puppet: TitanPuppet
   /** Restyle a KIT_DEFAULTS slot on the live figure: tints materials, repaints baked canvases. */
   setColor(slot: string, hex: string): void
   setHeight(h: number): void
@@ -133,6 +137,7 @@ export function buildFootballer(
       map: cloth(path, repeat),
       color: new Color(kit[name] ?? '#ffffff'),
       roughness,
+      transparent: true, // live titans dissolve on death, kit and all
     })
     ;(materialSlots[name] ??= []).push(material)
     return material
@@ -187,7 +192,7 @@ export function buildFootballer(
   }
 
   const clothImg = loadImage('/textures/soldier-cloth.jpg', paintJersey)
-  const chestMat = new MeshStandardMaterial({ map: jerseyTexture, roughness: 0.9 })
+  const chestMat = new MeshStandardMaterial({ map: jerseyTexture, roughness: 0.9, transparent: true })
 
   // --- baked head: the face photo feathered into the skin at the sphere front
   const headCanvas = document.createElement('canvas')
@@ -231,7 +236,7 @@ export function buildFootballer(
     headTexture.needsUpdate = true
   }
 
-  const headMat = new MeshStandardMaterial({ map: headTexture, roughness: 0.85 })
+  const headMat = new MeshStandardMaterial({ map: headTexture, roughness: 0.85, transparent: true })
   const skinImg = loadImage('/textures/skin.jpg', paintHead)
   const faceImg = loadImage(FACE_PHOTO[kind], paintHead)
 
@@ -342,16 +347,20 @@ export function buildFootballer(
   }
 
   // the nape marks them as titans: the same bloom-from-within as every other nape, plus
-  // heel tendons since they cripple like any aberrant
+  // heel tendons since they cripple like any aberrant; anchors hug the skull and calf
+  // surfaces so nothing floats
   const weakMats = makeWeakPointMats()
-  const nape = makeWeakPoint(weakMats, 0.34, 0.12)
-  nape.position.set(0, 0.36, -0.1)
+  const nape = makeWeakPoint(weakMats, 0.4, 0.14)
+  // anchored on the hair crown, not the skull: both cuts wear a shell over the nape
+  nape.position.set(0, 0.38, -0.093 * shape.z)
   torso.add(nape)
-  for (const limb of [legL, legR]) {
-    const heel = makeWeakPoint(weakMats, 0.19, 0.07)
-    heel.position.set(0, -0.175, -0.055)
+  const heelOf = (limb: Limb): Group => {
+    const heel = makeWeakPoint(weakMats, 0.22, 0.08)
+    heel.position.set(0, -0.175, -0.047)
     limb.lower.add(heel)
+    return heel
   }
+  const ankleGlows: [Group, Group] = [heelOf(legL), heelOf(legR)]
 
   group.scale.setScalar(height)
   paintJersey()
@@ -361,6 +370,22 @@ export function buildFootballer(
   return {
     kind,
     group,
+    puppet: {
+      group,
+      torso,
+      legL,
+      legR,
+      armL,
+      armR,
+      weakMats,
+      napeGlow: nape,
+      ankleGlows,
+      setFade(fade: number) {
+        for (const material of [...Object.values(materialSlots).flat(), chestMat, headMat]) {
+          material.opacity = fade
+        }
+      },
+    },
     setColor(slotName: string, hex: string) {
       kit[slotName] = hex
       for (const material of materialSlots[slotName] ?? []) material.color.set(hex)
@@ -373,5 +398,33 @@ export function buildFootballer(
     dispose(scene: Scene) {
       scene.remove(group)
     },
+  }
+}
+
+/**
+ * A footballer walking as a live titan: buildFootballer's body driven by the shared
+ * TitanPoser, so Haaland and Kane wander, chase, leap, swat, kneel, and dissolve exactly
+ * like the flesh titans do.
+ */
+export class FootballerVisual {
+  private readonly figure: FootballerFigure
+  private readonly poser: TitanPoser
+
+  constructor(t: TitanState) {
+    this.figure = buildFootballer(t.kind === 'captain' ? 'captain' : 'striker', {}, t.height)
+    this.poser = new TitanPoser(this.figure.puppet)
+    this.poser.syncPose(t, 0)
+  }
+
+  addTo(scene: Scene): void {
+    scene.add(this.figure.group)
+  }
+
+  removeFrom(scene: Scene): void {
+    scene.remove(this.figure.group)
+  }
+
+  syncPose(t: TitanState, dt: number): void {
+    this.poser.syncPose(t, dt)
   }
 }

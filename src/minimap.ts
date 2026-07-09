@@ -1,5 +1,6 @@
 import type { Arena } from './sim/city'
 import type { GameState } from './sim/game'
+import { isFootballer } from './sim/titan'
 
 const SIZE = 170
 const CENTER = SIZE / 2
@@ -59,7 +60,13 @@ export class Minimap {
       const y = CENTER + t.pos.z * this.scale
       const radius = 2.4 + t.height * 0.08
       ctx.fillStyle =
-        t.state === 'crippled' ? '#ffd257' : t.kind === 'abnormal' ? '#ff7a3c' : '#e0352b'
+        t.state === 'crippled'
+          ? '#ffd257'
+          : isFootballer(t.kind)
+            ? '#ffffff' // the matchday duo reads as stars on the map
+            : t.kind === 'abnormal'
+              ? '#ff7a3c'
+              : '#e0352b'
       ctx.beginPath()
       ctx.arc(x, y, radius, 0, Math.PI * 2)
       ctx.fill()

@@ -11,7 +11,7 @@ import { Effects } from './render/effects'
 import { FlashlightBeam } from './render/flashlight'
 import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
-import { TitanPool } from './render/titans'
+import { TitanPool } from './render/titanPool'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
 import { clockFraction } from './sim/daynight'
@@ -29,7 +29,8 @@ import type { InputState } from './sim/player'
 import { createPlayer, neutralInput } from './sim/player'
 import { releaseHook } from './sim/rope'
 import { createScore } from './sim/score'
-import { anklePos, napeCenter } from './sim/titan'
+import { anklePos, isFootballer, napeCenter } from './sim/titan'
+import { isMatchday } from './sim/waves'
 import { UPGRADE_POOL, applyUpgrade } from './sim/upgrades'
 
 function dailySeed(): string {
@@ -204,10 +205,21 @@ function beginRun(): void {
   if (game.phase === 'menu' || game.phase === 'dead') {
     startGame(game)
     prevPhase = game.phase
-    hud.showBanner(game.mode.id === 'waves' ? `Wave ${game.wave}` : game.mode.name)
+    if (game.mode.id === 'waves') announceWave(game.wave)
+    else hud.showBanner(game.mode.name)
     persistRun()
   }
   lockPointer()
+}
+
+/** Every 3rd wave the footballers walk: the banner and horn say so. */
+function announceWave(wave: number): void {
+  if (isMatchday(wave)) {
+    hud.showBanner(`Matchday · Wave ${wave}`, 3000)
+    audio.boom()
+  } else {
+    hud.showBanner(`Wave ${wave}`)
+  }
 }
 
 // settings: persisted sliders applied live to the audio buses and mouse look
@@ -276,7 +288,8 @@ hud.onRestart = () => {
   clearRun()
   startGame(game)
   prevPhase = game.phase
-  hud.showBanner(game.mode.id === 'waves' ? `Wave ${game.wave}` : game.mode.name)
+  if (game.mode.id === 'waves') announceWave(game.wave)
+  else hud.showBanner(game.mode.name)
   persistRun()
   lockPointer()
 }
@@ -290,7 +303,7 @@ hud.onPickUpgrade = (id) => {
   chooseUpgrade(game, id)
   prevPhase = game.phase
   hud.hideUpgrades()
-  hud.showBanner(`Wave ${game.wave}`)
+  announceWave(game.wave)
   persistRun()
   lockPointer()
 }
@@ -461,7 +474,8 @@ function handleCoopEvents(events: CoopEvent[]): void {
       }
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
-        const aberrant = event.kind === 'abnormal'
+        const star = isFootballer(event.kind)
+        const aberrant = event.kind === 'abnormal' || star
         if (titan) {
           const nape = napeCenter(titan)
           effects.burst(nape, 0xd42b35, aberrant ? 52 : 40)
@@ -475,11 +489,13 @@ function handleCoopEvents(events: CoopEvent[]): void {
           if (audio.has('aberrant-slain')) {
             audio.play('aberrant-slain', { volume: aberrant ? 0.95 : 0.4, rate: aberrant ? 1 : 1.25 })
           }
-          if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
+          if (star) hud.showBanner(event.kind === 'striker' ? 'Striker Sent Off!' : 'Captain Sent Off!', 2000)
+          else if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
           hud.popPoints(event.points, event.oneCut, event.heartGained)
         } else {
           audio.killHit(0.25)
-          hud.addFeedLine(`<b>${event.playerId}</b> slew ${aberrant ? 'an aberrant' : 'a titan'} +${event.points}`)
+          const prey = star ? `the ${event.kind === 'striker' ? 'Striker' : 'Captain'}` : aberrant ? 'an aberrant' : 'a titan'
+          hud.addFeedLine(`<b>${event.playerId}</b> slew ${prey} +${event.points}`)
         }
         break
       }
@@ -496,7 +512,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
       case 'crippled': {
         const titan = game.titans.find((t) => t.id === event.titanId)
         if (titan) audio.playAt(ROARS, titan.pos.distanceTo(game.player.pos), { volume: 1.4, rate: 0.75 })
-        hud.showBanner('Crippled — Take the Nape!', 1800)
+        hud.showBanner('Crippled · Take the Nape!', 1800)
         break
       }
       case 'bladeBroke':
@@ -574,7 +590,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
       case 'waveStart':
         hud.hideUpgrades()
         hud.setPickStatus('')
-        hud.showBanner(`Wave ${event.wave}`)
+        announceWave(event.wave)
         if (coop.playing && !spectating) lockPointer()
         break
       case 'teamWipe':
@@ -749,7 +765,8 @@ function handleEvents(events: GameEvent[]): void {
         break
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
-        const aberrant = event.kind === 'abnormal'
+        const star = isFootballer(event.kind)
+        const aberrant = event.kind === 'abnormal' || star
         if (titan) {
           const nape = napeCenter(titan)
           effects.burst(nape, 0xd42b35, aberrant ? 52 : 40) // blood
@@ -762,7 +779,8 @@ function handleEvents(events: GameEvent[]): void {
         if (audio.has('aberrant-slain')) {
           audio.play('aberrant-slain', { volume: aberrant ? 0.95 : 0.4, rate: aberrant ? 1 : 1.25 })
         }
-        if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
+        if (star) hud.showBanner(event.kind === 'striker' ? 'Striker Sent Off!' : 'Captain Sent Off!', 2000)
+        else if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
         hud.popPoints(event.points, event.oneCut, event.heartGained)
         break
       }
@@ -792,7 +810,7 @@ function handleEvents(events: GameEvent[]): void {
         if (titan) {
           audio.playAt(ROARS, titan.pos.distanceTo(game.player.pos), { volume: 1.4, rate: 0.75 })
         }
-        hud.showBanner('Crippled — Take the Nape!', 1800)
+        hud.showBanner('Crippled · Take the Nape!', 1800)
         effects.addShake(0.35)
         break
       }
