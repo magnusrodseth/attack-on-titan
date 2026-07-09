@@ -20,7 +20,7 @@ function dailySeed(): string {
 
 const seed = new URLSearchParams(location.search).get('seed') ?? dailySeed()
 const game = createGame(seed)
-const scene = buildScene(game.arena)
+const { scene, updateScenery } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
 camera.rotation.order = 'YXZ'
 
@@ -272,6 +272,7 @@ renderer.setAnimationLoop(() => {
   effects.applyShake(camera)
 
   titanPool.sync(game.titans, dt)
+  updateScenery(dt)
   blade.update(dt)
   effects.syncRopes(game.player, camera)
   effects.update(dt, camera, game.player.vel)

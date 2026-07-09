@@ -22,6 +22,7 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
 - [Progression](tickets/006-progression.md) — per-wave RNG streams keep seeds deterministic; score multipliers compose; bests persist.
 - [Renderer](tickets/007-renderer.md) — AoT district look per user reference images (instanced gabled row-houses, towers, 50m wall), procedural grinning pure titans, ropes/streaks/shake/FOV effects, full DOM HUD.
 - [Browser verification](tickets/008-browser-verify.md) — full loop verified live in Chrome via playwriter debug hook with screenshot evidence; 73 tests green, tsc clean, production build 144 kB gzip.
+- Controls v2 (user request, 2026-07-09) — Space jump, Shift horizontal boost; no reel button: holding a hook winches automatically at a speed-scaled rate with a ratcheting rope, releasing detaches. Velocity steering on slides/air fixed slipperiness. 3 spare gas canisters auto-swap on empty. Houses raised to 14-22m for bigger pendulum drops. First-person blade sweep viewmodel; volumetric rope cables; Cloister Black titles.
 - Audio (user request, 2026-07-09) — CC0 samples from OpenGameArt (creature SFX by rubberduck, sword whooshes by StarNinjas) for voiced sounds; procedural WebAudio for speed-tracked wind, gas hiss, impacts and chimes; distance-attenuated ambient titan roars. `src/audio.ts`, credits in README. Skipped a CC-BY pack to stay attribution-free at the asset level.
 
 ## Not yet specified
