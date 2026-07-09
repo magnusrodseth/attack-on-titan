@@ -58,6 +58,11 @@ describe('registerSpearKill', () => {
     expect(registerSpearKill(chained, {})).toBe(Math.round(75 * 1.25)) // combo of 1 carried in
     expect(chained.combo).toBe(2)
   })
+
+  it('pays the footballer jackpot tier, same as a blade kill', () => {
+    const s = createScore()
+    expect(registerSpearKill(s, { footballer: true })).toBe(75 * 3)
+  })
 })
 
 describe('stepScore', () => {

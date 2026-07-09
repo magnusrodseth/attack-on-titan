@@ -304,7 +304,10 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       g.events.push({ type: 'staggered', titanId })
     }
     for (const kill of blast.kills) {
-      const points = registerSpearKill(g.score, { abnormal: kill.kind === 'abnormal' })
+      const points = registerSpearKill(g.score, {
+        abnormal: kill.kind === 'abnormal',
+        footballer: isFootballer(kill.kind),
+      })
       p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
       const heartGained = p.hp < p.config.maxHp
       if (heartGained) p.hp += 1 // a kill is a kill: the heart comes back

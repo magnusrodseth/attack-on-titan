@@ -35,8 +35,8 @@ export function registerKill(s: ScoreState, info: KillInfo, killSpeed: number): 
  * A spear kill is guaranteed, so it pays a flat base below the blade's 100 and none of the
  * execution multipliers — only rarity (target choice) and the chain (spears can bridge one).
  */
-export function registerSpearKill(s: ScoreState, info: { abnormal?: boolean }): number {
-  const rareMult = info.abnormal ? 1.75 : 1
+export function registerSpearKill(s: ScoreState, info: { abnormal?: boolean; footballer?: boolean }): number {
+  const rareMult = info.footballer ? 3 : info.abnormal ? 1.75 : 1
   const chainMult = 1 + 0.25 * Math.min(s.combo, 12)
   return bankKill(s, Math.round(75 * rareMult * chainMult))
 }
