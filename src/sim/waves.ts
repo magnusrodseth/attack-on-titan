@@ -7,8 +7,8 @@ export interface TitanSpawn {
   z: number
 }
 
-export function waveComposition(wave: number, rng: () => number): TitanSpawn[] {
-  const count = Math.min(4 + (wave - 1) * 2, 18)
+export function waveComposition(wave: number, rng: () => number, countScale = 1): TitanSpawn[] {
+  const count = Math.min(Math.round(Math.min(4 + (wave - 1) * 2, 18) * countScale), 40)
   const abnormalChance = Math.min(0.06 + (wave - 1) * 0.07, 0.5)
   const spawns: TitanSpawn[] = []
   for (let i = 0; i < count; i++) {
