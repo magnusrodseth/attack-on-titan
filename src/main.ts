@@ -1,4 +1,5 @@
 import { PerspectiveCamera, Vector3, WebGLRenderer } from 'three'
+import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { Hud } from './hud'
 import { Effects } from './render/effects'
 import { buildScene } from './render/scene'
@@ -31,6 +32,9 @@ document.body.appendChild(renderer.domElement)
 const titanPool = new TitanPool(scene)
 const effects = new Effects(scene)
 const hud = new Hud(seed)
+const audio = new AudioSystem()
+let gasAudible = false
+let roarTimer = 3
 
 // --- input -----------------------------------------------------------------
 
@@ -99,6 +103,7 @@ function lockPointer(): void {
 }
 
 function beginRun(): void {
+  audio.init()
   hud.hideStart()
   hud.hideDeath()
   pauseShown = false
@@ -113,6 +118,8 @@ function beginRun(): void {
 hud.onStart = beginRun
 hud.onRetry = beginRun
 hud.onPickUpgrade = (id) => {
+  audio.init()
+  audio.chime()
   chooseUpgrade(game, id)
   prevPhase = game.phase
   hud.hideUpgrades()
@@ -128,32 +135,54 @@ function handleEvents(events: GameEvent[]): void {
     switch (event.type) {
       case 'slash':
         hud.slashFlash()
-        if (event.hit) effects.addShake(event.napeHit ? 0.12 : 0.06)
+        audio.play(SLASHES, { volume: 0.55 })
+        if (event.hit && event.napeHit) {
+          effects.addShake(0.12)
+          audio.play('slice', { volume: 0.9 })
+        } else if (event.hit) {
+          effects.addShake(0.06)
+          audio.thud(0.3)
+          audio.play(FLINCHES, { volume: 0.4 })
+        }
         break
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
-        if (titan) effects.burst(napeCenter(titan), 0xd42b35)
+        if (titan) {
+          effects.burst(napeCenter(titan), 0xd42b35)
+          const dist = titan.pos.distanceTo(game.player.pos)
+          audio.playAt('death-groan', dist, { volume: 1.2 })
+        }
         effects.addShake(0.4)
+        audio.thud(0.6)
         hud.popPoints(event.points, event.oneCut)
         break
       }
       case 'bladeBroke':
         hud.showBanner('BLADE SHATTERED', 900)
+        audio.snap()
         break
       case 'playerHit':
         hud.showHit()
         effects.addShake(0.6)
+        audio.thud(0.9)
+        audio.play(GRUNTS, { volume: 0.8, rate: 0.7 })
         break
       case 'waveClear':
         hud.showBanner(`WAVE ${event.wave} CLEARED  +${event.bonus}`, 2400)
+        audio.chime()
         break
       case 'resupply':
         hud.showBanner('RESUPPLIED', 900)
+        audio.refill()
         break
       case 'death':
         effects.addShake(1)
+        audio.boom()
+        audio.play('player-death', { volume: 0.7, rate: 0.85 })
         break
       case 'hook':
+        audio.click()
+        break
       case 'unhook':
         break // ropes render straight from state
     }
@@ -185,9 +214,13 @@ renderer.setAnimationLoop(() => {
       handleEvents(game.events)
       acc -= SIM_DT
     }
-  } else if (game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
-    hud.showStart(true)
-    pauseShown = true
+    gasAudible = input.gas && game.player.gas > 0 && !game.player.onGround
+  } else {
+    gasAudible = false
+    if (game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
+      hud.showStart(true)
+      pauseShown = true
+    }
   }
 
   if (game.phase !== prevPhase) {
@@ -213,6 +246,23 @@ renderer.setAnimationLoop(() => {
   titanPool.sync(game.titans, dt)
   effects.syncRopes(game.player, camera)
   effects.update(dt, camera, game.player.vel)
+
+  audio.setWind(game.phase === 'playing' ? speed : 0)
+  audio.setGas(gasAudible)
+  roarTimer -= dt
+  if (roarTimer <= 0) {
+    roarTimer = 4 + Math.random() * 6
+    if (game.phase === 'playing') {
+      const alive = game.titans.filter((t) => t.hp > 0)
+      const titan = alive[Math.floor(Math.random() * alive.length)]
+      if (titan) {
+        const dist = titan.pos.distanceTo(game.player.pos)
+        audio.playAt([ROARS[titan.id % ROARS.length]!], dist, {
+          volume: titan.state === 'chase' || titan.state === 'leap' ? 1.1 : 0.7,
+        })
+      }
+    }
+  }
 
   const lookDir = camera.getWorldDirection(new Vector3())
   const hookInRange =
@@ -260,6 +310,9 @@ function snapshot() {
   snapshot,
   setAutopilot(value: boolean) {
     debug.autopilot = value
+  },
+  audioDebug() {
+    return { state: audio.state, loaded: audio.loadedCount }
   },
   setSilent(value: boolean) {
     debug.silent = value

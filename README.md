@@ -53,3 +53,11 @@ pnpm build       # production bundle in dist/
 
 Design decisions and their history live in `wayfinder/map.md`; mechanics research with sources in
 `docs/research/odm-mechanics.md`.
+
+## Sound credits
+
+All bundled samples are CC0 (public domain); the rest of the audio (wind, gas, impacts, chimes)
+is synthesized at runtime with WebAudio.
+
+- Titan roars, grunts, flinches, slice, groans, scream: [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx) by rubberduck (OpenGameArt)
+- Blade whooshes: [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes) by StarNinjas (OpenGameArt)
