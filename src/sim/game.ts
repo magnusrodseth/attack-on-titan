@@ -5,6 +5,8 @@ import { EYE_HEIGHT } from './constants'
 import { trySlash } from './combat'
 import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
+import type { NavGrid } from './nav'
+import { buildNavGrid } from './nav'
 import type { InputState, PlayerState } from './player'
 import { createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import type { Rng } from './rng'
@@ -13,7 +15,7 @@ import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from '.
 import type { ScoreState } from './score'
 import { createScore, registerKill, stepScore } from './score'
 import type { TitanState } from './titan'
-import { raycastTitan, stepTitan } from './titan'
+import { aggroRange, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead'
@@ -58,6 +60,8 @@ export interface GameState {
   player: PlayerState
   titans: TitanState[]
   arena: Arena
+  /** Walkable street grid derived from the arena; never persisted, rebuilt from seed. */
+  nav: NavGrid
   score: ScoreState
   offers: Upgrade[]
   events: GameEvent[]
@@ -106,6 +110,7 @@ export function createGame(
   storage: StorageLike | null = defaultStorage(),
   modeId: string = DEFAULT_MODE_ID,
 ): GameState {
+  const arena = generateCity(createRng(hashSeed(`${seed}:city`)))
   return {
     seed,
     phase: 'menu',
@@ -113,7 +118,8 @@ export function createGame(
     time: 0,
     player: createPlayer(),
     titans: [],
-    arena: generateCity(createRng(hashSeed(`${seed}:city`))),
+    arena,
+    nav: buildNavGrid(arena),
     score: createScore(),
     offers: [],
     events: [],
@@ -221,8 +227,9 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
     g.events.push({ type: 'canisterSwap', remaining: p.canisters })
   }
 
+  const chasers = pickChasers(g)
   for (const titan of g.titans) {
-    for (const event of stepTitan(titan, p.pos, dt, g.rngLive)) {
+    for (const event of stepTitan(titan, p.pos, dt, g.rngLive, g.arena, g.nav, chasers.has(titan.id))) {
       if (event.type !== 'swat') continue
       if (p.invulnTimer > 0) continue
       if (p.pos.distanceTo(event.pos) > event.radius) continue
@@ -248,6 +255,25 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   if (g.phase !== 'playing') saveBest(g) // the run just ended or hit an intermission
 
   copyInput(g.prevInput, input)
+}
+
+// Only a few titans hunt at once, or the maze becomes a blender. Tokens go to the
+// nearest engaged-or-aggroed titans; engaged ones get a stickiness bonus so the set
+// does not flip-flop at range boundaries.
+export const MAX_CHASERS = 3
+
+function pickChasers(g: GameState): Set<number> {
+  const p = g.player
+  const candidates: { id: number; key: number }[] = []
+  for (const t of g.titans) {
+    if (t.hp <= 0 || t.state === 'crippled' || t.state === 'dead') continue
+    const dist = Math.hypot(p.pos.x - t.pos.x, p.pos.z - t.pos.z)
+    const engaged = t.state === 'chase' || t.state === 'attack' || t.state === 'leap'
+    if (!engaged && dist >= aggroRange(t.kind)) continue
+    candidates.push({ id: t.id, key: engaged ? dist - 20 : dist })
+  }
+  candidates.sort((a, b) => a.key - b.key || a.id - b.id)
+  return new Set(candidates.slice(0, MAX_CHASERS).map((c) => c.id))
 }
 
 function handleHookEdge(

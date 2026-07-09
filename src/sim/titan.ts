@@ -1,7 +1,9 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
-import { resolveBuildingCollision } from './city'
+import { insideBuildingXZ, resolveBuildingCollision } from './city'
 import { GRAVITY } from './constants'
+import type { NavGrid } from './nav'
+import { findPath, lineWalkable, nearestWalkable } from './nav'
 
 export type TitanKind = 'normal' | 'abnormal'
 export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'crippled' | 'dead'
@@ -25,6 +27,14 @@ export interface TitanState {
   ankles: [boolean, boolean]
   crippleTimer: number
   avoidTimer: number
+  /** Street-grid waypoints toward the player while chasing (world x/z pairs). */
+  path: [number, number][] | null
+  pathIndex: number
+  repathTimer: number
+}
+
+export function aggroRange(kind: TitanKind): number {
+  return kind === 'abnormal' ? 130 : 55
 }
 
 export interface TitanEvent {
@@ -69,6 +79,9 @@ export function createTitan(opts: {
     ankles: [false, false],
     crippleTimer: 0,
     avoidTimer: 0,
+    path: null,
+    pathIndex: 0,
+    repathTimer: 0,
   }
 }
 
@@ -130,6 +143,8 @@ export function stepTitan(
   dt: number,
   rng: () => number,
   arena?: Arena,
+  nav?: NavGrid,
+  allowChase = true,
 ): TitanEvent[] {
   if (t.hp <= 0) {
     if (t.state !== 'dead') {
@@ -149,9 +164,27 @@ export function stepTitan(
   const dx = playerPos.x - t.pos.x
   const dz = playerPos.z - t.pos.z
   const horizDist = Math.hypot(dx, dz)
-  const aggro = t.kind === 'abnormal' ? 130 : 55
+  const aggro = aggroRange(t.kind)
   const reach = t.height * 0.5
   const walkSpeed = t.height * (t.kind === 'abnormal' ? 0.38 : 0.2)
+
+  // deeply embedded in a building (bad spawn, old save): wade straight out. This must
+  // check the PHYSICAL footprint, not nav walkability — clearance cells near corners are
+  // unwalkable but legitimate to brush, and wading there would fight the path steering.
+  if (
+    nav &&
+    arena &&
+    t.pos.y <= 0.1 &&
+    (t.state === 'wander' || t.state === 'chase') &&
+    insideBuildingXZ(arena, t.pos.x, t.pos.z, -0.3)
+  ) {
+    const [wx, wz] = nearestWalkable(nav, t.pos.x, t.pos.z)
+    const yaw = Math.atan2(wx - t.pos.x, wz - t.pos.z)
+    turnToward(t, yaw, dt * 4)
+    t.pos.x += Math.sin(yaw) * walkSpeed * dt
+    t.pos.z += Math.cos(yaw) * walkSpeed * dt
+    return events
+  }
 
   switch (t.state) {
     case 'wander': {
@@ -161,14 +194,49 @@ export function stepTitan(
         t.wanderTimer = 2 + rng() * 4
       }
       walkTitan(t, walkSpeed * 0.5 * dt, arena, rng)
-      if (horizDist < aggro) {
+      if (horizDist < aggro && allowChase) {
         t.state = 'chase'
         t.stateTime = 0
+        t.path = null
+        t.repathTimer = 0
       }
       break
     }
     case 'chase': {
-      if (t.avoidTimer <= 0) turnToward(t, Math.atan2(dx, dz), dt)
+      if (!allowChase) {
+        // the chase token went to a closer titan: fall back to wandering
+        t.state = 'wander'
+        t.stateTime = 0
+        t.path = null
+        break
+      }
+      // steer along the street grid when the direct line is blocked
+      let steerX = dx
+      let steerZ = dz
+      if (nav) {
+        t.repathTimer -= dt
+        if (!t.path || t.repathTimer <= 0) {
+          t.path = lineWalkable(nav, t.pos.x, t.pos.z, playerPos.x, playerPos.z)
+            ? null // clear line of sight: walk straight at the player
+            : findPath(nav, t.pos.x, t.pos.z, playerPos.x, playerPos.z)
+          t.pathIndex = 0
+          t.repathTimer = 1.25
+        }
+        if (t.path) {
+          while (
+            t.pathIndex < t.path.length &&
+            Math.hypot(t.path[t.pathIndex]![0] - t.pos.x, t.path[t.pathIndex]![1] - t.pos.z) < 3.5
+          ) {
+            t.pathIndex++
+          }
+          const waypoint = t.path[t.pathIndex]
+          if (waypoint) {
+            steerX = waypoint[0] - t.pos.x
+            steerZ = waypoint[1] - t.pos.z
+          }
+        }
+      }
+      if (t.avoidTimer <= 0) turnToward(t, Math.atan2(steerX, steerZ), dt)
       if (t.kind === 'abnormal' && t.leapCooldown <= 0 && horizDist > 12 && horizDist < 80) {
         t.state = 'leap'
         t.stateTime = 0
@@ -186,7 +254,10 @@ export function stepTitan(
       if (horizDist > reach * 0.6) {
         walkTitan(t, walkSpeed * 1.35 * dt, arena, rng)
       }
-      if (horizDist > aggro * 1.5) t.state = 'wander'
+      if (horizDist > aggro * 1.5) {
+        t.state = 'wander'
+        t.path = null
+      }
       break
     }
     case 'attack': {

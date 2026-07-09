@@ -1,5 +1,6 @@
 import type { GameState } from './game'
 import { saveBest } from './game'
+import { nearestWalkable } from './nav'
 import { createRng, hashSeed } from './rng'
 import { createTitan } from './titan'
 import { applyUpgrade, offerUpgrades } from './upgrades'
@@ -27,9 +28,11 @@ export interface GameMode {
 
 function spawnWave(g: GameState): void {
   const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
-  g.titans = waveComposition(g.wave, rng).map((s) =>
-    createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x: s.x, z: s.z }),
-  )
+  g.titans = waveComposition(g.wave, rng).map((s) => {
+    // snap spawns onto walkable streets so no titan starts its life inside a house
+    const [x, z] = nearestWalkable(g.nav, s.x, s.z)
+    return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
+  })
 }
 
 /** The original endless run: clear a wave, pick a field modification, repeat. */

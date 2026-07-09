@@ -134,6 +134,14 @@ export function groundHeightAt(arena: Arena, x: number, z: number): number {
   return ground
 }
 
+/** True when the XZ point is inside a building footprint (inflate < 0 shrinks it). */
+export function insideBuildingXZ(arena: Arena, x: number, z: number, inflate = 0): boolean {
+  for (const b of arena.buildings) {
+    if (Math.abs(x - b.x) < b.w / 2 + inflate && Math.abs(z - b.z) < b.d / 2 + inflate) return true
+  }
+  return false
+}
+
 export function resolveBuildingCollision(
   arena: Arena,
   pos: Vector3,

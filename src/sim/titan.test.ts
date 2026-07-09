@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { emptyArena } from './city'
+import { emptyArena, insideBuildingXZ } from './city'
+import { buildNavGrid, isWalkable } from './nav'
 import { createTitan, napeCenter, raycastTitan, stepTitan, TURN_RATE } from './titan'
 
 const DT = 1 / 120
@@ -69,6 +70,36 @@ describe('stepTitan', () => {
     stepTitan(t, player(0, 1.7, -40), DT, rngZero) // target yaw is π, directly behind
     expect(Math.abs(t.facing)).toBeGreaterThan(0)
     expect(Math.abs(t.facing)).toBeLessThanOrEqual(TURN_RATE.normal * DT + 1e-9)
+  })
+
+  it('paths around a building between it and the player instead of grinding into it', () => {
+    const arena = emptyArena()
+    arena.buildings.push({ x: 15, z: 0, w: 6, d: 14, h: 16, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
+    const nav = buildNavGrid(arena)
+    const t = createTitan({ id: 1, kind: 'normal', height: 16, x: 0, z: 0 })
+    t.state = 'chase'
+    const target = player(30, 1.7, 0)
+    for (let i = 0; i < 120 * 10; i++) stepTitan(t, target, DT, rngZero, arena, nav)
+    expect(Math.hypot(t.pos.x - 30, t.pos.z)).toBeLessThan(10) // arrived despite the wall
+    expect(isWalkable(nav, t.pos.x, t.pos.z)).toBe(true) // and never parked inside it
+  })
+
+  it('a titan standing inside a building wades out of the footprint', () => {
+    const arena = emptyArena()
+    arena.buildings.push({ x: 15, z: 0, w: 10, d: 14, h: 16, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
+    const nav = buildNavGrid(arena)
+    const t = createTitan({ id: 1, kind: 'normal', height: 12, x: 15, z: 0 }) // embedded
+    for (let i = 0; i < 120 * 5; i++) stepTitan(t, player(200, 1.7, 0), DT, rngZero, arena, nav)
+    expect(insideBuildingXZ(arena, t.pos.x, t.pos.z)).toBe(false)
+  })
+
+  it('only aggros with a chase token, and disengages when the token is lost', () => {
+    const t = createTitan({ id: 1, kind: 'normal', height: 12, x: 0, z: 0 })
+    stepTitan(t, player(40, 1.7, 0), DT, rngZero, undefined, undefined, false)
+    expect(t.state).toBe('wander')
+    t.state = 'chase'
+    stepTitan(t, player(40, 1.7, 0), DT, rngZero, undefined, undefined, false)
+    expect(t.state).toBe('wander')
   })
 
   it('dead titans do not move or emit events', () => {

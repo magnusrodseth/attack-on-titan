@@ -1,8 +1,9 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { chooseUpgrade, createGame, startGame, stepGame } from './game'
+import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
+import { isWalkable } from './nav'
 import { neutralInput } from './player'
-import { napeCenter } from './titan'
+import { createTitan, napeCenter } from './titan'
 
 const DT = 1 / 120
 
@@ -232,6 +233,32 @@ describe('resupply', () => {
     input.resupply = true
     stepGame(game, input, DT)
     expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+})
+
+describe('titan navigation through the game loop', () => {
+  it('spawns every titan on walkable ground, never inside a building', () => {
+    const game = playingGame('nav-spawns')
+    expect(game.titans.length).toBeGreaterThan(0)
+    for (const titan of game.titans) {
+      expect(isWalkable(game.nav, titan.pos.x, titan.pos.z)).toBe(true)
+    }
+  })
+
+  it('lets at most MAX_CHASERS titans hunt the player at once, nearest first', () => {
+    const game = playingGame()
+    game.titans = []
+    for (let i = 0; i < 6; i++) {
+      game.titans.push(
+        createTitan({ id: 100 + i, kind: 'normal', height: 12, x: 20 + i * 4, z: 0 }),
+      )
+    }
+    game.player.pos.set(0, 1.7, 0)
+    for (let i = 0; i < 60; i++) stepGame(game, neutralInput(), DT)
+    const engaged = game.titans.filter((t) => ['chase', 'attack', 'leap'].includes(t.state))
+    expect(engaged.length).toBeGreaterThan(0)
+    expect(engaged.length).toBeLessThanOrEqual(MAX_CHASERS)
+    expect(engaged.map((t) => t.id).sort()).toEqual([100, 101, 102])
   })
 })
 
