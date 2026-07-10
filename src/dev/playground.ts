@@ -12,6 +12,7 @@ import { LAMP_BATTERY_SECONDS } from '../sim/flashlight'
 import type { GameState } from '../sim/game'
 import type { TitanKind } from '../sim/titan'
 import { createTitan } from '../sim/titan'
+import { TitanHitboxes } from './hitboxes'
 
 /**
  * Dev-only playground: a statue gallery in the real city with free ODM flight and
@@ -201,6 +202,8 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     <div class="dv-section">
       <label class="dv-check"><input type="checkbox" id="dv-turntable"> Turntable</label>
       <label class="dv-check"><input type="checkbox" id="dv-hud"> Hide HUD</label>
+      <label class="dv-check"><input type="checkbox" id="dv-hitboxes"> Titan hitboxes</label>
+      <div class="dv-hint">the sim's true hit volumes — nape red (dims outside your aim cone), ankles amber, body blue, hook anchor green</div>
     </div>
     <div class="dv-section">
       <div class="dv-label">Time of day</div>
@@ -282,6 +285,11 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   q<HTMLInputElement>('#dv-hud').addEventListener('change', (e) => {
     const hudRoot = document.getElementById('hud')
     if (hudRoot) hudRoot.style.visibility = (e.target as HTMLInputElement).checked ? 'hidden' : ''
+  })
+  const hitboxes = new TitanHitboxes(scene)
+  const aimScratch = new Vector3()
+  q<HTMLInputElement>('#dv-hitboxes').addEventListener('change', (e) => {
+    hitboxes.setVisible((e.target as HTMLInputElement).checked)
   })
   q<HTMLButtonElement>('#dv-exit').addEventListener('click', () => {
     const params = new URLSearchParams(location.search)
@@ -440,5 +448,12 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       for (const figure of figures) figure.group.rotation.y += dt * 0.4
       for (const dummy of dummies.values()) dummy.yaw += dt * 0.4
     }
+    // after the turntable spin so the nape/ankle volumes track facing without a frame of lag
+    hitboxes.sync(
+      game.titans,
+      game.player.config.slashRange,
+      game.player.pos,
+      camera.getWorldDirection(aimScratch),
+    )
   }
 }

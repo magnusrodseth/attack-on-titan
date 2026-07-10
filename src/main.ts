@@ -479,7 +479,8 @@ function handleCoopIntents(events: GameEvent[]): void {
     if (event.type === 'coopSlash') {
       blade.slash()
       audio.play(SLASHES, { volume: 0.55 })
-      coop?.sendSlash()
+      const look = camera.getWorldDirection(new Vector3())
+      coop?.sendSlash({ x: look.x, y: look.y, z: look.z })
     } else if (event.type === 'coopFire') {
       audio.spearLaunch() // whoosh instantly; the server launches the real spear
       effects.addShake(0.1)
@@ -834,6 +835,18 @@ function handleEvents(events: GameEvent[]): void {
           effects.addShake(0.12)
           audio.play('slice', { volume: 0.9 })
         } else if (event.hit) {
+          effects.addShake(0.06)
+          audio.thud(0.3)
+          audio.play(FLINCHES, { volume: 0.4 })
+        }
+        break
+      case 'slashConnect':
+        // a buffered swing landing a beat after its whoosh: contact feedback only
+        if (event.napeHit) {
+          hud.slashFlash()
+          effects.addShake(0.12)
+          audio.play('slice', { volume: 0.9 })
+        } else {
           effects.addShake(0.06)
           audio.thud(0.3)
           audio.play(FLINCHES, { volume: 0.4 })

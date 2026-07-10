@@ -2,7 +2,8 @@ import { Vector3 } from 'three'
 import type { Arena } from './city'
 import { generateCity, raycastHookTarget } from './city'
 import { EYE_HEIGHT } from './constants'
-import { trySlash } from './combat'
+import type { SlashResult } from './combat'
+import { stepSlashBuffer, trySlash } from './combat'
 import { clockFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
 import type { GameMode } from './modes'
@@ -41,6 +42,8 @@ export type GameEvent =
   | { type: 'hook'; index: 0 | 1; point: Vector3 }
   | { type: 'unhook'; index: 0 | 1 }
   | { type: 'slash'; hit: boolean; napeHit: boolean }
+  /** A buffered swing connected a beat after its press (contact feedback, no new swing fx). */
+  | { type: 'slashConnect'; napeHit: boolean }
   | { type: 'ankleSliced'; titanId: number; remaining: number; side: 0 | 1 }
   | { type: 'crippled'; titanId: number }
   | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean; kind: TitanKind; weapon: 'blade' | 'spear' | 'focus' }
@@ -346,49 +349,21 @@ function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
   handleHookEdge(g, 0, input.hookL, g.prevInput.hookL, input)
   handleHookEdge(g, 1, input.hookR, g.prevInput.hookR, input)
 
+  // a live swing from a fraction of a second ago connects the moment a titan arrives
+  const late = stepSlashBuffer(p, g.titans, input.lookDir, dt)
+  if (late) {
+    g.events.push({ type: 'slashConnect', napeHit: late.napeHit })
+    emitSlashOutcome(g, late, !p.onGround)
+  }
+
   if (input.slash && !g.prevInput.slash) {
     if (p.blades <= 0) {
       g.events.push({ type: 'empty', kind: 'blades' }) // nothing to swing: jam, don't sweep
     } else {
       const airborne = !p.onGround
-      const result = trySlash(p, g.titans)
+      const result = trySlash(p, g.titans, input.lookDir)
       g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
-      if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
-      if (result.ankleHit && result.titanId !== undefined) {
-        const titan = g.titans.find((t) => t.id === result.titanId)
-        const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
-        g.events.push({
-          type: 'ankleSliced',
-          titanId: result.titanId,
-          remaining,
-          side: result.ankleSide ?? 0,
-        })
-        if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
-      }
-      if (result.killed && result.titanId !== undefined) {
-        const killed = g.titans.find((t) => t.id === result.titanId)
-        const abnormal = killed?.kind === 'abnormal'
-        const footballer = killed !== undefined && isFootballer(killed.kind)
-        const points = registerKill(
-          g.score,
-          { speed: result.speed, airborne, oneCut: result.oneCut, abnormal, footballer },
-          p.config.killSpeed,
-        )
-        p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
-        const heartGained = p.hp < p.config.maxHp
-        if (heartGained) p.hp += 1 // every kill buys a heart back
-        g.events.push({
-          type: 'kill',
-          titanId: result.titanId,
-          points,
-          oneCut: result.oneCut,
-          speed: result.speed,
-          heartGained,
-          kind: killed?.kind ?? 'normal',
-          weapon: 'blade',
-        })
-        grantFocusCharge(g)
-      }
+      emitSlashOutcome(g, result, airborne)
     }
   }
 
@@ -427,6 +402,47 @@ function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
 
   for (const _id of collectPickups(g.pickups, p)) {
     g.events.push({ type: 'spearPickup', remaining: p.spears })
+  }
+}
+
+/** Everything a connected slash owes the world: wound events, kill scoring, focus charge. */
+function emitSlashOutcome(g: GameState, result: SlashResult, airborne: boolean): void {
+  const p = g.player
+  if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
+  if (result.ankleHit && result.titanId !== undefined) {
+    const titan = g.titans.find((t) => t.id === result.titanId)
+    const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
+    g.events.push({
+      type: 'ankleSliced',
+      titanId: result.titanId,
+      remaining,
+      side: result.ankleSide ?? 0,
+    })
+    if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
+  }
+  if (result.killed && result.titanId !== undefined) {
+    const killed = g.titans.find((t) => t.id === result.titanId)
+    const abnormal = killed?.kind === 'abnormal'
+    const footballer = killed !== undefined && isFootballer(killed.kind)
+    const points = registerKill(
+      g.score,
+      { speed: result.speed, airborne, oneCut: result.oneCut, abnormal, footballer },
+      p.config.killSpeed,
+    )
+    p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+    const heartGained = p.hp < p.config.maxHp
+    if (heartGained) p.hp += 1 // every kill buys a heart back
+    g.events.push({
+      type: 'kill',
+      titanId: result.titanId,
+      points,
+      oneCut: result.oneCut,
+      speed: result.speed,
+      heartGained,
+      kind: killed?.kind ?? 'normal',
+      weapon: 'blade',
+    })
+    grantFocusCharge(g)
   }
 }
 

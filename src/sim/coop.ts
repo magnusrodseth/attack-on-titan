@@ -2,7 +2,8 @@ import { Vector3 } from 'three'
 import type { Arena } from './city'
 import { generateCity } from './city'
 import { EYE_HEIGHT } from './constants'
-import { trySlash } from './combat'
+import type { SlashResult } from './combat'
+import { stepSlashBuffer, trySlash } from './combat'
 import type { NavGrid } from './nav'
 import { buildNavGrid, nearestWalkable } from './nav'
 import type { PlayerState } from './player'
@@ -67,6 +68,8 @@ export interface CoopPlayer {
   body: PlayerState
   onGround: boolean
   pose: PlayerPose
+  /** Aim carried by the last slash intent; a buffered swing keeps connecting along it. */
+  slashAim: Vector3 | null
   alive: boolean
   connected: boolean
   deaths: number
@@ -185,6 +188,7 @@ export function createCoopWorld(seed: string, playerIds: string[], citySeed = se
       body,
       onGround: false,
       pose: { yaw: 0, pitch: 0, hooks: [null, null] },
+      slashAim: null,
       alive: true,
       connected: true,
       deaths: 0,
@@ -313,6 +317,11 @@ export function coopStep(w: CoopWorld, dt: number): CoopEvent[] {
     p.body.invulnTimer = Math.max(0, p.body.invulnTimer - dt)
     p.body.fireTimer = Math.max(0, p.body.fireTimer - dt)
     stepScore(p.score, dt)
+    if (w.phase === 'playing' && p.alive) {
+      // a swing whose intent arrived a beat early connects against the live titans
+      const late = stepSlashBuffer(p.body, w.titans, p.slashAim, dt)
+      if (late) events.push(...slashResultEvents(w, p, late))
+    }
   }
 
   if (w.phase === 'upgrading') {
@@ -464,14 +473,27 @@ function rewindTitans(w: CoopWorld, rewindS: number): () => void {
   }
 }
 
-export function coopSlash(w: CoopWorld, playerId: string, rewindS = SLASH_REWIND): CoopEvent[] {
-  const events: CoopEvent[] = []
-  if (w.phase !== 'playing') return events
+export function coopSlash(
+  w: CoopWorld,
+  playerId: string,
+  aim: Vector3 | null,
+  rewindS = SLASH_REWIND,
+): CoopEvent[] {
+  if (w.phase !== 'playing') return []
   const p = w.players.get(playerId)
-  if (!p || !p.connected || !p.alive) return events
+  if (!p || !p.connected || !p.alive) return []
+  if (aim && ![aim.x, aim.y, aim.z].every(Number.isFinite)) aim = null
+  p.slashAim = aim
   const restore = rewindS > 0 ? rewindTitans(w, rewindS) : () => {}
-  const result = trySlash(p.body, w.titans)
+  const result = trySlash(p.body, w.titans, aim)
   restore()
+  return slashResultEvents(w, p, result)
+}
+
+/** Maps a swing's outcome to relayed events; shared by intents and buffered connects. */
+function slashResultEvents(w: CoopWorld, p: CoopPlayer, result: SlashResult): CoopEvent[] {
+  const events: CoopEvent[] = []
+  const playerId = p.id
   if (result.hit || result.bladeBroke) {
     events.push({ type: 'slash', playerId, hit: result.hit, napeHit: result.napeHit })
   }

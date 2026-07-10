@@ -56,7 +56,9 @@ browser profiles, ready to share on LinkedIn.
   starting point, not a law).
 - Anti-cheat beyond server-side sanity clamps on reported movement.
 - Custom domain for the Worker (workers.dev first).
-- Per-mode / per-week leaderboard slices; posting solo runs when logged in.
+- Per-mode / per-week leaderboard slices; posting solo waves/matchday runs when logged
+  in. (Time-trial solo runs post since tt-008 on the time-trials map: `trials` table +
+  `/api/trial`; the same pattern can carry waves/matchday.)
 - In-lobby text chat.
 - Hardening still open (post-review, 2026-07-09): session token rides the websocket query
   string and lands in Workers observability logs (accepted at friends-scale; move to a first
