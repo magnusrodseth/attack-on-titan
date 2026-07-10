@@ -36,6 +36,11 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   budget tightening per level, countdown HUD with urgency; local PB + global D1 board keyed by
   (mode, seed) with a featured seed; ranked by time (race) and deepest level cleared, score
   tiebreak (hunt).
+- [Course generator](tickets/tt-002-course-generator.md) — `generateCourse` in
+  `src/sim/course.ts`: 10–15 gates walk a point-to-point crossing (0.78 × wall radius each
+  side) on `:course:0`/`:course:1` streams; 35–70 m spacing snapped to walkable streets
+  ≥ 12 m inside the wall, consecutive gates street-connected; three height tiers (street
+  4–7 m/r4, canyon 10–16 m/r5, rooftop 20–28 m/r6) shuffled so every course mixes all three.
 
 ## Not yet specified
 
