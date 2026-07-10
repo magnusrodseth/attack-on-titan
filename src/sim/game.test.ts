@@ -221,33 +221,41 @@ describe('focus (kill-charged)', () => {
     expect(seen.map((e) => e.full)).toEqual([false, false, true])
   })
 
-  it('activates only at full charge, and activation commits the whole charge', () => {
+  it('a tap activates only at full charge, and releasing Q cannot end the window', () => {
     const game = playingGame()
     game.focusCharge = 3
     const input = neutralInput()
     input.focus = true
-    stepGame(game, input, DT)
+    stepGame(game, input, DT) // the tap: pressed for a single tick
     expect(game.focusActive).toBe(true)
     expect(game.focusCharge).toBe(0)
     expect(game.focus).toBeGreaterThan(0)
 
-    // bail out early: the unspent remainder is gone, and Q is dead again
-    stepGame(game, neutralInput(), DT)
-    expect(game.focusActive).toBe(false)
-    expect(game.focus).toBe(0)
-    stepGame(game, input, DT)
-    expect(game.focusActive).toBe(false)
+    // Q released: the window keeps running on its own clock
+    for (let i = 0; i < 30; i++) stepGame(game, neutralInput(), DT)
+    expect(game.focusActive).toBe(true)
+    expect(game.focus).toBeGreaterThan(0)
   })
 
-  it('drains dry back to an empty meter when held to the end', () => {
+  it('the window lasts 3 real seconds of slow-mo, then the meter is empty', () => {
     const game = playingGame()
     game.focusCharge = 3
-    const input = neutralInput()
-    input.focus = true
-    for (let i = 0; i < 240; i++) stepGame(game, input, DT) // 2 sim-seconds: past the window
+    const tap = neutralInput()
+    tap.focus = true
+    stepGame(game, tap, DT)
+    expect(game.focusActive).toBe(true)
+
+    // 3 real seconds at 0.3x = 0.9 sim-seconds = 108 ticks of drain
+    for (let i = 0; i < 100; i++) stepGame(game, neutralInput(), DT)
+    expect(game.focusActive).toBe(true) // still slowed near the end of the window
+    for (let i = 0; i < 15; i++) stepGame(game, neutralInput(), DT)
     expect(game.focusActive).toBe(false)
     expect(game.focus).toBe(0)
     expect(game.focusCharge).toBe(0)
+
+    // and Q is dead again until three more kills
+    stepGame(game, tap, DT)
+    expect(game.focusActive).toBe(false)
   })
 })
 
@@ -269,13 +277,13 @@ describe('focus strike through the game loop', () => {
     return { game, titan, input }
   }
 
-  it('locks the nape only while focus is active', () => {
+  it('locks the nape only while the window is open, and loses it when the window expires', () => {
     const { game, titan, input } = armedGame()
     expect(game.focusActive).toBe(true)
     expect(game.strikeTargetId).toBe(titan.id)
 
-    input.focus = false
-    stepGame(game, input, DT) // window abandoned
+    input.focus = false // releasing Q changes nothing; the window has its own clock
+    for (let i = 0; i < 120 && game.focusActive; i++) stepGame(game, input, DT)
     expect(game.focusActive).toBe(false)
     expect(game.strikeTargetId).toBe(null)
   })

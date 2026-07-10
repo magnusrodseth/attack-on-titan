@@ -26,13 +26,16 @@ import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead'
 
-// Focus (bullet time): a charge banked one kill at a time. At full charge Q opens one
-// slow-mo window; activation commits the whole charge, and lining the crosshair up with a
-// nape during the window offers the focus strike (see strike.ts).
+// Focus (bullet time): a charge banked one kill at a time. At full charge a TAP of Q opens
+// one fixed slow-mo window that always runs its full course — releasing Q cannot end it, so
+// a quick tap never wastes the charge. Lining the crosshair up with a nape during the
+// window offers the focus strike (see strike.ts), which spends the window on the spot.
 export const FOCUS_TIME_SCALE = 0.3
 export const FOCUS_MAX = 100
 export const FOCUS_KILLS_TO_FILL = 3
-const FOCUS_DRAIN = 80 // per sim-second: ~4 real seconds of slow-mo per charge
+/** Real seconds one focus window lasts; the world runs at FOCUS_TIME_SCALE throughout. */
+export const FOCUS_WINDOW_SECONDS = 3
+const FOCUS_DRAIN = FOCUS_MAX / (FOCUS_WINDOW_SECONDS * FOCUS_TIME_SCALE) // per sim-second
 
 export type GameEvent =
   | { type: 'hook'; index: 0 | 1; point: Vector3 }
@@ -207,14 +210,12 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   const p = g.player
   stepLamp(g, dt)
 
-  // focus: a full charge buys one slow-mo window (main loop applies FOCUS_TIME_SCALE);
-  // activation commits the charge — strike, bail out early, or drain dry, it ends at zero
+  // focus: a full charge buys one fixed slow-mo window (main loop applies FOCUS_TIME_SCALE).
+  // The tap only opens it; the window runs to the end of its 3 real seconds no matter what
+  // Q does afterwards — only the strike or an intermission cuts it short.
   if (g.focusActive) {
     g.focus = Math.max(0, g.focus - FOCUS_DRAIN * dt)
-    if (!input.focus || g.focus <= 0) {
-      g.focusActive = false
-      g.focus = 0
-    }
+    if (g.focus <= 0) g.focusActive = false
   } else if (
     input.focus &&
     !g.prevInput.focus &&
