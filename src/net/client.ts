@@ -1,5 +1,5 @@
 import { PartySocket } from 'partysocket'
-import type { ClientMsg, Leaderboard, ServerMsg } from './protocol'
+import type { ClientMsg, Leaderboard, ServerMsg, TrialBoards } from './protocol'
 import { PROTOCOL_VERSION, parseServerMsg } from './protocol'
 
 /**
@@ -82,6 +82,36 @@ export async function fetchLeaderboard(): Promise<Leaderboard | null> {
     const res = await fetch(`${API_BASE}/api/leaderboard`)
     if (!res.ok) return null
     return (await res.json()) as Leaderboard
+  } catch {
+    return null
+  }
+}
+
+// --- time trials (tt-008) ------------------------------------------------------
+
+export type TrialPostBody =
+  | { mode: 'race'; seed: string; timeS: number; splits: number[] }
+  | { mode: 'hunt'; seed: string; level: number; score: number }
+
+/** Fire-and-forget: a lost post costs one board entry, never interrupts play. */
+export async function postTrial(token: string, body: TrialPostBody): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/trial`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+export async function fetchTrials(seed: string): Promise<TrialBoards | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/trials?seed=${encodeURIComponent(seed)}`)
+    if (!res.ok) return null
+    return (await res.json()) as TrialBoards
   } catch {
     return null
   }

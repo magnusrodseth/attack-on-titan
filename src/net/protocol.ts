@@ -102,6 +102,30 @@ export interface Leaderboard {
   soldiers: LeaderboardSoldier[]
 }
 
+// --- time trials (tt-008) ----------------------------------------------------
+
+/** The course the menu promotes so global times contest the same line (manual, v1). */
+export const FEATURED_SEED = 'shiganshina'
+
+export interface TrialRaceEntry {
+  username: string
+  timeS: number
+  endedAt: string
+}
+
+export interface TrialHuntEntry {
+  username: string
+  level: number
+  score: number
+  endedAt: string
+}
+
+/** Per-seed boards: Signal Run by time, The Culling by depth (score tiebreak). */
+export interface TrialBoards {
+  race: TrialRaceEntry[]
+  hunt: TrialHuntEntry[]
+}
+
 export const MAX_ROOM_PLAYERS = 4
 
 /** Room codes read like Wall districts: TROST-7K. Generated client-side on Create Lobby. */

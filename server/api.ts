@@ -6,7 +6,9 @@ import { createDb } from './db/client'
 import { readLeaderboard } from './db/matches'
 import { users } from './db/schema'
 import { createSession, validateSessionToken } from './db/sessions'
+import { readTrialBoards, writeTrial } from './db/trials'
 import type { Env } from './env'
+import { MAX_SEED_LENGTH, parseTrialPost } from './trials'
 
 /** Origins allowed to call the API and open rooms: prod, previews, local dev. */
 export function isAllowedOrigin(origin: string): boolean {
@@ -94,12 +96,32 @@ api.post('/login', async (c) => {
   return c.json({ token, username: user.username }, 200)
 })
 
+function bearerToken(header: string | undefined): string {
+  return header?.startsWith('Bearer ') ? header.slice(7) : ''
+}
+
 api.get('/me', async (c) => {
-  const header = c.req.header('Authorization') ?? ''
-  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+  const token = bearerToken(c.req.header('Authorization'))
   const session = await validateSessionToken(createDb(c.env.DB), token)
   if (!session) return c.json({ error: 'Not signed in' }, 401)
   return c.json({ username: session.username }, 200)
 })
 
 api.get('/leaderboard', async (c) => c.json(await readLeaderboard(createDb(c.env.DB)), 200))
+
+// --- time trials (tt-008): logged-in finishes post here; boards read per seed --------
+
+api.post('/trial', async (c) => {
+  const db = createDb(c.env.DB)
+  const session = await validateSessionToken(db, bearerToken(c.req.header('Authorization')))
+  if (!session) return c.json({ error: 'Not signed in' }, 401)
+  const post = parseTrialPost(await readBody(c.req.raw))
+  if (!post) return c.json({ error: 'Bad trial payload' }, 400)
+  return c.json(await writeTrial(db, session.userId, post), 200)
+})
+
+api.get('/trials', async (c) => {
+  const seed = (c.req.query('seed') ?? '').trim()
+  if (seed.length === 0 || seed.length > MAX_SEED_LENGTH) return c.json({ error: 'Bad seed' }, 400)
+  return c.json(await readTrialBoards(createDb(c.env.DB), seed), 200)
+})

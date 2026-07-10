@@ -3,9 +3,9 @@ import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
 import { Hud } from './hud'
 import type { Account } from './net/client'
-import { clearAccount, fetchLeaderboard, loadAccount, login, register } from './net/client'
+import { clearAccount, fetchLeaderboard, fetchTrials, loadAccount, login, postTrial, register } from './net/client'
 import type { Leaderboard } from './net/protocol'
-import { generateRoomCode, normalizeRoomCode } from './net/protocol'
+import { FEATURED_SEED, generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { FlashlightBeam } from './render/flashlight'
@@ -304,6 +304,21 @@ hud.onPickMode = (id) => {
   const params = new URLSearchParams(location.search)
   params.set('mode', id)
   location.search = params.toString()
+}
+
+// featured course: one seed the menu promotes so global times contest the same line
+hud.initFeatured(FEATURED_SEED, seed === FEATURED_SEED)
+hud.onFeatured = () => {
+  const params = new URLSearchParams(location.search)
+  params.set('seed', FEATURED_SEED)
+  location.search = params.toString()
+}
+
+/** A finished trial posts to the board when signed in; localStorage PBs always work. */
+function submitTrial(body: Parameters<typeof postTrial>[1]): void {
+  if (coopMode || playgroundMode || debug.autopilot) return
+  const account = loadAccount()
+  if (account) void postTrial(account.token, body)
 }
 
 hud.onStart = beginRun
@@ -758,6 +773,10 @@ try {
 }
 hud.onOpenLeaderboard = () => {
   hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading')
+  hud.showTrialBoards(seed, null, 'loading')
+  void fetchTrials(seed).then((boards) => {
+    if (hud.leaderboardOpen) hud.showTrialBoards(seed, boards, boards ? 'ready' : 'error')
+  })
   void fetchLeaderboard().then((data) => {
     if (data) {
       leaderboardCache = data
@@ -985,6 +1004,7 @@ function handleEvents(events: GameEvent[]): void {
       case 'raceFinished':
         audio.chime()
         effects.addShake(0.25)
+        submitTrial({ mode: 'race', seed, timeS: event.time, splits: event.splits })
         break
       case 'raceArmed':
       case 'raceRestart':
@@ -1130,6 +1150,10 @@ renderer.setAnimationLoop(() => {
         hud.showRaceResults(game)
         clearRun() // a finished run must not resurrect on refresh
       } else {
+        // the hunt posts its result when the run ends, however it ended
+        if (game.mode.id === 'hunt' && game.wave > 1) {
+          submitTrial({ mode: 'hunt', seed, level: game.wave - 1, score: game.score.score })
+        }
         hud.showDeath(game)
         clearRun()
       }

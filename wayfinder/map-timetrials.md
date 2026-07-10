@@ -65,6 +65,12 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   levels in the wave banners, urgency at 20%: red pulsing clock, creeping vignette, and a
   procedural heartbeat GainNode on the sfx bus driven from state each frame; run-over card
   shows level/cleared/kills/score + best-level PB ("The Clock Ran Out" on timeout).
+- [Global leaderboard](tickets/tt-008-global-leaderboard.md) — `trials` D1 table keyed
+  (user, mode, seed) with keep-best upserts (`server/trials.ts`, unit-tested plausibility
+  gates); `POST /api/trial` + `GET /api/trials?seed=`; client posts on race finish and hunt
+  run-over when signed in; leaderboard panel gains per-seed boards; menu gains the featured
+  course (`shiganshina`, manual v1). Verified on local wrangler+D1; **deploy deferred to
+  tt-010**.
 
 ## Not yet specified
 

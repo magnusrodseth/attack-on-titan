@@ -8,6 +8,13 @@
       "when": 1783614126028,
       "tag": "0000_flaky_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783676703299,
+      "tag": "0001_secret_madame_masque",
+      "breakpoints": true
     }
   ]
 }

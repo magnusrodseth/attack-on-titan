@@ -1,4 +1,4 @@
-import type { Leaderboard, LobbyMsg } from './net/protocol'
+import type { Leaderboard, LobbyMsg, TrialBoards } from './net/protocol'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { HUNT_URGENCY_FRACTION } from './sim/hunt'
@@ -132,11 +132,13 @@ export class Hud {
   onOpenLeaderboard: () => void = () => {}
   onCloseLeaderboard: () => void = () => {}
   onRaceAgain: () => void = () => {}
+  onFeatured: () => void = () => {}
 
   constructor(seed: string) {
     el('death-seed').textContent = `seed: ${seed}`
     el('race-seed').textContent = `seed: ${seed}`
     el<HTMLButtonElement>('race-again-btn').addEventListener('click', () => this.onRaceAgain())
+    el<HTMLButtonElement>('featured-btn').addEventListener('click', () => this.onFeatured())
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
     el<HTMLButtonElement>('restart-btn').addEventListener('click', () => this.onRestart())
     el<HTMLButtonElement>('retry-btn').addEventListener('click', () => this.onRetry())
@@ -657,6 +659,57 @@ export class Hud {
 
   hideLeaderboard(): void {
     this.leaderboardPanel.classList.add('hidden')
+  }
+
+  /** The menu's featured-course button; disabled once you're already on that seed. */
+  initFeatured(featuredSeed: string, onIt: boolean): void {
+    const btn = el<HTMLButtonElement>('featured-btn')
+    btn.textContent = onIt
+      ? `Featured Course · ${featuredSeed.toUpperCase()} ✓`
+      : `Featured Course · ${featuredSeed.toUpperCase()}`
+    btn.disabled = onIt
+    btn.style.opacity = onIt ? '0.55' : '1'
+  }
+
+  /** Per-seed time-trial boards inside the leaderboard panel. */
+  showTrialBoards(seed: string, boards: TrialBoards | null, state: 'loading' | 'ready' | 'error'): void {
+    el('lb-trial-caption').innerHTML = `Time trials on this course — seed: <b>${seed}</b>`
+    const race = el('lb-race')
+    const hunt = el('lb-hunt')
+    if (!boards) {
+      if (state === 'loading') {
+        const skeletons = Array.from(
+          { length: 3 },
+          () => '<div class="lb-row skeleton"><span class="sk-bar"></span><span class="sk-bar sk-short"></span></div>',
+        ).join('')
+        race.innerHTML = skeletons
+        hunt.innerHTML = skeletons
+      } else {
+        race.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
+        hunt.innerHTML = '<div class="lb-empty"></div>'
+      }
+      return
+    }
+    race.innerHTML =
+      boards.race.length === 0
+        ? '<div class="lb-empty">No times on this course yet. Set one.</div>'
+        : boards.race
+            .map(
+              (entry, i) =>
+                `<div class="lb-row"><span><b>${formatRaceTime(entry.timeS)}</b> · ${entry.username}</span>` +
+                `<span class="lb-sub">#${i + 1}</span></div>`,
+            )
+            .join('')
+    hunt.innerHTML =
+      boards.hunt.length === 0
+        ? '<div class="lb-empty">No culls on this district yet.</div>'
+        : boards.hunt
+            .map(
+              (entry, i) =>
+                `<div class="lb-row"><span><b>Level ${entry.level}</b> · ${entry.username}</span>` +
+                `<span class="lb-sub">#${i + 1} · ${entry.score}</span></div>`,
+            )
+            .join('')
   }
 
   get leaderboardOpen(): boolean {

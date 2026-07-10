@@ -32,6 +32,30 @@ export const matches = sqliteTable('matches', {
     .$defaultFn(() => new Date()),
 })
 
+/**
+ * Time-trial boards (tt-008): one row per (soldier, mode, seed) holding their best —
+ * fastest race time (with splits) or deepest hunt level with score tiebreak. Dedupe is
+ * the primary key; "best" is decided in server/trials.ts before writing.
+ */
+export const trials = sqliteTable(
+  'trials',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mode: text('mode').notNull(), // 'race' | 'hunt'
+    seed: text('seed').notNull(),
+    timeS: real('time_s'), // race only
+    splits: text('splits'), // race only, JSON number[]
+    level: integer('level'), // hunt only: deepest level fully cleared
+    score: integer('score'), // hunt only: tiebreak
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.mode, t.seed] })],
+)
+
 export const matchPlayers = sqliteTable(
   'match_players',
   {
