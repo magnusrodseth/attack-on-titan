@@ -231,10 +231,25 @@ function lockPointer(): void {
   }
 }
 
-// phones and tablets cannot drive this control scheme: gate them out, on brand
-const touchOnly =
+// phones and tablets cannot drive this control scheme: gate them out, on brand.
+// The media queries only report the browser's guess at the primary pointer, and
+// Edge on touch-screen Windows machines guesses touch even with a mouse attached;
+// proof of a real mouse or keyboard overrides the guess and lifts the gate.
+let touchOnly =
   matchMedia('(pointer: coarse)').matches && matchMedia('(hover: none)').matches
-if (touchOnly) document.getElementById('mobile-gate')?.classList.remove('hidden')
+if (touchOnly) {
+  const gate = document.getElementById('mobile-gate')
+  gate?.classList.remove('hidden')
+  const liftGate = (e: Event) => {
+    if (e instanceof PointerEvent && e.pointerType !== 'mouse') return
+    touchOnly = false
+    gate?.classList.add('hidden')
+    window.removeEventListener('keydown', liftGate)
+    window.removeEventListener('pointermove', liftGate)
+  }
+  window.addEventListener('keydown', liftGate)
+  window.addEventListener('pointermove', liftGate)
+}
 
 function beginRun(): void {
   if (touchOnly) return
