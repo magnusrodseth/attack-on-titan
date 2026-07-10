@@ -30,6 +30,7 @@ import { restoreRun, serializeRun } from './sim/persist'
 import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
 import { createPlayer, neutralInput } from './sim/player'
+import { restartRace } from './sim/race'
 import { releaseHook } from './sim/rope'
 import { createScore } from './sim/score'
 import { SPEAR_FUSE } from './sim/spear'
@@ -97,6 +98,7 @@ const audio = new AudioSystem()
 const minimap = new Minimap(game.arena)
 const spearsView = new SpearsView(scene)
 const gatesView = new GatesView(scene)
+hud.setRaceUi(game.mode.id === 'race')
 let roarTimer = 3
 
 // --- input -----------------------------------------------------------------
@@ -219,8 +221,9 @@ function beginRun(): void {
   audio.init()
   hud.hideStart()
   hud.hideDeath()
+  hud.hideRaceResults()
   pauseShown = false
-  if (game.phase === 'menu' || game.phase === 'dead') {
+  if (game.phase === 'menu' || game.phase === 'dead' || game.phase === 'finished') {
     startGame(game)
     prevPhase = game.phase
     if (waveBased()) announceWave(game.wave)
@@ -299,6 +302,19 @@ hud.onPickMode = (id) => {
 
 hud.onStart = beginRun
 hud.onRetry = beginRun
+// the finish screen's "Run It Again" relights the same line without a full startGame
+hud.onRaceAgain = () => {
+  if (touchOnly) return
+  audio.init()
+  hud.hideRaceResults()
+  restartRace(game)
+  prevPhase = game.phase
+  lockPointer()
+}
+// R restarts straight off the finish screen; mid-run R is handled inside the sim
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyR' && game.phase === 'finished') hud.onRaceAgain()
+})
 hud.onRestart = () => {
   // abandon the current round and take the field again from wave 1, same seed and mode
   if (touchOnly) return
@@ -956,6 +972,7 @@ function handleEvents(events: GameEvent[]): void {
           effects.burst(pos.clone().add(new Vector3(0, 1.5, 0)), 0xbfc7cc, 22)
         }
         audio.pickupChime()
+        hud.raceSplitFlash(event.delta, event.split)
         break
       }
       case 'raceFinished':
@@ -1084,7 +1101,7 @@ renderer.setAnimationLoop(() => {
   }
 
   if (game.phase !== prevPhase) {
-    if (game.phase === 'upgrading' || game.phase === 'dead') {
+    if (game.phase === 'upgrading' || game.phase === 'dead' || game.phase === 'finished') {
       document.exitPointerLock()
       hud.hideStart() // a lingering pause overlay must not sit under the new menu
       hud.hideSettings()
@@ -1093,9 +1110,12 @@ renderer.setAnimationLoop(() => {
       if (game.phase === 'upgrading') {
         hud.showUpgrades(game.offers)
         persistRun()
+      } else if (game.phase === 'finished') {
+        hud.showRaceResults(game)
+        clearRun() // a finished run must not resurrect on refresh
       } else {
         hud.showDeath(game)
-        clearRun() // a finished run must not resurrect on refresh
+        clearRun()
       }
     }
     prevPhase = game.phase
@@ -1176,6 +1196,34 @@ renderer.setAnimationLoop(() => {
   const lamp =
     lampOn(clock) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
   hud.update(game, { speed, nearStation, hookInRange, lamp })
+
+  if (game.race) {
+    // project the active gate: distance readout on screen, an edge caret when it is not
+    const gate = game.race.course.gates[game.race.nextGate]
+    if (gate && game.phase === 'playing') {
+      const world = new Vector3(gate.x, gate.y, gate.z)
+      const dist = world.distanceTo(game.player.pos)
+      const ndc = world.project(camera)
+      const behind = ndc.z > 1
+      const onScreen = !behind && Math.abs(ndc.x) <= 0.92 && Math.abs(ndc.y) <= 0.88
+      // behind the camera the NDC flips: negate so the caret points the right way
+      let dx = behind ? -ndc.x : ndc.x
+      let dy = behind ? -ndc.y : ndc.y
+      if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) dy = -1
+      const scale = 0.92 / Math.max(Math.abs(dx), Math.abs(dy))
+      dx *= scale
+      dy *= scale
+      hud.updateRace(game, {
+        dist,
+        onScreen,
+        x: ((dx + 1) / 2) * innerWidth,
+        y: ((1 - dy) / 2) * innerHeight,
+        angle: Math.atan2(dx, dy), // 0 = up; the caret triangle points up by default
+      })
+    } else {
+      hud.updateRace(game, null)
+    }
+  }
 
   saveTimer += dt
   if (saveTimer >= 1) {
@@ -1304,7 +1352,11 @@ function snapshot() {
     input.resupply = partial.resupply ?? false
     if (partial.look) input.lookDir.set(...partial.look).normalize()
     if (partial.move) input.move.set(partial.move[0], 0, partial.move[1])
-    for (let i = 0; i < ticks; i++) stepGame(game, input, SIM_DT)
+    for (let i = 0; i < ticks; i++) {
+      stepGame(game, input, SIM_DT)
+      // route events exactly like the live loop so headless runs exercise HUD/FX/audio
+      if (!coopMode) handleEvents(game.events)
+    }
     return snapshot()
   },
   coop() {

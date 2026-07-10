@@ -123,6 +123,28 @@
       @keyframes floatup { 0% { opacity: 1; transform: translate(-50%, 0) } 100% { opacity: 0; transform: translate(-50%, -46px) } }
       #prompt { position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); font-family: var(--header-font); font-size: 16px; letter-spacing: 3px; opacity: 0.9; text-shadow: 0 0 8px #000; }
 
+      /* Signal Run race strip: the clock owns the top of the screen */
+      body.race .combat { display: none !important; }
+      body.race #scorebox { display: none !important; }
+      #race-strip { position: absolute; left: 50%; top: 5%; transform: translateX(-50%); text-align: center; }
+      #race-timer { font-family: var(--header-font); font-size: 46px; font-weight: 700; letter-spacing: 2px; text-shadow: 0 2px 10px #000c; }
+      #race-timer.idle { opacity: 0.5; }
+      #race-gate { font-family: var(--header-font); font-size: 15px; letter-spacing: 5px; opacity: 0.9; margin-top: 2px; }
+      #race-split { font-family: var(--header-font); font-size: 21px; font-weight: 700; min-height: 28px; margin-top: 4px; opacity: 0; transition: opacity 0.25s; }
+      #race-split.show { opacity: 1; }
+      #race-split.ahead { color: #7fe08f; text-shadow: 0 0 12px #37e06b99; }
+      #race-split.behind { color: #ff7a6b; text-shadow: 0 0 12px #e8402f99; }
+      #race-dist { position: absolute; left: 50%; top: 57%; transform: translateX(-50%); font-family: var(--header-font); font-size: 15px; letter-spacing: 3px; opacity: 0.85; text-shadow: 0 0 8px #000; }
+      #race-caret {
+        position: absolute; width: 0; height: 0; pointer-events: none;
+        border-left: 11px solid transparent; border-right: 11px solid transparent;
+        border-bottom: 17px solid #37e06be0; filter: drop-shadow(0 0 7px #37e06b);
+      }
+      #race-splits { font-family: var(--body-font); font-size: 15px; line-height: 1.55; margin: 10px 0 18px; max-height: 38vh; overflow-y: auto; }
+      #race-splits .rs-row { display: flex; gap: 18px; justify-content: center; }
+      #race-splits .rs-ahead { color: #7fe08f; }
+      #race-splits .rs-behind { color: #ff7a6b; }
+
       /* damage vignette + slash flash */
       #vignette { position: absolute; inset: 0; box-shadow: inset 0 0 140px 40px #c1121f; opacity: 0; transition: opacity 0.15s; }
       #flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, #ffffff2e 0%, transparent 55%); opacity: 0; }
@@ -398,21 +420,28 @@
         <div id="best"></div>
       </div>
       <div id="meters">
-        <div class="meter-label">HEALTH</div>
-        <div id="hearts"></div>
+        <div class="meter-label combat">HEALTH</div>
+        <div id="hearts" class="combat"></div>
         <div class="meter-label">GAS <span id="gas-canisters"></span></div>
         <div id="gas-bar" class="bar segmented"><div id="gas-fill" class="fill"></div></div>
-        <div class="meter-label">BLADE <span id="blade-pairs"></span></div>
-        <div id="blade-bar" class="bar segmented"><div id="blade-fill" class="fill"></div></div>
-        <div class="meter-label">SPEAR <span id="spear-count"></span></div>
-        <div id="spear-bar" class="bar segmented"><div id="spear-fill" class="fill"></div></div>
+        <div class="meter-label combat">BLADE <span id="blade-pairs"></span></div>
+        <div id="blade-bar" class="bar segmented combat"><div id="blade-fill" class="fill"></div></div>
+        <div class="meter-label combat">SPEAR <span id="spear-count"></span></div>
+        <div id="spear-bar" class="bar segmented combat"><div id="spear-fill" class="fill"></div></div>
         <div id="lamp-row" class="hidden">
           <div class="meter-label">LAMP</div>
           <div id="lamp-bar" class="bar"><div id="lamp-fill" class="fill"></div></div>
         </div>
-        <div class="meter-label">FOCUS</div>
-        <div id="focus-bar" class="bar"><div id="focus-fill" class="fill"></div></div>
+        <div class="meter-label combat">FOCUS</div>
+        <div id="focus-bar" class="bar combat"><div id="focus-fill" class="fill"></div></div>
       </div>
+      <div id="race-strip" class="hidden">
+        <div id="race-timer">0:00.00</div>
+        <div id="race-gate"></div>
+        <div id="race-split"></div>
+      </div>
+      <div id="race-dist" class="hidden"></div>
+      <div id="race-caret" class="hidden"></div>
       <canvas id="minimap" width="170" height="170"></canvas>
       <div id="squad"></div>
       <div id="feed"></div>
@@ -560,6 +589,14 @@
         <div class="stats" id="death-stats"></div>
         <button id="retry-btn" class="primary">Once More</button>
         <div class="seedline" id="death-seed"></div>
+      </div>
+
+      <div id="race-results" class="overlay hidden">
+        <h2 class="aot-title">Signal Run Complete</h2>
+        <div class="stats" id="race-results-stats"></div>
+        <div id="race-splits"></div>
+        <button id="race-again-btn" class="primary">Run It Again — R</button>
+        <div class="seedline" id="race-seed"></div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

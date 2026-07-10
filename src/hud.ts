@@ -18,6 +18,27 @@ export interface HudFrame {
   lamp: number | null
 }
 
+/** Where the active gate sits relative to the screen, computed by main from the camera. */
+export interface RaceCaret {
+  dist: number
+  onScreen: boolean
+  /** Viewport position for the edge caret (px) and its pointing angle (rad, 0 = up). */
+  x: number
+  y: number
+  angle: number
+}
+
+/** m:ss.cc — the race strip's one number. */
+export function formatRaceTime(t: number): string {
+  const minutes = Math.floor(t / 60)
+  const seconds = t - minutes * 60
+  return `${minutes}:${seconds.toFixed(2).padStart(5, '0')}`
+}
+
+function formatDelta(delta: number): string {
+  return `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toFixed(2)}`
+}
+
 export interface SettingsValues {
   music: number
   sfx: number
@@ -62,6 +83,15 @@ export class Hud {
   private modeCards = el('mode-cards')
   private bannerTimer: number | undefined
 
+  private raceStrip = el('race-strip')
+  private raceTimer = el('race-timer')
+  private raceGate = el('race-gate')
+  private raceSplit = el('race-split')
+  private raceDist = el('race-dist')
+  private raceCaret = el('race-caret')
+  private raceResults = el('race-results')
+  private raceSplitTimer: number | undefined
+
   private coopPanel = el('coop')
   private lobbyPanel = el('lobby')
   private resultsPanel = el('results')
@@ -96,9 +126,12 @@ export class Hud {
   onRematch: () => void = () => {}
   onOpenLeaderboard: () => void = () => {}
   onCloseLeaderboard: () => void = () => {}
+  onRaceAgain: () => void = () => {}
 
   constructor(seed: string) {
     el('death-seed').textContent = `seed: ${seed}`
+    el('race-seed').textContent = `seed: ${seed}`
+    el<HTMLButtonElement>('race-again-btn').addEventListener('click', () => this.onRaceAgain())
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
     el<HTMLButtonElement>('restart-btn').addEventListener('click', () => this.onRestart())
     el<HTMLButtonElement>('retry-btn').addEventListener('click', () => this.onRetry())
@@ -242,12 +275,85 @@ export class Hud {
 
     this.focusFill.style.width = `${game.focus.toFixed(1)}%`
 
-    const kmh = Math.round(frame.speed * 3.6)
-    this.speedo.innerHTML =
-      frame.speed >= p.config.killSpeed ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
+    if (game.mode.id === 'race') {
+      // racers think in meters per second; the station prompt is meaningless (R restarts)
+      this.speedo.textContent = `${Math.round(frame.speed)} m/s`
+      this.prompt.textContent = ''
+    } else {
+      const kmh = Math.round(frame.speed * 3.6)
+      this.speedo.innerHTML =
+        frame.speed >= p.config.killSpeed ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
+      this.prompt.textContent =
+        frame.nearStation && game.phase === 'playing' ? 'R — RESUPPLY' : ''
+    }
+  }
 
-    this.prompt.textContent =
-      frame.nearStation && game.phase === 'playing' ? 'R — RESUPPLY' : ''
+  // --- Signal Run race strip ---------------------------------------------------
+
+  /** Swaps the combat HUD for the race strip; set once at boot (mode is per page load). */
+  setRaceUi(active: boolean): void {
+    document.body.classList.toggle('race', active)
+    this.raceStrip.classList.toggle('hidden', !active)
+  }
+
+  /** Per-frame race readout: clock, gate counter, meters-to-gate, edge caret. */
+  updateRace(game: GameState, caret: RaceCaret | null): void {
+    const race = game.race
+    if (!race) return
+    this.raceTimer.textContent = formatRaceTime(race.time)
+    this.raceTimer.classList.toggle('idle', !race.armed)
+    this.raceGate.textContent =
+      race.nextGate >= race.course.gates.length
+        ? 'FINISH'
+        : `GATE ${race.nextGate + 1}/${race.course.gates.length}`
+
+    const show = caret !== null && game.phase === 'playing'
+    this.raceDist.classList.toggle('hidden', !show)
+    if (show) this.raceDist.textContent = `${Math.round(caret.dist)} m`
+    const edge = show && !caret.onScreen
+    this.raceCaret.classList.toggle('hidden', !edge)
+    if (edge) {
+      this.raceCaret.style.left = `${caret.x.toFixed(0)}px`
+      this.raceCaret.style.top = `${caret.y.toFixed(0)}px`
+      this.raceCaret.style.transform = `translate(-50%, -50%) rotate(${caret.angle.toFixed(3)}rad)`
+    }
+  }
+
+  /** Split delta vs PB flashed as a gate is passed: green ahead, red behind. */
+  raceSplitFlash(delta: number | null, split: number): void {
+    this.raceSplit.textContent = delta === null ? formatRaceTime(split) : formatDelta(delta)
+    this.raceSplit.className = delta === null ? 'show' : delta <= 0 ? 'show ahead' : 'show behind'
+    window.clearTimeout(this.raceSplitTimer)
+    this.raceSplitTimer = window.setTimeout(() => this.raceSplit.classList.remove('show'), 1800)
+  }
+
+  showRaceResults(game: GameState): void {
+    const race = game.race
+    if (!race) return
+    const best = race.best
+    const pb = best !== null && race.time <= best.time
+    el('race-results-stats').innerHTML = [
+      `TIME <b>${formatRaceTime(race.time)}</b>${pb ? ' · <b>NEW PB</b>' : ''}`,
+      best && !pb ? `PB <b>${formatRaceTime(best.time)}</b> (${formatDelta(race.time - best.time)})` : '',
+    ]
+      .filter(Boolean)
+      .join('<br />')
+    el('race-splits').innerHTML = race.splits
+      .map((split, i) => {
+        const ref = pb ? null : best?.splits[i]
+        const delta = ref === undefined || ref === null ? null : split - ref
+        const cls = delta === null ? '' : delta <= 0 ? 'rs-ahead' : 'rs-behind'
+        return (
+          `<div class="rs-row"><span>GATE ${i + 1}</span><span>${formatRaceTime(split)}</span>` +
+          `<span class="${cls}">${delta === null ? '' : formatDelta(delta)}</span></div>`
+        )
+      })
+      .join('')
+    this.raceResults.classList.remove('hidden')
+  }
+
+  hideRaceResults(): void {
+    this.raceResults.classList.add('hidden')
   }
 
   showBanner(text: string, ms = 1800): void {

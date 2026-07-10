@@ -57,6 +57,10 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   on the active gate / dim yellow on the next / red on the finish, pulsing pass ring faced
   along the approach; pass = smoke pop + chime; minimap blips; verified day + night via
   playwright-cli + `__aot`.
+- [Race HUD](tickets/tt-005-race-hud.md) — race strip on the brand fonts: m:ss.cc timer,
+  GATE n/N, PB split deltas flashed green/red, meters-to-gate with an edge caret from camera
+  projection; `body.race` hides combat rows (gas stays, speedo goes m/s); results overlay
+  with split table + "Run It Again — R"; `__aot.step` now routes events like the live loop.
 
 ## Not yet specified
 
