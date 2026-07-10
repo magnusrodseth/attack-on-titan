@@ -191,8 +191,10 @@ export class CoopSession {
     this.socket?.send(clientMsg({ type: 'start' }))
   }
 
-  sendSlash(): void {
-    this.socket?.send(clientMsg({ type: 'slash' }))
+  sendSlash(look: { x: number; y: number; z: number }): void {
+    this.socket?.send(
+      clientMsg({ type: 'slash', look: { x: r2(look.x), y: r2(look.y), z: r2(look.z) } }),
+    )
   }
 
   sendFire(look: { x: number; y: number; z: number }): void {

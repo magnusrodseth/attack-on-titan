@@ -357,6 +357,11 @@ export function stepTitan(
   return events
 }
 
+/** The body cylinder hooks can anchor to; exported so the dev hitbox overlay draws it. */
+export function hookBody(t: TitanState): { radius: number; top: number } {
+  return { radius: Math.max(0.8, t.height * 0.14), top: t.height * 0.92 }
+}
+
 /** Ray vs the titan's body cylinder; returns hit distance or null. Lets hooks anchor to titans. */
 export function raycastTitan(
   t: TitanState,
@@ -365,7 +370,7 @@ export function raycastTitan(
   maxRange: number,
 ): number | null {
   if (t.hp <= 0) return null
-  const radius = Math.max(0.8, t.height * 0.14)
+  const { radius, top } = hookBody(t)
   const ox = origin.x - t.pos.x
   const oz = origin.z - t.pos.z
   const a = dir.x * dir.x + dir.z * dir.z
@@ -378,7 +383,7 @@ export function raycastTitan(
   for (const hit of [(-b - sqrtDisc) / (2 * a), (-b + sqrtDisc) / (2 * a)]) {
     if (hit <= 0.01 || hit > maxRange) continue
     const y = origin.y + dir.y * hit
-    if (y >= t.pos.y && y <= t.pos.y + t.height * 0.92) return hit
+    if (y >= t.pos.y && y <= t.pos.y + top) return hit
   }
   return null
 }

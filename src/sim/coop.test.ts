@@ -14,6 +14,7 @@ import {
   createCoopWorld,
   removePlayer,
 } from './coop'
+import { napeHitRadius } from './combat'
 import { SIM_DT } from './constants'
 import { createRng, hashSeed } from './rng'
 import { worldToTitanLocal } from './rope'
@@ -187,7 +188,7 @@ describe('coopSlash', () => {
     const levi = w.players.get('levi')!
     levi.body.hp = 3
     applyPlayerUpdate(w, 'levi', { pos: napeCenter(titan), vel: new Vector3(30, 0, 0), onGround: false })
-    const events = coopSlash(w, 'levi')
+    const events = coopSlash(w, 'levi', new Vector3(0, 0, -1)) // point-blank: any aim connects
     const kills = byType(events, 'kill')
     expect(kills).toHaveLength(1)
     expect(kills[0]).toMatchObject({ playerId: 'levi', titanId: titan.id, oneCut: true, heartGained: true })
@@ -211,13 +212,13 @@ describe('coopSlash', () => {
       return { w, titan }
     }
     const rewound = setup('maria')
-    expect(byType(coopSlash(rewound.w, 'levi'), 'kill')).toHaveLength(1)
+    expect(byType(coopSlash(rewound.w, 'levi', null), 'kill')).toHaveLength(1)
     expect(rewound.titan.hp).toBe(0)
     // titan pose is restored after validation: only hp sticks
     expect(rewound.titan.pos.x).toBeGreaterThan(rewound.w.history.get(rewound.titan.id)!.at(-1)!.pos.x + 10)
 
     const raw = setup('maria')
-    expect(byType(coopSlash(raw.w, 'levi', 0), 'kill')).toHaveLength(0)
+    expect(byType(coopSlash(raw.w, 'levi', null, 0), 'kill')).toHaveLength(0)
     expect(raw.titan.hp).toBe(raw.titan.maxHp)
   })
 
@@ -227,8 +228,27 @@ describe('coopSlash', () => {
     const levi = w.players.get('levi')!
     applyPlayerUpdate(w, 'levi', { pos: napeCenter(titan), vel: new Vector3(30, 0, 0), onGround: false })
     levi.alive = false
-    expect(coopSlash(w, 'levi')).toHaveLength(0)
+    expect(coopSlash(w, 'levi', null)).toHaveLength(0)
     expect(titan.hp).toBe(titan.maxHp)
+  })
+
+  it('a slash intent pressed a beat early connects via the swing buffer', () => {
+    const w = createCoopWorld('trost', ['levi'])
+    const titan = w.titans[0]!
+    const levi = w.players.get('levi')!
+    const above = napeCenter(titan)
+    above.y += napeHitRadius(levi.body.config.slashRange, titan) + 2
+    applyPlayerUpdate(w, 'levi', { pos: above, vel: new Vector3(0, -30, 0), onGround: false })
+    const aim = new Vector3(0, -1, 0)
+    expect(byType(coopSlash(w, 'levi', aim), 'kill')).toHaveLength(0) // pressed early: no contact yet
+    let kills: CoopEvent[] = []
+    for (let i = 0; i < 24 && kills.length === 0; i++) {
+      levi.body.pos.addScaledVector(levi.body.vel, SIM_DT) // the dive keeps falling
+      kills = byType(coopStep(w, SIM_DT), 'kill')
+    }
+    expect(kills).toHaveLength(1)
+    expect(kills[0]).toMatchObject({ playerId: 'levi', titanId: titan.id })
+    expect(titan.hp).toBe(0)
   })
 })
 

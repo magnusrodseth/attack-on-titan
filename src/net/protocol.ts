@@ -43,7 +43,8 @@ export type ClientMsg =
   | InputMsg
   | { v: typeof PROTOCOL_VERSION; type: 'ready'; ready: boolean }
   | { v: typeof PROTOCOL_VERSION; type: 'start' } // creator only
-  | { v: typeof PROTOCOL_VERSION; type: 'slash' }
+  // look feeds the nape aim cone; optional so pre-cone clients keep working (gate stays open)
+  | { v: typeof PROTOCOL_VERSION; type: 'slash'; look?: { x: number; y: number; z: number } }
   | { v: typeof PROTOCOL_VERSION; type: 'fire'; look: { x: number; y: number; z: number } }
   | { v: typeof PROTOCOL_VERSION; type: 'pick'; upgradeId: string }
   | { v: typeof PROTOCOL_VERSION; type: 'resupply' }

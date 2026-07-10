@@ -19,6 +19,10 @@ import { UPGRADE_POOL } from './upgrades'
  *
  * v2 (thunder spears): rack count, fire cooldown, live/stuck spears with fuses and
  * titan-local anchors, and the wave's pickups. v1 saves are discarded, not migrated.
+ *
+ * v2 addendum (kill-charged focus): focusCharge joined the shape additively. Saves from
+ * before it load with an empty meter (nobody spawns pre-charged); an in-flight strike dash
+ * is never saved — a restore lands you wherever the dash had gotten to, in normal flight.
  */
 export const SAVE_VERSION = 2
 
@@ -68,6 +72,8 @@ export interface SavedRun {
   time: number
   focus: number
   focusActive: boolean
+  /** Absent in saves from before the kill-charged focus meter. */
+  focusCharge?: number
   nextTitanId: number
   nextSpearId: number
   rngLiveState: number
@@ -97,6 +103,7 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     time: g.time,
     focus: g.focus,
     focusActive: g.focusActive,
+    focusCharge: g.focusCharge,
     nextTitanId: g.nextTitanId,
     nextSpearId: g.nextSpearId,
     rngLiveState: g.rngLive.state(),
@@ -153,8 +160,18 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
   g.phase = save.phase
   g.wave = save.wave
   g.time = save.time
-  g.focus = save.focus
-  g.focusActive = save.focusActive
+  if (save.focusCharge === undefined) {
+    // a save from the regen-meter era: the kill-charged meter starts over empty
+    g.focus = 0
+    g.focusActive = false
+    g.focusCharge = 0
+  } else {
+    g.focus = save.focus
+    g.focusActive = save.focusActive
+    g.focusCharge = save.focusCharge
+  }
+  g.strike = null
+  g.strikeTargetId = null
   g.nextTitanId = save.nextTitanId
   g.nextSpearId = save.nextSpearId
   g.rngLive = resumeRng(save.rngLiveState)

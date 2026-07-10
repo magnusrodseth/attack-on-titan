@@ -128,7 +128,8 @@ export class MatchRoom extends Server<Env> {
       }
       case 'slash': {
         if (!this.world || this.phase !== 'match' || member.spectator) return
-        this.relayEvents(coopSlash(this.world, member.handle))
+        const look = msg.look ? new Vector3(msg.look.x, msg.look.y, msg.look.z) : null
+        this.relayEvents(coopSlash(this.world, member.handle, look))
         return
       }
       case 'fire': {

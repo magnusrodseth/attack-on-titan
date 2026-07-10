@@ -347,6 +347,48 @@ export class AudioSystem {
     osc.stop(ctx.currentTime + 0.55)
   }
 
+  /** Focus meter topping off: a bright rising two-note ping. */
+  focusReady(): void {
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    for (const [freq, delay] of [
+      [523, 0],
+      [1046, 0.09],
+    ] as const) {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + delay)
+      gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + delay + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.7)
+      osc.connect(gain).connect(this.sfx)
+      osc.start(ctx.currentTime + delay)
+      osc.stop(ctx.currentTime + delay + 0.75)
+    }
+  }
+
+  /** The strike dash tearing the air: a rising whoosh over a low kick and a blade tail. */
+  strikeSwoosh(): void {
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    const source = ctx.createBufferSource()
+    source.buffer = this.noiseBuffer(ctx)
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.Q.value = 1.2
+    filter.frequency.setValueAtTime(240, ctx.currentTime)
+    filter.frequency.exponentialRampToValueAtTime(4200, ctx.currentTime + 0.3)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.85, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.42)
+    source.connect(filter).connect(gain).connect(this.sfx)
+    source.start()
+    source.stop(ctx.currentTime + 0.45)
+    this.thud(0.4)
+    this.play(SLASHES, { volume: 0.7, rate: 0.8 })
+  }
+
   /**
    * The Culling's urgency layer: a low heartbeat that rises on its own gain when the
    * countdown enters panic range and fades out the moment the pressure lifts. Rides the

@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Vector3, WebGLRenderer } from 'three'
+import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeometry, Vector3, WebGLRenderer } from 'three'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
 import { Hud } from './hud'
@@ -101,6 +101,23 @@ const gatesView = new GatesView(scene)
 hud.setRaceUi(game.mode.id === 'race')
 hud.setHuntUi(game.mode.id === 'hunt')
 let roarTimer = 3
+
+// focus strike lock: an indicator glow riding the locked nape (accepted texture-rule
+// exception, like the weak-point blooms) so a crowd never leaves the target ambiguous
+const strikeMarker = new Mesh(
+  new SphereGeometry(0.6, 20, 14),
+  new MeshBasicMaterial({
+    color: 0xc3adff,
+    transparent: true,
+    opacity: 0.9,
+    blending: AdditiveBlending,
+    depthTest: false,
+    depthWrite: false,
+  }),
+)
+strikeMarker.visible = false
+strikeMarker.renderOrder = 5
+scene.add(strikeMarker)
 
 // --- input -----------------------------------------------------------------
 
@@ -501,7 +518,8 @@ function handleCoopIntents(events: GameEvent[]): void {
     if (event.type === 'coopSlash') {
       blade.slash()
       audio.play(SLASHES, { volume: 0.55 })
-      coop?.sendSlash()
+      const look = camera.getWorldDirection(new Vector3())
+      coop?.sendSlash({ x: look.x, y: look.y, z: look.z })
     } else if (event.type === 'coopFire') {
       audio.spearLaunch() // whoosh instantly; the server launches the real spear
       effects.addShake(0.1)
@@ -865,6 +883,18 @@ function handleEvents(events: GameEvent[]): void {
           audio.play(FLINCHES, { volume: 0.4 })
         }
         break
+      case 'slashConnect':
+        // a buffered swing landing a beat after its whoosh: contact feedback only
+        if (event.napeHit) {
+          hud.slashFlash()
+          effects.addShake(0.12)
+          audio.play('slice', { volume: 0.9 })
+        } else {
+          effects.addShake(0.06)
+          audio.thud(0.3)
+          audio.play(FLINCHES, { volume: 0.4 })
+        }
+        break
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
         const star = isFootballer(event.kind)
@@ -876,6 +906,11 @@ function handleEvents(events: GameEvent[]): void {
           audio.playAt('death-groan', titan.pos.distanceTo(game.player.pos), { volume: 1.2 })
         }
         if (game.mode.id === 'hunt') hud.huntKillFlash()
+        if (event.weapon === 'focus') {
+          // the dash just passed through the nape: the cut itself flashes and sings
+          hud.slashFlash()
+          audio.play('slice', { volume: 1 })
+        }
         effects.addShake(aberrant ? 0.6 : 0.45)
         hitstop = aberrant ? 0.14 : 0.09 // a heartbeat of frozen time sells the cut
         audio.killHit(aberrant ? 0.85 : 0.65)
@@ -1017,6 +1052,16 @@ function handleEvents(events: GameEvent[]): void {
       case 'huntTimeout':
         effects.addShake(0.8)
         audio.boom()
+        break
+      case 'focusCharge':
+        hud.focusCharged()
+        if (event.full) audio.focusReady()
+        break
+      case 'strike':
+        audio.strikeSwoosh()
+        hud.strikeFx()
+        blade.slash()
+        effects.addShake(0.25)
         break
     }
   }
@@ -1175,10 +1220,22 @@ renderer.setAnimationLoop(() => {
     camera.position.copy(game.player.pos)
   }
   const speed = game.player.vel.length()
-  const targetFov = 75 + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
-  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 8)
+  // the strike dash slams the FOV wide open; the snap-in is most of the ZOOM feel
+  const targetFov = game.strike ? 112 : 75 + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * (game.strike ? 18 : 8))
   camera.updateProjectionMatrix()
   effects.applyShake(camera)
+
+  // nape lock indicator + crosshair prompt while a strike is on offer
+  const lockedTitan =
+    game.strikeTargetId === null ? undefined : game.titans.find((t) => t.id === game.strikeTargetId)
+  strikeMarker.visible = lockedTitan !== undefined
+  if (lockedTitan) {
+    strikeMarker.position.copy(napeCenter(lockedTitan))
+    // sized to the titan so a 15m captain reads as clearly as a 6m runt
+    strikeMarker.scale.setScalar((lockedTitan.height / 8) * (1 + 0.25 * Math.sin(now * 0.02)))
+  }
+  hud.setStrikePrompt(lockedTitan !== undefined)
 
   titanPool.sync(game.titans, dt)
   spearsView.sync(game.spears, game.pickups, dt)
@@ -1309,6 +1366,11 @@ function snapshot() {
     pos: game.player.pos.toArray().map((v) => Math.round(v * 10) / 10),
     speed: Math.round(game.player.vel.length() * 10) / 10,
     titansAlive: game.titans.filter((t) => t.hp > 0).length,
+    focus: Math.round(game.focus),
+    focusCharge: game.focusCharge,
+    focusActive: game.focusActive,
+    striking: game.strike !== null,
+    strikeTarget: game.strikeTargetId,
     hooks: game.player.hooks.map((h) => h.state),
     buildings: game.arena.buildings.length,
     clock: Math.round((debug.clockOverride ?? clockFraction(seed, game.time)) * 1000) / 1000,

@@ -2,7 +2,8 @@ import { Vector3 } from 'three'
 import type { Arena } from './city'
 import { generateCity, raycastHookTarget } from './city'
 import { EYE_HEIGHT } from './constants'
-import { trySlash } from './combat'
+import type { SlashResult } from './combat'
+import { stepSlashBuffer, trySlash } from './combat'
 import { clockFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
 import type { HuntState } from './hunt'
@@ -20,26 +21,36 @@ import type { ScoreState } from './score'
 import { createScore, registerKill, registerSpearKill, stepScore } from './score'
 import type { SpearPickup, SpearState } from './spear'
 import { collectPickups, fireSpear, stepSpears } from './spear'
+import type { StrikeState } from './strike'
+import { createStrike, findStrikeTarget, stepStrike } from './strike'
 import type { TitanKind, TitanState } from './titan'
 import { aggroRange, isFootballer, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead' | 'finished'
 
-// Focus (bullet time): hold to slow the world while the meter drains; refills on its own.
+// Focus (bullet time): a charge banked one kill at a time. At full charge a TAP of Q opens
+// one fixed slow-mo window that always runs its full course — releasing Q cannot end it, so
+// a quick tap never wastes the charge. Lining the crosshair up with a nape during the
+// window offers the focus strike (see strike.ts), which spends the window on the spot.
 export const FOCUS_TIME_SCALE = 0.3
 export const FOCUS_MAX = 100
-const FOCUS_DRAIN = 160 // per sim-second: ~2 real seconds of slow-mo per full meter
-const FOCUS_REGEN = 12
-const FOCUS_MIN_START = 25
+export const FOCUS_KILLS_TO_FILL = 3
+/** Real seconds one focus window lasts; the world runs at FOCUS_TIME_SCALE throughout. */
+export const FOCUS_WINDOW_SECONDS = 3
+const FOCUS_DRAIN = FOCUS_MAX / (FOCUS_WINDOW_SECONDS * FOCUS_TIME_SCALE) // per sim-second
 
 export type GameEvent =
   | { type: 'hook'; index: 0 | 1; point: Vector3 }
   | { type: 'unhook'; index: 0 | 1 }
   | { type: 'slash'; hit: boolean; napeHit: boolean }
+  /** A buffered swing connected a beat after its press (contact feedback, no new swing fx). */
+  | { type: 'slashConnect'; napeHit: boolean }
   | { type: 'ankleSliced'; titanId: number; remaining: number; side: 0 | 1 }
   | { type: 'crippled'; titanId: number }
-  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean; kind: TitanKind; weapon: 'blade' | 'spear' }
+  | { type: 'kill'; titanId: number; points: number; oneCut: boolean; speed: number; heartGained: boolean; kind: TitanKind; weapon: 'blade' | 'spear' | 'focus' }
+  | { type: 'focusCharge'; charge: number; full: boolean }
+  | { type: 'strike'; titanId: number }
   | { type: 'empty'; kind: 'blades' | 'gas' | 'spears' }
   | { type: 'bladeBroke' }
   | { type: 'spearFired'; remaining: number }
@@ -104,6 +115,12 @@ export interface GameState {
   nextSpearId: number
   focus: number
   focusActive: boolean
+  /** Kills banked toward the next focus window (0..FOCUS_KILLS_TO_FILL). */
+  focusCharge: number
+  /** The in-flight focus strike dash; the dash owns player movement while set. */
+  strike: StrikeState | null
+  /** Titan whose nape the crosshair is locked onto during an active focus window. */
+  strikeTargetId: number | null
   mode: GameMode
   /** Signal Run's course and clock; null in every other mode. */
   race: RaceState | null
@@ -169,8 +186,11 @@ export function createGame(
     prevInput: neutralInput(),
     nextTitanId: 1,
     nextSpearId: 1,
-    focus: FOCUS_MAX,
+    focus: 0,
     focusActive: false,
+    focusCharge: 0,
+    strike: null,
+    strikeTargetId: null,
     mode: getMode(modeId),
     race: null,
     hunt: null,
@@ -191,6 +211,11 @@ export function startGame(g: GameState): void {
   g.race = null
   g.hunt = null
   g.relentless = false
+  g.focus = 0
+  g.focusActive = false
+  g.focusCharge = 0
+  g.strike = null
+  g.strikeTargetId = null
   g.phase = 'playing' // set first so the mode may override it from start()
   g.mode.start(g)
 }
@@ -210,107 +235,37 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   const p = g.player
   stepLamp(g, dt)
 
-  // focus meter: hold to slow time (main loop applies FOCUS_TIME_SCALE while focusActive)
+  // focus: a full charge buys one fixed slow-mo window (main loop applies FOCUS_TIME_SCALE).
+  // The tap only opens it; the window runs to the end of its 3 real seconds no matter what
+  // Q does afterwards — only the strike or an intermission cuts it short.
   if (g.focusActive) {
     g.focus = Math.max(0, g.focus - FOCUS_DRAIN * dt)
-    if (!input.focus || g.focus <= 0) g.focusActive = false
+    if (g.focus <= 0) g.focusActive = false
+  } else if (
+    input.focus &&
+    !g.prevInput.focus &&
+    g.focusCharge >= FOCUS_KILLS_TO_FILL &&
+    !g.strike
+  ) {
+    g.focusActive = true
+    g.focusCharge = 0
+    g.focus = FOCUS_MAX
+  }
+
+  // the crosshair lock only exists inside an active window; firing needs this step's aim
+  g.strikeTargetId =
+    g.focusActive && !g.strike ? findStrikeTarget(p.pos, input.lookDir, g.titans, g.arena) : null
+
+  // F with a lock fires the strike; the same press must not also swing a blade
+  if (input.slash && !g.prevInput.slash && g.strikeTargetId !== null) {
+    beginStrike(g, g.strikeTargetId)
+  }
+
+  if (g.strike) {
+    // the dash owns the soldier: no hooks, blades, spears or footwork until it lands
+    stepStrikeDash(g, dt)
   } else {
-    g.focus = Math.min(FOCUS_MAX, g.focus + FOCUS_REGEN * dt)
-    if (input.focus && !g.prevInput.focus && g.focus >= FOCUS_MIN_START) g.focusActive = true
-  }
-
-  const canistersBefore = p.canisters
-  if (input.gas && !g.prevInput.gas) {
-    if (tryBoost(p, input.lookDir)) {
-      g.events.push({ type: 'boost' })
-    } else if (!p.onGround && p.boostCooldown <= 0 && p.gas < BOOST_COST && p.canisters <= 0) {
-      g.events.push({ type: 'empty', kind: 'gas' }) // truly dry, not just cooling down
-    }
-  }
-
-  handleHookEdge(g, 0, input.hookL, g.prevInput.hookL, input)
-  handleHookEdge(g, 1, input.hookR, g.prevInput.hookR, input)
-
-  if (input.slash && !g.prevInput.slash) {
-    if (p.blades <= 0) {
-      g.events.push({ type: 'empty', kind: 'blades' }) // nothing to swing: jam, don't sweep
-    } else {
-      const airborne = !p.onGround
-      const result = trySlash(p, g.titans)
-      g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
-      if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
-      if (result.ankleHit && result.titanId !== undefined) {
-        const titan = g.titans.find((t) => t.id === result.titanId)
-        const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
-        g.events.push({
-          type: 'ankleSliced',
-          titanId: result.titanId,
-          remaining,
-          side: result.ankleSide ?? 0,
-        })
-        if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
-      }
-      if (result.killed && result.titanId !== undefined) {
-        const killed = g.titans.find((t) => t.id === result.titanId)
-        const abnormal = killed?.kind === 'abnormal'
-        const footballer = killed !== undefined && isFootballer(killed.kind)
-        const points = registerKill(
-          g.score,
-          { speed: result.speed, airborne, oneCut: result.oneCut, abnormal, footballer },
-          p.config.killSpeed,
-        )
-        p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
-        const heartGained = p.hp < p.config.maxHp
-        if (heartGained) p.hp += 1 // every kill buys a heart back
-        g.events.push({
-          type: 'kill',
-          titanId: result.titanId,
-          points,
-          oneCut: result.oneCut,
-          speed: result.speed,
-          heartGained,
-          kind: killed?.kind ?? 'normal',
-          weapon: 'blade',
-        })
-      }
-    }
-  }
-
-  if (input.fire && !g.prevInput.fire) {
-    if (p.spears <= 0) {
-      g.events.push({ type: 'empty', kind: 'spears' }) // rack is dry: find a pickup
-    } else {
-      const spear = fireSpear(p, g.nextSpearId, input.lookDir)
-      if (spear) {
-        g.nextSpearId += 1
-        g.spears.push(spear)
-        g.events.push({ type: 'spearFired', remaining: p.spears })
-      }
-    }
-  }
-
-  if (input.resupply && !g.prevInput.resupply) {
-    const dist = Math.hypot(p.pos.x - g.arena.station.x, p.pos.z - g.arena.station.z)
-    if (dist <= RESUPPLY_RADIUS) {
-      p.gas = p.config.maxGas
-      p.canisters = p.config.gasCanisters
-      p.blades = p.config.bladePairs
-      p.bladeHp = p.config.bladeDurability
-      p.hp = p.config.maxHp
-      p.lamp = LAMP_BATTERY_SECONDS
-      g.events.push({ type: 'resupply' })
-    }
-  }
-
-  syncTitanHooks(g)
-
-  stepPlayer(p, input, dt, g.arena)
-  if (p.canisters < canistersBefore) {
-    g.events.push({ type: 'canisterSwap', remaining: p.canisters })
-  }
-
-  for (const _id of collectPickups(g.pickups, p)) {
-    g.events.push({ type: 'spearPickup', remaining: p.spears })
+    stepPlayerActions(g, input, dt)
   }
 
   // spears resolve before titan AI so a fresh stagger suppresses this tick's swat
@@ -344,6 +299,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
         kind: kill.kind,
         weapon: 'spear',
       })
+      grantFocusCharge(g)
     }
     if (blast.playerInBlast && p.invulnTimer <= 0) {
       p.hp -= 1
@@ -387,9 +343,195 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
 
   // the mode drives progression (wave clears, objectives, win/lose)
   if (g.phase === 'playing') g.mode.step(g, dt, input)
-  if (g.phase !== 'playing') saveBest(g) // the run just ended or hit an intermission
+  if (g.phase !== 'playing') {
+    saveBest(g) // the run just ended or hit an intermission
+    // a strike that cleared the wave must not resume as a stale dash next wave, and the
+    // slow-mo window (its charge already committed) does not survive an intermission
+    g.strike = null
+    g.strikeTargetId = null
+    g.focusActive = false
+    g.focus = 0
+  }
 
   copyInput(g.prevInput, input)
+}
+
+/** Everything the soldier does with their own hands; skipped while a strike dash flies. */
+function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
+  const p = g.player
+  const canistersBefore = p.canisters
+  if (input.gas && !g.prevInput.gas) {
+    if (tryBoost(p, input.lookDir)) {
+      g.events.push({ type: 'boost' })
+    } else if (!p.onGround && p.boostCooldown <= 0 && p.gas < BOOST_COST && p.canisters <= 0) {
+      g.events.push({ type: 'empty', kind: 'gas' }) // truly dry, not just cooling down
+    }
+  }
+
+  handleHookEdge(g, 0, input.hookL, g.prevInput.hookL, input)
+  handleHookEdge(g, 1, input.hookR, g.prevInput.hookR, input)
+
+  // a live swing from a fraction of a second ago connects the moment a titan arrives
+  const late = stepSlashBuffer(p, g.titans, input.lookDir, dt)
+  if (late) {
+    g.events.push({ type: 'slashConnect', napeHit: late.napeHit })
+    emitSlashOutcome(g, late, !p.onGround)
+  }
+
+  if (input.slash && !g.prevInput.slash) {
+    if (p.blades <= 0) {
+      g.events.push({ type: 'empty', kind: 'blades' }) // nothing to swing: jam, don't sweep
+    } else {
+      const airborne = !p.onGround
+      const result = trySlash(p, g.titans, input.lookDir)
+      g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
+      emitSlashOutcome(g, result, airborne)
+    }
+  }
+
+  if (input.fire && !g.prevInput.fire) {
+    if (p.spears <= 0) {
+      g.events.push({ type: 'empty', kind: 'spears' }) // rack is dry: find a pickup
+    } else {
+      const spear = fireSpear(p, g.nextSpearId, input.lookDir)
+      if (spear) {
+        g.nextSpearId += 1
+        g.spears.push(spear)
+        g.events.push({ type: 'spearFired', remaining: p.spears })
+      }
+    }
+  }
+
+  if (input.resupply && !g.prevInput.resupply) {
+    const dist = Math.hypot(p.pos.x - g.arena.station.x, p.pos.z - g.arena.station.z)
+    if (dist <= RESUPPLY_RADIUS) {
+      p.gas = p.config.maxGas
+      p.canisters = p.config.gasCanisters
+      p.blades = p.config.bladePairs
+      p.bladeHp = p.config.bladeDurability
+      p.hp = p.config.maxHp
+      p.lamp = LAMP_BATTERY_SECONDS
+      g.events.push({ type: 'resupply' })
+    }
+  }
+
+  syncTitanHooks(g)
+
+  stepPlayer(p, input, dt, g.arena)
+  if (p.canisters < canistersBefore) {
+    g.events.push({ type: 'canisterSwap', remaining: p.canisters })
+  }
+
+  for (const _id of collectPickups(g.pickups, p)) {
+    g.events.push({ type: 'spearPickup', remaining: p.spears })
+  }
+}
+
+/** Everything a connected slash owes the world: wound events, kill scoring, focus charge. */
+function emitSlashOutcome(g: GameState, result: SlashResult, airborne: boolean): void {
+  const p = g.player
+  if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
+  if (result.ankleHit && result.titanId !== undefined) {
+    const titan = g.titans.find((t) => t.id === result.titanId)
+    const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
+    g.events.push({
+      type: 'ankleSliced',
+      titanId: result.titanId,
+      remaining,
+      side: result.ankleSide ?? 0,
+    })
+    if (result.crippled) g.events.push({ type: 'crippled', titanId: result.titanId })
+  }
+  if (result.killed && result.titanId !== undefined) {
+    const killed = g.titans.find((t) => t.id === result.titanId)
+    const abnormal = killed?.kind === 'abnormal'
+    const footballer = killed !== undefined && isFootballer(killed.kind)
+    const points = registerKill(
+      g.score,
+      { speed: result.speed, airborne, oneCut: result.oneCut, abnormal, footballer },
+      p.config.killSpeed,
+    )
+    p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+    const heartGained = p.hp < p.config.maxHp
+    if (heartGained) p.hp += 1 // every kill buys a heart back
+    g.events.push({
+      type: 'kill',
+      titanId: result.titanId,
+      points,
+      oneCut: result.oneCut,
+      speed: result.speed,
+      heartGained,
+      kind: killed?.kind ?? 'normal',
+      weapon: 'blade',
+    })
+    grantFocusCharge(g)
+  }
+}
+
+/** Every kill banks a third of the next focus window, however it was earned. */
+function grantFocusCharge(g: GameState): void {
+  if (g.focusCharge >= FOCUS_KILLS_TO_FILL) return
+  g.focusCharge += 1
+  g.events.push({
+    type: 'focusCharge',
+    charge: g.focusCharge,
+    full: g.focusCharge >= FOCUS_KILLS_TO_FILL,
+  })
+}
+
+/** Fires the focus strike: time snaps back to full speed and the dash takes the soldier. */
+function beginStrike(g: GameState, titanId: number): void {
+  const titan = g.titans.find((t) => t.id === titanId)
+  if (!titan) return
+  const p = g.player
+  g.focusActive = false // the cut from molasses to blur IS the zoom
+  g.focus = 0
+  g.strikeTargetId = null
+  for (const [index, hook] of p.hooks.entries()) {
+    // a taut rope would fight the homing path
+    if (hook.state === 'attached') {
+      releaseHook(hook)
+      g.events.push({ type: 'unhook', index: index as 0 | 1 })
+    }
+  }
+  g.strike = createStrike(titan, p.pos)
+  g.events.push({ type: 'strike', titanId })
+}
+
+function stepStrikeDash(g: GameState, dt: number): void {
+  if (!g.strike) return
+  const p = g.player
+  p.invulnTimer = Math.max(p.invulnTimer, 0.2) // untouchable while the dash owns movement
+  const result = stepStrike(g.strike, p, g.titans, g.arena, dt)
+  if (result.killed) {
+    const killed = result.killed
+    const points = registerKill(
+      g.score,
+      {
+        speed: p.config.speedCap, // pays what a blade kill at the speed cap would
+        airborne: true,
+        oneCut: result.oneCut,
+        abnormal: killed.kind === 'abnormal',
+        footballer: isFootballer(killed.kind),
+      },
+      p.config.killSpeed,
+    )
+    p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+    const heartGained = p.hp < p.config.maxHp
+    if (heartGained) p.hp += 1 // a kill is a kill: the heart comes back
+    g.events.push({
+      type: 'kill',
+      titanId: killed.id,
+      points,
+      oneCut: result.oneCut,
+      speed: p.config.speedCap,
+      heartGained,
+      kind: killed.kind,
+      weapon: 'focus',
+    })
+    grantFocusCharge(g)
+  }
+  if (result.done) g.strike = null
 }
 
 /**

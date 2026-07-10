@@ -101,6 +101,8 @@ export interface PlayerState {
   lamp: number
   onGround: boolean
   slashTimer: number
+  /** Seconds a pressed swing stays live waiting for a titan to arrive (see combat.ts). */
+  slashBuffer: number
   fireTimer: number
   invulnTimer: number
   boostCooldown: number
@@ -124,6 +126,7 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     lamp: LAMP_BATTERY_SECONDS,
     onGround: true,
     slashTimer: 0,
+    slashBuffer: 0,
     fireTimer: 0,
     invulnTimer: 0,
     boostCooldown: 0,

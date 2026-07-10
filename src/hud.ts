@@ -1,6 +1,7 @@
 import type { Leaderboard, LobbyMsg, TrialBoards } from './net/protocol'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
+import { FOCUS_KILLS_TO_FILL } from './sim/game'
 import { HUNT_URGENCY_FRACTION } from './sim/hunt'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
@@ -58,8 +59,12 @@ export class Hud {
   private gasFill = el('gas-fill')
   private gasCanisters = el('gas-canisters')
   private bladeBar = el('blade-bar')
+  private focusBar = el('focus-bar')
   private focusFill = el('focus-fill')
+  private focusStatus = el('focus-status')
   private focusVignette = el('focus-vignette')
+  private strikePrompt = el('strike-prompt')
+  private strikeFxEl = el('strike-fx')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
   private spearBar = el('spear-bar')
@@ -280,7 +285,21 @@ export class Hud {
       (gasRatio < 0.2 && p.canisters === 0) || p.blades <= 1 || (frame.lamp !== null && frame.lamp < 0.2),
     )
 
-    this.focusFill.style.width = `${game.focus.toFixed(1)}%`
+    // the focus bar is a 3-kill charge: segments fill per kill, drain continuously while spent
+    this.focusBar.style.setProperty('--segs', String(FOCUS_KILLS_TO_FILL))
+    const focusReady = game.focusCharge >= FOCUS_KILLS_TO_FILL
+    this.focusFill.style.width = game.focusActive
+      ? `${game.focus.toFixed(1)}%`
+      : `${((game.focusCharge / FOCUS_KILLS_TO_FILL) * 100).toFixed(1)}%`
+    this.focusBar.classList.toggle('ready', focusReady && !game.focusActive)
+    this.focusStatus.classList.toggle('ready', focusReady && !game.focusActive)
+    this.focusStatus.textContent = game.focusActive
+      ? 'AIM THE NAPE'
+      : focusReady
+        ? 'READY — Q'
+        : game.focusCharge === 0
+          ? 'KILL TITANS TO CHARGE'
+          : `${game.focusCharge} / ${FOCUS_KILLS_TO_FILL}`
 
     if (game.mode.id === 'race') {
       // racers think in meters per second; the station prompt is meaningless (R restarts)
@@ -414,6 +433,24 @@ export class Hud {
 
   setFocusVignette(active: boolean): void {
     this.focusVignette.classList.toggle('on', active)
+  }
+
+  setStrikePrompt(show: boolean): void {
+    this.strikePrompt.classList.toggle('show', show)
+  }
+
+  /** A kill just banked a third of the meter: snap the new segment in with a flash. */
+  focusCharged(): void {
+    this.focusBar.classList.remove('charged')
+    void this.focusBar.offsetWidth // restart the CSS animation
+    this.focusBar.classList.add('charged')
+  }
+
+  /** Radial speed lines for the strike dash. */
+  strikeFx(): void {
+    this.strikeFxEl.classList.remove('go')
+    void this.strikeFxEl.offsetWidth
+    this.strikeFxEl.classList.add('go')
   }
 
   slashFlash(): void {
