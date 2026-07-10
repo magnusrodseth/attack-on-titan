@@ -1,6 +1,8 @@
 import type { GameState } from './game'
 import { saveBest } from './game'
 import { nearestWalkable } from './nav'
+import type { InputState } from './player'
+import { raceMode } from './race'
 import { createRng, hashSeed } from './rng'
 import { spawnPickups } from './spear'
 import { createTitan } from './titan'
@@ -23,7 +25,7 @@ export interface GameMode {
   /** Seeds the mode's objectives on a fresh run (startGame resets player/score first). */
   start(g: GameState): void
   /** Runs at the end of every playing tick; drives progression, phases and win/lose. */
-  step(g: GameState, dt: number): void
+  step(g: GameState, dt: number, input: InputState): void
   /** Resolves an upgrade pick if this mode uses the 'upgrading' intermission. */
   chooseUpgrade?(g: GameState, id: string): void
 }
@@ -88,7 +90,7 @@ const matchdayMode: GameMode = {
   ...waveLoop(matchdayComposition),
 }
 
-export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode]
+export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode, raceMode]
 
 export const DEFAULT_MODE_ID = 'waves'
 

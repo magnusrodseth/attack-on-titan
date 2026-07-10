@@ -41,6 +41,11 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   side) on `:course:0`/`:course:1` streams; 35–70 m spacing snapped to walkable streets
   ≥ 12 m inside the wall, consecutive gates street-connected; three height tiers (street
   4–7 m/r4, canyon 10–16 m/r5, rooftop 20–28 m/r6) shuffled so every course mixes all three.
+- [Signal Run sim](tickets/tt-003-signal-run-sim.md) — mode `race` in `src/sim/race.ts`:
+  clock arms on first control input, rings pass in order and refill gas, R restarts the same
+  course instantly, finish → new phase `finished` with splits; PB + splits persist at
+  `aot-odm-tt:race:<seed>`; `GameMode.step` now receives the tick's input; a mid-run refresh
+  relights the line instead of resuming the clock.
 
 ## Not yet specified
 

@@ -9,6 +9,7 @@ import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { NavGrid } from './nav'
 import { buildNavGrid } from './nav'
+import type { RaceState } from './race'
 import type { InputState, PlayerState } from './player'
 import { BOOST_COST, createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import type { Rng } from './rng'
@@ -22,7 +23,7 @@ import type { TitanKind, TitanState } from './titan'
 import { aggroRange, isFootballer, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
-export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead'
+export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead' | 'finished'
 
 // Focus (bullet time): hold to slow the world while the meter drains; refills on its own.
 export const FOCUS_TIME_SCALE = 0.3
@@ -54,6 +55,11 @@ export type GameEvent =
   | { type: 'canisterSwap'; remaining: number }
   | { type: 'boost' }
   | { type: 'death' }
+  // Signal Run: the clock arming, ordered ring passes with PB deltas, and the finish
+  | { type: 'raceArmed' }
+  | { type: 'gatePass'; index: number; total: number; split: number; delta: number | null }
+  | { type: 'raceFinished'; time: number; splits: number[]; pb: boolean; delta: number | null }
+  | { type: 'raceRestart' }
   // client intents in co-op: the net layer forwards these to the room server
   | { type: 'coopSlash' }
   | { type: 'coopFire' }
@@ -95,6 +101,8 @@ export interface GameState {
   focus: number
   focusActive: boolean
   mode: GameMode
+  /** Signal Run's course and clock; null in every other mode. */
+  race: RaceState | null
 }
 
 const BEST_KEY = 'aot-odm-best'
@@ -156,6 +164,7 @@ export function createGame(
     focus: FOCUS_MAX,
     focusActive: false,
     mode: getMode(modeId),
+    race: null,
   }
 }
 
@@ -364,7 +373,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   stepScore(g.score, dt)
 
   // the mode drives progression (wave clears, objectives, win/lose)
-  if (g.phase === 'playing') g.mode.step(g, dt)
+  if (g.phase === 'playing') g.mode.step(g, dt, input)
   if (g.phase !== 'playing') saveBest(g) // the run just ended or hit an intermission
 
   copyInput(g.prevInput, input)
