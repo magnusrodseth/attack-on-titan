@@ -9,6 +9,7 @@ import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { FlashlightBeam } from './render/flashlight'
+import { GatesView } from './render/gates'
 import { PerfHud } from './render/perf'
 import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
@@ -95,6 +96,7 @@ const blade = new BladeView(camera)
 const audio = new AudioSystem()
 const minimap = new Minimap(game.arena)
 const spearsView = new SpearsView(scene)
+const gatesView = new GatesView(scene)
 let roarTimer = 3
 
 // --- input -----------------------------------------------------------------
@@ -944,6 +946,25 @@ function handleEvents(events: GameEvent[]): void {
         hud.showBanner(`Thunder Spear Racked · ${event.remaining}`, 1200)
         audio.pickupChime()
         break
+      case 'gatePass': {
+        // the flare pops in a puff of its own smoke and the column dies with it
+        const gate = game.race?.course.gates[event.index]
+        if (gate) {
+          const pos = new Vector3(gate.x, gate.y, gate.z)
+          const last = event.index === event.total - 1
+          effects.burst(pos, last ? 0xe8402f : 0x37e06b, 44)
+          effects.burst(pos.clone().add(new Vector3(0, 1.5, 0)), 0xbfc7cc, 22)
+        }
+        audio.pickupChime()
+        break
+      }
+      case 'raceFinished':
+        audio.chime()
+        effects.addShake(0.25)
+        break
+      case 'raceArmed':
+      case 'raceRestart':
+        break // the HUD and the columns re-derive from race state
     }
   }
 }
@@ -1101,6 +1122,7 @@ renderer.setAnimationLoop(() => {
 
   titanPool.sync(game.titans, dt)
   spearsView.sync(game.spears, game.pickups, dt)
+  gatesView.sync(game, now * 0.001)
   updateSpearBeeps(dt)
   updateScenery(dt, camera)
   const clock = debug.clockOverride ?? clockFraction(seed, game.time)

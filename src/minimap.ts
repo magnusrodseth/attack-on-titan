@@ -65,6 +65,35 @@ export class Minimap {
       ctx.restore()
     }
 
+    // Signal Run: the lit gate pulses green, the finish burns red, the next line dims yellow
+    const race = game.race
+    if (race && game.phase === 'playing') {
+      const gates = race.course.gates
+      const active = gates[race.nextGate]
+      const finish = gates[gates.length - 1]!
+      const pulse = 1 + 0.35 * Math.sin(performance.now() * 0.006)
+      if (active !== finish) {
+        ctx.strokeStyle = '#e8402f'
+        ctx.lineWidth = 1.6
+        ctx.beginPath()
+        ctx.arc(CENTER + finish.x * this.scale, CENTER + finish.z * this.scale, 3.4, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+      const after = gates[race.nextGate + 1]
+      if (after && after !== finish) {
+        ctx.fillStyle = 'rgba(232, 197, 69, 0.75)'
+        ctx.beginPath()
+        ctx.arc(CENTER + after.x * this.scale, CENTER + after.z * this.scale, 2.2, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      if (active) {
+        ctx.fillStyle = active === finish ? '#e8402f' : '#37e06b'
+        ctx.beginPath()
+        ctx.arc(CENTER + active.x * this.scale, CENTER + active.z * this.scale, 2.6 * pulse, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
     for (const t of game.titans) {
       if (t.hp <= 0) continue
       const x = CENTER + t.pos.x * this.scale

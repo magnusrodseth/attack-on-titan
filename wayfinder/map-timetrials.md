@@ -52,6 +52,11 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   floor (constants exported for tt-009); clock pauses through upgrades; `huntUrgency` at 20%,
   `huntTimeout` at zero; deepest-cleared PB (score tiebreak) at `aot-odm-tt:hunt:<seed>`; the
   countdown rides the refresh save.
+- [Checkpoint visuals](tickets/tt-004-checkpoint-visuals.md) — `GatesView`
+  (`src/render/gates.ts`): recycled flare rigs (beam + 240 m soft-sprite smoke column) green
+  on the active gate / dim yellow on the next / red on the finish, pulsing pass ring faced
+  along the approach; pass = smoke pop + chime; minimap blips; verified day + night via
+  playwright-cli + `__aot`.
 
 ## Not yet specified
 
