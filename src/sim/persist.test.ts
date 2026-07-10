@@ -62,6 +62,7 @@ describe('serializeRun / restoreRun', () => {
     g.player.hp = 2
     g.player.canisters = 1
     g.focus = 41.5
+    g.focusCharge = 2
     g.player.spears = 1
     g.spears.push({
       id: 3,
@@ -83,6 +84,7 @@ describe('serializeRun / restoreRun', () => {
     expect(fresh.phase).toBe(g.phase)
     expect(fresh.time).toBe(g.time)
     expect(fresh.focus).toBe(41.5)
+    expect(fresh.focusCharge).toBe(2)
     expect(fresh.nextTitanId).toBe(g.nextTitanId)
     expect(fresh.player.pos.toArray()).toEqual(g.player.pos.toArray())
     expect(fresh.player.vel.toArray()).toEqual(g.player.vel.toArray())
@@ -145,6 +147,22 @@ describe('serializeRun / restoreRun', () => {
     restoreRun(save, untouched)
     expect(untouched.player.pos.toArray()).toEqual(before.toArray()) // failed restore mutates nothing
     expect(untouched.phase).toBe('menu')
+  })
+
+  it('saves from before the kill-charged meter load with an empty meter', () => {
+    const g = createGame('persist-oldfocus', null)
+    startGame(g)
+    g.focus = 88
+    g.focusActive = true
+    g.focusCharge = 3
+    const save = JSON.parse(JSON.stringify(serializeRun(g)))
+    delete save.focusCharge // exactly what a pre-strike-era save looks like
+
+    const fresh = createGame('persist-oldfocus', null)
+    expect(restoreRun(save, fresh)).toBe(true)
+    expect(fresh.focus).toBe(0)
+    expect(fresh.focusActive).toBe(false)
+    expect(fresh.focusCharge).toBe(0)
   })
 
   it('hooks anchored in titans survive the round trip and keep tracking', () => {

@@ -76,7 +76,15 @@
       #gas-fill { background: linear-gradient(180deg, #f0cb6b, #a97c2c); }
       #blade-fill { background: linear-gradient(180deg, #f4f8fb, #93a1ad); }
       #spear-fill { background: linear-gradient(180deg, #ffb36b, #c25e1e); }
-      #focus-fill { background: linear-gradient(180deg, #c3adff, #6d4fd0); }
+      #focus-fill { background: linear-gradient(180deg, #c3adff, #6d4fd0); transition: width 0.25s ease-out; }
+      /* the focus bar is a 3-kill charge: each kill snaps a segment in, full pulses until spent */
+      #focus-status { font-size: 11px; letter-spacing: 2px; opacity: 0.55; }
+      #focus-status.ready { color: #c3adff; opacity: 1; text-shadow: 0 0 8px #8a63ffcc; }
+      #focus-bar.ready { animation: focus-ready 1.1s ease-in-out infinite; }
+      @keyframes focus-ready { 50% { box-shadow: 0 0 14px #a88bffcc, inset 0 1px 5px #000d; filter: brightness(1.45); } }
+      #focus-bar.charged { animation: focus-charged 0.45s ease-out; }
+      @keyframes focus-charged { 0% { filter: brightness(2.6); } 100% { filter: brightness(1); } }
+      body.coop #focus-row { display: none; } /* focus does not exist in the shared world */
       /* lamp gauge only appears at night, while the flashlight is running its battery */
       #lamp-fill { background: linear-gradient(180deg, #ffe9b0, #cf9435); }
       /* segmented gauges read as countable uses; separators overlay the fill */
@@ -128,6 +136,25 @@
       #flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, #ffffff2e 0%, transparent 55%); opacity: 0; }
       #flash.go { animation: slashflash 0.18s ease-out; }
       @keyframes slashflash { 0% { opacity: 1 } 100% { opacity: 0 } }
+
+      /* focus strike: crosshair prompt while locked, radial speed lines while dashing */
+      #strike-prompt {
+        position: absolute; left: 50%; top: calc(50% + 48px); transform: translateX(-50%);
+        font-family: var(--header-font); font-size: 16px; font-weight: 700; letter-spacing: 4px;
+        color: #c3adff; text-shadow: 0 0 12px #8a63ffcc, 0 1px 3px #000d;
+        opacity: 0; transition: opacity 0.08s; white-space: nowrap;
+      }
+      #strike-prompt.show { opacity: 1; }
+      #strike-fx {
+        position: absolute; inset: 0; opacity: 0; pointer-events: none;
+        background:
+          radial-gradient(ellipse at center, transparent 32%, #c3adff22 58%, transparent 74%),
+          repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 5deg, #ffffff2e 5deg 6.4deg);
+        -webkit-mask-image: radial-gradient(circle at center, transparent 20%, #000 55%);
+        mask-image: radial-gradient(circle at center, transparent 20%, #000 55%);
+      }
+      #strike-fx.go { animation: strikefx 0.45s ease-out; }
+      @keyframes strikefx { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
 
       /* overlays */
       .overlay {
@@ -410,8 +437,10 @@
           <div class="meter-label">LAMP</div>
           <div id="lamp-bar" class="bar"><div id="lamp-fill" class="fill"></div></div>
         </div>
-        <div class="meter-label">FOCUS</div>
-        <div id="focus-bar" class="bar"><div id="focus-fill" class="fill"></div></div>
+        <div id="focus-row">
+          <div class="meter-label">FOCUS <span id="focus-status"></span></div>
+          <div id="focus-bar" class="bar segmented"><div id="focus-fill" class="fill"></div></div>
+        </div>
       </div>
       <canvas id="minimap" width="170" height="170"></canvas>
       <div id="squad"></div>
@@ -423,6 +452,8 @@
       <div id="prompt"></div>
       <div id="vignette"></div>
       <div id="flash"></div>
+      <div id="strike-fx"></div>
+      <div id="strike-prompt">F — NAPE STRIKE</div>
       <div id="toast"></div>
 
       <div id="start" class="overlay">
@@ -430,7 +461,7 @@
         <div class="sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
         <div class="keys">
           <b>Mouse</b> look &nbsp;·&nbsp; <b>LMB / RMB</b> (or <b>J / K</b>) hold to hook &amp; winch in, release to let go<br />
-          <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost burst &nbsp;·&nbsp; <b>Q</b> focus (slow time) &nbsp;·&nbsp; <b>F</b> slash &nbsp;·&nbsp; <b>E / MMB</b> thunder spear &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply
+          <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost burst &nbsp;·&nbsp; <b>Q</b> focus (3 kills charge it; slows time) &nbsp;·&nbsp; <b>F</b> slash — or nape strike in focus &nbsp;·&nbsp; <b>E / MMB</b> thunder spear &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply
         </div>
         <div class="menu-col">
           <button id="start-btn" class="primary">Deploy Your Soldier</button>

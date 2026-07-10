@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { CYCLE_SECONDS, startFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS } from './flashlight'
+import type { GameEvent } from './game'
 import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
 import { isWalkable } from './nav'
 import { neutralInput } from './player'
@@ -168,29 +169,186 @@ describe('hooking titans', () => {
   })
 })
 
-describe('focus (bullet time)', () => {
-  it('activates on press with a full meter, drains, and deactivates on release', () => {
+describe('focus (kill-charged)', () => {
+  /** A fresh run whose titans are our own, far from wave-clear bookkeeping. */
+  function gameWithOwnTitans(count: number) {
     const game = playingGame()
-    const input = neutralInput()
-    input.focus = true
-    stepGame(game, input, DT)
-    expect(game.focusActive).toBe(true)
-    const before = game.focus
-    stepGame(game, input, DT)
-    expect(game.focus).toBeLessThan(before)
-    stepGame(game, neutralInput(), DT)
-    expect(game.focusActive).toBe(false)
-  })
+    game.titans.length = 0
+    for (let i = 0; i < count; i++) {
+      game.titans.push(
+        createTitan({ id: game.nextTitanId++, kind: 'normal', height: 10, x: 40 + i * 30, z: 0 }),
+      )
+    }
+    return game
+  }
 
-  it('will not start below the threshold, and the meter refills on its own', () => {
+  function bladeKill(game: ReturnType<typeof playingGame>, index: number): GameEvent[] {
+    const titan = game.titans[index]!
+    game.player.slashTimer = 0
+    game.player.pos.copy(napeCenter(titan))
+    game.player.vel.set(30, 0, 0)
+    game.player.onGround = false
+    const input = neutralInput()
+    input.slash = true
+    stepGame(game, input, DT)
+    expect(titan.hp).toBe(0)
+    const killStepEvents = [...game.events]
+    stepGame(game, neutralInput(), DT) // release the edge for the next press
+    return killStepEvents
+  }
+
+  it('starts empty, never refills on its own, and Q does nothing uncharged', () => {
     const game = playingGame()
-    game.focus = 10
+    expect(game.focus).toBe(0)
+    expect(game.focusCharge).toBe(0)
     const input = neutralInput()
     input.focus = true
     stepGame(game, input, DT)
     expect(game.focusActive).toBe(false)
     for (let i = 0; i < 360; i++) stepGame(game, neutralInput(), DT) // 3 sim-seconds
-    expect(game.focus).toBeGreaterThan(40)
+    expect(game.focus).toBe(0)
+  })
+
+  it('banks a charge per kill and reports full on the third', () => {
+    const game = gameWithOwnTitans(4)
+    const seen: { charge: number; full: boolean }[] = []
+    for (let i = 0; i < 3; i++) {
+      // the charge event rides the kill step; the release step must not add another
+      for (const e of bladeKill(game, i)) if (e.type === 'focusCharge') seen.push(e)
+    }
+    expect(game.focusCharge).toBe(3)
+    expect(seen.map((e) => e.charge)).toEqual([1, 2, 3])
+    expect(seen.map((e) => e.full)).toEqual([false, false, true])
+  })
+
+  it('activates only at full charge, and activation commits the whole charge', () => {
+    const game = playingGame()
+    game.focusCharge = 3
+    const input = neutralInput()
+    input.focus = true
+    stepGame(game, input, DT)
+    expect(game.focusActive).toBe(true)
+    expect(game.focusCharge).toBe(0)
+    expect(game.focus).toBeGreaterThan(0)
+
+    // bail out early: the unspent remainder is gone, and Q is dead again
+    stepGame(game, neutralInput(), DT)
+    expect(game.focusActive).toBe(false)
+    expect(game.focus).toBe(0)
+    stepGame(game, input, DT)
+    expect(game.focusActive).toBe(false)
+  })
+
+  it('drains dry back to an empty meter when held to the end', () => {
+    const game = playingGame()
+    game.focusCharge = 3
+    const input = neutralInput()
+    input.focus = true
+    for (let i = 0; i < 240; i++) stepGame(game, input, DT) // 2 sim-seconds: past the window
+    expect(game.focusActive).toBe(false)
+    expect(game.focus).toBe(0)
+    expect(game.focusCharge).toBe(0)
+  })
+})
+
+describe('focus strike through the game loop', () => {
+  function armedGame() {
+    const game = playingGame()
+    game.arena.buildings.length = 0
+    game.titans.length = 0
+    const titan = createTitan({ id: game.nextTitanId++, kind: 'normal', height: 10, x: 40, z: 0 })
+    const bystander = createTitan({ id: game.nextTitanId++, kind: 'normal', height: 10, x: -200, z: 0 })
+    game.titans.push(titan, bystander)
+    game.player.pos.set(0, 10, 0)
+    game.player.vel.set(0, 0, 0)
+    game.focusCharge = 3
+    const input = neutralInput()
+    input.focus = true
+    input.lookDir = napeCenter(titan).sub(game.player.pos).normalize()
+    stepGame(game, input, DT) // activates focus and computes the lock
+    return { game, titan, input }
+  }
+
+  it('locks the nape only while focus is active', () => {
+    const { game, titan, input } = armedGame()
+    expect(game.focusActive).toBe(true)
+    expect(game.strikeTargetId).toBe(titan.id)
+
+    input.focus = false
+    stepGame(game, input, DT) // window abandoned
+    expect(game.focusActive).toBe(false)
+    expect(game.strikeTargetId).toBe(null)
+  })
+
+  it('F with a lock dashes through the nape: instant kill, no blade cost', () => {
+    const { game, titan, input } = armedGame()
+    const bladesBefore = game.player.blades
+    const bladeHpBefore = game.player.bladeHp
+
+    input.slash = true
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'strike')).toBe(true)
+    expect(game.events.some((e) => e.type === 'slash')).toBe(false) // the press did not swing
+    expect(game.focusActive).toBe(false) // time snapped back to full speed
+    expect(game.focus).toBe(0)
+    expect(game.strike).not.toBe(null)
+    expect(game.player.invulnTimer).toBeGreaterThan(0)
+
+    let killEvent: Extract<GameEvent, { type: 'kill' }> | undefined
+    for (let i = 0; i < 200 && game.strike; i++) {
+      stepGame(game, input, DT)
+      const kill = game.events.find((e) => e.type === 'kill')
+      if (kill && kill.type === 'kill') killEvent = kill
+    }
+    expect(killEvent).toBeDefined()
+    expect(killEvent!.weapon).toBe('focus')
+    expect(killEvent!.points).toBeGreaterThan(0)
+    expect(titan.hp).toBe(0)
+    expect(game.strike).toBe(null)
+    expect(game.player.blades).toBe(bladesBefore) // the charge was the price, not steel
+    expect(game.player.bladeHp).toBe(bladeHpBefore)
+    expect(game.focusCharge).toBe(1) // the strike's own kill banks the first third
+    expect(game.player.pos.x).toBeGreaterThan(40) // carried out the far side
+  })
+
+  it('releases attached hooks the moment the strike fires', () => {
+    const { game, titan, input } = armedGame()
+    game.arena.buildings.push({ x: 0, z: 30, w: 10, d: 10, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    const hookInput = neutralInput()
+    hookInput.focus = true
+    hookInput.lookDir = new Vector3(0, 0.5, 1).normalize()
+    hookInput.hookL = true
+    stepGame(game, hookInput, DT)
+    expect(game.player.hooks[0].state).toBe('attached')
+
+    input.hookL = true // still holding the rope when the lock lines up
+    input.slash = true
+    input.lookDir = napeCenter(titan).sub(game.player.pos).normalize()
+    stepGame(game, input, DT)
+    expect(game.events.some((e) => e.type === 'strike')).toBe(true)
+    expect(game.player.hooks[0].state).toBe('none')
+  })
+
+  it('a strike that clears the wave does not survive into the intermission', () => {
+    const { game, titan, input } = armedGame()
+    game.titans.splice(1) // the lock target is the wave's last titan
+    input.slash = true
+    stepGame(game, input, DT)
+    expect(game.strike).not.toBe(null)
+    for (let i = 0; i < 200 && game.phase === 'playing'; i++) stepGame(game, input, DT)
+    expect(titan.hp).toBe(0)
+    expect(game.phase).toBe('upgrading')
+    expect(game.strike).toBe(null) // no stale dash waiting to resume next wave
+    expect(game.strikeTargetId).toBe(null)
+    expect(game.focusActive).toBe(false)
+  })
+
+  it('never locks a nape hidden behind a building', () => {
+    const { game, titan, input } = armedGame()
+    game.arena.buildings.push({ x: 20, z: 0, w: 8, d: 8, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    input.lookDir = napeCenter(titan).sub(game.player.pos).normalize()
+    stepGame(game, input, DT)
+    expect(game.strikeTargetId).toBe(null)
   })
 })
 
