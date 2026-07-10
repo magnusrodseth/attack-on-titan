@@ -1,6 +1,7 @@
 ---
 type: wayfinder:task
-status: open
+status: closed
+assignee: claude (worktree-timetrials session, 2026-07-10)
 blocked-by: [tt-008, tt-009]
 ---
 
@@ -41,3 +42,26 @@ named session `timetrials`). All green:
 Remaining before this ticket closes: tt-009 HITL playtest, then merge
 `worktree-timetrials` → main (Vercel auto-deploy), `wrangler d1 migrations apply aot`
 (remote) + `pnpm server:deploy`, and both modes verified live in production.
+
+## Resolution (shipped 2026-07-10)
+
+The user ordered ship ahead of the tt-009 playtest; tt-009 stays open as post-launch
+tuning against live defaults (all knobs are exported constants).
+
+- **Merge**: origin/main had moved (focus strike, height-scaled hitboxes, keybind HUD,
+  and the committed charting docs). Merged into `worktree-timetrials` preserving both
+  features (7 conflict hunks across game.ts/main.ts/hud.ts/audio.ts/index.html — notable:
+  `startGame` resets race/hunt/relentless AND focus/strike; the focus row keeps its
+  3-kill-charge structure and gains the `combat` class so Signal Run hides it). Merged
+  suite: 24 files / 298 tests, both tsconfigs, prod build, plus a browser smoke of both
+  modes on the merged tree.
+- **Server**: `wrangler d1 migrations apply aot --remote` (0001 trials table) then
+  `pnpm server:deploy` → aot-party live; `/api/health` ok, `/api/trials?seed=` serving,
+  unauthenticated `/api/trial` correctly 401.
+- **Client**: pushed `worktree-timetrials` → `origin/main` (0a4e575..c835fdd); Vercel
+  deployed; verified live at attack-on-titan.magnusrodseth.com — Signal Run (15 gates on
+  the featured seed, timer arming, race strip) and The Culling (relentless convergence,
+  budget 88 at level 1) both driven via `__aot`; the leaderboard panel reaches the prod
+  worker (per-seed boards, empty states); featured-course button correct; default page
+  regression fine.
+- The full pre-ship E2E matrix is recorded under Prep above.

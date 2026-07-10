@@ -71,6 +71,10 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   run-over when signed in; leaderboard panel gains per-seed boards; menu gains the featured
   course (`shiganshina`, manual v1). Verified on local wrangler+D1; **deploy deferred to
   tt-010**.
+- [Verify & ship](tickets/tt-010-verify-ship.md) — **destination reached 2026-07-10**: merged
+  with main's focus-strike work, remote D1 migration + worker deploy, pushed to main, both
+  modes verified live in production via `__aot`. tt-009 (tuning playtest) stays open as
+  post-launch tuning; every number it owns is an exported constant.
 
 ## Not yet specified
 
