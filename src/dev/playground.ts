@@ -69,14 +69,13 @@ export function initDev(ctx: DevCtx): ((dt: number) => void) | null {
   return bootPlayground(ctx)
 }
 
-/** Normal dev session: add a Playground entry to the main menu. */
+/** Normal dev session: add a Playground entry to the menu's utility row. */
 function injectMenuButton(): void {
-  const menu = document.querySelector('#start .menu-col')
-  const settingsBtn = document.getElementById('settings-btn')
-  if (!menu || !settingsBtn || document.getElementById('playground-btn')) return
+  const row = document.getElementById('menu-row')
+  if (!row || document.getElementById('playground-btn')) return
   const btn = document.createElement('button')
   btn.id = 'playground-btn'
-  btn.className = 'solo-only'
+  btn.className = 'solo-only compact'
   btn.textContent = 'Playground · Dev'
   btn.addEventListener('click', () => {
     const params = new URLSearchParams(location.search)
@@ -84,7 +83,7 @@ function injectMenuButton(): void {
     params.set('playground', '1')
     location.search = params.toString()
   })
-  menu.insertBefore(btn, settingsBtn)
+  row.appendChild(btn)
 }
 
 function bootPlayground(ctx: DevCtx): (dt: number) => void {

@@ -3,7 +3,8 @@ import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
 import { GRAB_ESCAPE_PRESSES } from './sim/grab'
-import { HUNT_URGENCY_FRACTION } from './sim/hunt'
+import { loadHuntBest, HUNT_URGENCY_FRACTION } from './sim/hunt'
+import { loadRaceBest } from './sim/race'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
 
@@ -46,9 +47,15 @@ export interface SettingsValues {
   music: number
   sfx: number
   sensitivity: number
+  invertY: boolean
+  /** Base field of view in degrees; speed and strike widening stack on top. */
+  fov: number
+  shadows: boolean
 }
 
-const SLIDER_IDS = ['set-music', 'set-sfx', 'set-sens'] as const
+const SLIDER_IDS = ['set-music', 'set-sfx', 'set-sens', 'set-fov'] as const
+/** Persisted on/off plates; fullscreen is browser state, not a setting. */
+const TOGGLE_IDS = ['set-invert', 'set-shadows'] as const
 
 export class Hud {
   private crosshair = el('crosshair')
@@ -110,6 +117,10 @@ export class Hud {
   private lobbyPanel = el('lobby')
   private resultsPanel = el('results')
   private leaderboardPanel = el('leaderboard')
+  private confirmPanel = el('confirm')
+  private confirmAction: () => void = () => {}
+  /** The fresh-menu subtitle, restored whenever the overlay is not a pause screen. */
+  private startSubDefault = el('start-sub').innerHTML
   private squad = el('squad')
   private feed = el('feed')
   private pickStatus = el('pick-status')
@@ -120,6 +131,9 @@ export class Hud {
 
   onStart: () => void = () => {}
   onRestart: () => void = () => {}
+  onGiveUp: () => void = () => {}
+  onConfirmCancel: () => void = () => {}
+  onResetSettings: () => void = () => {}
   onRetry: () => void = () => {}
   onPickUpgrade: (id: string) => void = () => {}
   onOpenSettings: () => void = () => {}
@@ -150,6 +164,15 @@ export class Hud {
     el<HTMLButtonElement>('featured-btn').addEventListener('click', () => this.onFeatured())
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
     el<HTMLButtonElement>('restart-btn').addEventListener('click', () => this.onRestart())
+    el<HTMLButtonElement>('giveup-btn').addEventListener('click', () => this.onGiveUp())
+    el<HTMLButtonElement>('confirm-yes').addEventListener('click', () => {
+      this.hideConfirm()
+      this.confirmAction()
+    })
+    el<HTMLButtonElement>('confirm-no').addEventListener('click', () => {
+      this.hideConfirm()
+      this.onConfirmCancel()
+    })
     el<HTMLButtonElement>('retry-btn').addEventListener('click', () => this.onRetry())
     el<HTMLButtonElement>('settings-btn').addEventListener('click', () => this.onOpenSettings())
     el<HTMLButtonElement>('settings-back').addEventListener('click', () => this.onCloseSettings())
@@ -184,6 +207,31 @@ export class Hud {
         this.onSettingsChange(this.readSettings())
       })
     }
+    for (const id of TOGGLE_IDS) {
+      el<HTMLButtonElement>(id).addEventListener('click', () => {
+        this.setToggle(id, !this.toggleOn(id))
+        this.onSettingsChange(this.readSettings())
+      })
+    }
+    el<HTMLButtonElement>('settings-reset').addEventListener('click', () => this.onResetSettings())
+    // fullscreen is queried live, never persisted; the label follows the browser state
+    el<HTMLButtonElement>('set-fullscreen').addEventListener('click', () => {
+      if (document.fullscreenElement) void document.exitFullscreen()
+      else void document.documentElement.requestFullscreen().catch(() => {})
+    })
+    document.addEventListener('fullscreenchange', () =>
+      this.setToggle('set-fullscreen', document.fullscreenElement !== null),
+    )
+  }
+
+  private toggleOn(id: string): boolean {
+    return el<HTMLButtonElement>(id).dataset.on === '1'
+  }
+
+  private setToggle(id: string, on: boolean): void {
+    const btn = el<HTMLButtonElement>(id)
+    btn.dataset.on = on ? '1' : '0'
+    btn.textContent = on ? 'On' : 'Off'
   }
 
   private submitAuth(mode: 'register' | 'login'): void {
@@ -194,6 +242,10 @@ export class Hud {
     el<HTMLInputElement>('set-music').value = String(Math.round(values.music * 100))
     el<HTMLInputElement>('set-sfx').value = String(Math.round(values.sfx * 100))
     el<HTMLInputElement>('set-sens').value = String(Math.round(values.sensitivity * 100))
+    el<HTMLInputElement>('set-fov').value = String(Math.round(values.fov))
+    this.setToggle('set-invert', values.invertY)
+    this.setToggle('set-shadows', values.shadows)
+    this.setToggle('set-fullscreen', document.fullscreenElement !== null)
     this.refreshSettingsDisplay()
   }
 
@@ -203,7 +255,7 @@ export class Hud {
       const min = Number(input.min)
       const pct = ((input.valueAsNumber - min) / (Number(input.max) - min)) * 100
       input.style.setProperty('--fill', `${pct.toFixed(0)}%`)
-      el(`${id}-val`).textContent = `${input.value}%`
+      el(`${id}-val`).textContent = id === 'set-fov' ? `${input.value}°` : `${input.value}%`
     }
   }
 
@@ -212,6 +264,9 @@ export class Hud {
       music: el<HTMLInputElement>('set-music').valueAsNumber / 100,
       sfx: el<HTMLInputElement>('set-sfx').valueAsNumber / 100,
       sensitivity: el<HTMLInputElement>('set-sens').valueAsNumber / 100,
+      invertY: this.toggleOn('set-invert'),
+      fov: el<HTMLInputElement>('set-fov').valueAsNumber,
+      shadows: this.toggleOn('set-shadows'),
     }
   }
 
@@ -228,16 +283,29 @@ export class Hud {
     return !this.settingsPanel.classList.contains('hidden')
   }
 
-  showModes(modes: { id: string; name: string; desc: string }[], currentId: string): void {
+  showModes(
+    modes: { id: string; name: string; desc: string }[],
+    currentId: string,
+    bests: Record<string, string> = {},
+  ): void {
     this.modeCards.innerHTML = ''
     for (const mode of modes) {
       const selected = mode.id === currentId
+      const best = bests[mode.id]
       const card = document.createElement('div')
       card.className = selected ? 'card mode-card selected' : 'card mode-card'
+      card.tabIndex = 0
+      card.setAttribute('role', 'button')
       card.innerHTML =
         `<div class="card-name">${mode.name}</div><div class="card-desc">${mode.desc}</div>` +
-        (selected ? '<div class="card-tag">Active</div>' : '')
+        (selected ? '<div class="card-tag">Active</div>' : '') +
+        (best ? `<div class="card-pb">${best}</div>` : '')
       card.addEventListener('click', () => this.onPickMode(mode.id))
+      card.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        this.onPickMode(mode.id)
+      })
       this.modeCards.appendChild(card)
     }
     this.start.classList.add('hidden')
@@ -478,16 +546,66 @@ export class Hud {
     window.setTimeout(() => (this.vignette.style.opacity = '0'), 220)
   }
 
-  showStart(resume = false): void {
+  showStart(resume = false, g?: GameState): void {
     this.start.classList.remove('hidden')
     this.start.classList.toggle('paused', resume) // pause menu lays the buttons out as a two-column grid
     this.start.querySelector('h1')!.textContent = resume ? 'Paused' : 'Wings of Freedom'
     el<HTMLButtonElement>('start-btn').textContent = resume ? 'Resume' : 'Deploy Your Soldier'
     el<HTMLButtonElement>('restart-btn').classList.toggle('hidden', !resume) // mid-run only
+    // no death report to file in a race: Restart already covers "start over"
+    el<HTMLButtonElement>('giveup-btn').classList.toggle('hidden', !resume || g?.mode.id === 'race')
+    // paused: the subtitle slot carries the run, not the sales pitch
+    el('start-sub').innerHTML = resume && g ? this.runSummary(g) : this.startSubDefault
+    el('start-context').textContent = g ? this.menuContext(g) : ''
+  }
+
+  /** One line of where the paused run stands, phrased per mode. */
+  private runSummary(g: GameState): string {
+    if (g.race) {
+      const total = g.race.course.gates.length
+      return `Signal Run · ${g.race.nextGate} of ${total} gates · ${formatRaceTime(g.race.time)}`
+    }
+    if (g.mode.id === 'hunt' && g.hunt) {
+      return `Level ${g.wave} · Score ${g.score.score} · ${Math.max(0, Math.ceil(g.hunt.timeLeft))} s on the clock`
+    }
+    return `Wave ${g.wave} · Score ${g.score.score} · ${g.score.kills} kills`
+  }
+
+  /** What deploys when you press the button: active mode, course, and your record on it. */
+  private menuContext(g: GameState): string {
+    const parts = [g.mode.name, `seed ${g.seed}`]
+    if (g.mode.id === 'race') {
+      const best = g.race?.best ?? loadRaceBest(g.storage, g.seed)
+      if (best) parts.push(`best ${formatRaceTime(best.time)}`)
+    } else if (g.mode.id === 'hunt') {
+      const best = g.hunt?.best ?? loadHuntBest(g.storage, g.seed)
+      if (best) parts.push(`best level ${best.level}`)
+    } else if (g.best.bestScore > 0) {
+      parts.push(`best ${g.best.bestScore} · wave ${g.best.bestWave}`)
+    }
+    return parts.join(' · ')
   }
 
   hideStart(): void {
     this.start.classList.add('hidden')
+  }
+
+  /** One shared "this ends your run" gate for every destructive menu action. */
+  showConfirm(text: string, yesLabel: string, onYes: () => void): void {
+    this.start.classList.add('hidden')
+    this.modesPanel.classList.add('hidden')
+    el('confirm-text').textContent = text
+    el<HTMLButtonElement>('confirm-yes').textContent = yesLabel
+    this.confirmAction = onYes
+    this.confirmPanel.classList.remove('hidden')
+  }
+
+  hideConfirm(): void {
+    this.confirmPanel.classList.add('hidden')
+  }
+
+  get confirmOpen(): boolean {
+    return !this.confirmPanel.classList.contains('hidden')
   }
 
   showUpgrades(offers: Upgrade[]): void {
@@ -665,7 +783,11 @@ export class Hud {
     this.pickStatus.textContent = text
   }
 
-  showLeaderboard(data: Leaderboard | null, state: 'loading' | 'ready' | 'error' = 'ready'): void {
+  showLeaderboard(
+    data: Leaderboard | null,
+    state: 'loading' | 'ready' | 'error' = 'ready',
+    you: string | null = null,
+  ): void {
     this.start.classList.add('hidden')
     this.leaderboardPanel.classList.remove('hidden')
     const teams = el('lb-teams')
@@ -685,13 +807,16 @@ export class Hud {
       }
       return
     }
+    // five rows per column: the panel must fit a laptop screen, not archive history
     teams.innerHTML =
       data.teams.length === 0
         ? '<div class="lb-empty">No squads on record yet. Be the first.</div>'
         : data.teams
+            .slice(0, 5)
             .map(
               (t) =>
-                `<div class="lb-row"><span><b>${t.wavesCleared} waves</b> · ${t.players
+                `<div class="lb-row${t.players.some((p) => p.username === you) ? ' mine' : ''}">` +
+                `<span><b>${t.wavesCleared} waves</b> · ${t.players
                   .map((p) => p.username)
                   .join(', ')}</span><span class="lb-sub">${Math.round(t.durationS / 60)} min</span></div>`,
             )
@@ -700,12 +825,20 @@ export class Hud {
       data.soldiers.length === 0
         ? '<div class="lb-empty">No soldiers on record yet.</div>'
         : data.soldiers
+            .slice(0, 5)
             .map(
               (s) =>
-                `<div class="lb-row"><span><b>${s.score}</b> · ${s.username}</span>` +
+                `<div class="lb-row${s.username === you ? ' mine' : ''}"><span><b>${s.score}</b> · ${s.username}</span>` +
                 `<span class="lb-sub">${s.kills} kills · wave ${s.wavesCleared}</span></div>`,
             )
             .join('')
+  }
+
+  /** Tells a signed-out visitor how names get onto the boards at all. */
+  setLeaderboardIdentity(username: string | null): void {
+    el('lb-signin').innerHTML = username
+      ? `Posting times as <b>${username}</b>`
+      : 'Times post under your soldier name: enlist once via <b>Multiplayer</b> to join the boards.'
   }
 
   hideLeaderboard(): void {
@@ -716,14 +849,20 @@ export class Hud {
   initFeatured(featuredSeed: string, onIt: boolean): void {
     const btn = el<HTMLButtonElement>('featured-btn')
     btn.textContent = onIt
-      ? `Featured Course · ${featuredSeed.toUpperCase()} ✓`
-      : `Featured Course · ${featuredSeed.toUpperCase()}`
+      ? `Featured · ${featuredSeed.toUpperCase()} ✓`
+      : `Featured · ${featuredSeed.toUpperCase()}`
     btn.disabled = onIt
     btn.style.opacity = onIt ? '0.55' : '1'
+    if (onIt) el('featured-note').textContent = 'You are on the featured district. Set a time.'
   }
 
   /** Per-seed time-trial boards inside the leaderboard panel. */
-  showTrialBoards(seed: string, boards: TrialBoards | null, state: 'loading' | 'ready' | 'error'): void {
+  showTrialBoards(
+    seed: string,
+    boards: TrialBoards | null,
+    state: 'loading' | 'ready' | 'error',
+    you: string | null = null,
+  ): void {
     el('lb-trial-caption').innerHTML = `Time trials on this course — seed: <b>${seed}</b>`
     const race = el('lb-race')
     const hunt = el('lb-hunt')
@@ -745,9 +884,11 @@ export class Hud {
       boards.race.length === 0
         ? '<div class="lb-empty">No times on this course yet. Set one.</div>'
         : boards.race
+            .slice(0, 5)
             .map(
               (entry, i) =>
-                `<div class="lb-row"><span><b>${formatRaceTime(entry.timeS)}</b> · ${entry.username}</span>` +
+                `<div class="lb-row${entry.username === you ? ' mine' : ''}">` +
+                `<span><b>${formatRaceTime(entry.timeS)}</b> · ${entry.username}</span>` +
                 `<span class="lb-sub">#${i + 1}</span></div>`,
             )
             .join('')
@@ -755,9 +896,11 @@ export class Hud {
       boards.hunt.length === 0
         ? '<div class="lb-empty">No culls on this district yet.</div>'
         : boards.hunt
+            .slice(0, 5)
             .map(
               (entry, i) =>
-                `<div class="lb-row"><span><b>Level ${entry.level}</b> · ${entry.username}</span>` +
+                `<div class="lb-row${entry.username === you ? ' mine' : ''}">` +
+                `<span><b>Level ${entry.level}</b> · ${entry.username}</span>` +
                 `<span class="lb-sub">#${i + 1} · ${entry.score}</span></div>`,
             )
             .join('')
@@ -767,7 +910,7 @@ export class Hud {
     return !this.leaderboardPanel.classList.contains('hidden')
   }
 
-  showDeath(game: GameState): void {
+  showDeath(game: GameState, abandoned = false): void {
     const title = this.death.querySelector('h2')!
     if (game.mode.id === 'hunt') {
       // the hunt's run-over card: how deep you got, and what the seed's record is
@@ -789,6 +932,7 @@ export class Hud {
         `ALL-TIME BEST <b>${game.best.bestScore}</b> · WAVE <b>${game.best.bestWave}</b>`,
       ].join('<br />')
     }
+    if (abandoned) title.textContent = 'Run Abandoned' // the stats still tell the story
     this.death.classList.remove('hidden')
   }
 

@@ -1,4 +1,4 @@
-import { desc, inArray } from 'drizzle-orm'
+import { desc, gt, gte, inArray } from 'drizzle-orm'
 import { asc, eq } from 'drizzle-orm'
 import type { Leaderboard, LeaderboardSoldier, LeaderboardTeam } from '../../src/net/protocol'
 import type { MatchResults } from '../../src/sim/coop'
@@ -43,6 +43,8 @@ export async function writeMatch(
 }
 
 export async function readLeaderboard(db: Db): Promise<Leaderboard> {
+  // a "longest stand" needs at least one cleared wave: instant wipes and dev-bot
+  // smoke tests would otherwise wallpaper the board with zero-wave rows
   const topMatches = await db
     .select({
       id: matches.id,
@@ -51,6 +53,7 @@ export async function readLeaderboard(db: Db): Promise<Leaderboard> {
       endedAt: matches.endedAt,
     })
     .from(matches)
+    .where(gte(matches.wavesCleared, 1))
     .orderBy(desc(matches.wavesCleared), asc(matches.durationS))
     .limit(10)
 
@@ -83,6 +86,7 @@ export async function readLeaderboard(db: Db): Promise<Leaderboard> {
       .map((r) => ({ username: r.username, score: r.score, mvp: r.mvp })),
   }))
 
+  // a deadliest soldier scored something; zero-score rows are connection tests
   const soldierRows = await db
     .select({
       username: users.username,
@@ -94,6 +98,7 @@ export async function readLeaderboard(db: Db): Promise<Leaderboard> {
     .from(matchPlayers)
     .innerJoin(users, eq(matchPlayers.userId, users.id))
     .innerJoin(matches, eq(matchPlayers.matchId, matches.id))
+    .where(gt(matchPlayers.score, 0))
     .orderBy(desc(matchPlayers.score), asc(users.username))
     .limit(50)
 

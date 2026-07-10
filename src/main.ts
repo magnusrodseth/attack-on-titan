@@ -2,7 +2,8 @@ import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeo
 import { initAnalytics, track } from './analytics'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
-import { Hud } from './hud'
+import type { SettingsValues } from './hud'
+import { formatRaceTime, Hud } from './hud'
 import type { Account } from './net/client'
 import { clearAccount, fetchLeaderboard, fetchTrials, loadAccount, login, postTrial, register } from './net/client'
 import type { Leaderboard } from './net/protocol'
@@ -24,14 +25,15 @@ import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
 import type { GameEvent } from './sim/game'
-import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, startGame, stepGame } from './sim/game'
+import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, saveBest, startGame, stepGame } from './sim/game'
+import { loadHuntBest } from './sim/hunt'
 import { DEFAULT_MODE_ID, GAME_MODES } from './sim/modes'
 import type { SavedRun } from './sim/persist'
 import { restoreRun, serializeRun } from './sim/persist'
 import { Minimap } from './minimap'
 import type { InputState } from './sim/player'
 import { createPlayer, neutralInput } from './sim/player'
-import { restartRace } from './sim/race'
+import { loadRaceBest, restartRace } from './sim/race'
 import { releaseHook } from './sim/rope'
 import { createScore } from './sim/score'
 import { SPEAR_FUSE } from './sim/spear'
@@ -157,8 +159,9 @@ window.addEventListener('contextmenu', (e) => e.preventDefault())
 window.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return
   const look = 0.0023 * settings.sensitivity
+  const dy = settings.invertY ? -e.movementY : e.movementY
   yaw -= e.movementX * look
-  pitch = Math.min(1.45, Math.max(-1.45, pitch - e.movementY * look))
+  pitch = Math.min(1.45, Math.max(-1.45, pitch - dy * look))
 })
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
@@ -175,6 +178,12 @@ document.addEventListener('pointerlockchange', () => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Escape') return
+  if (hud.confirmOpen) {
+    // Escape declines: the run is too expensive for a default-yes
+    hud.hideConfirm()
+    hud.showStart(game.phase === 'playing', game)
+    return
+  }
   if (hud.settingsOpen || hud.modesOpen || hud.leaderboardOpen || (hud.coopOpen && !coopMode)) {
     // Escape backs out of a panel to the menu underneath instead of resuming
     hud.hideSettings()
@@ -182,7 +191,7 @@ window.addEventListener('keydown', (e) => {
     hud.hideLeaderboard()
     if (!coopMode) {
       hud.hideCoop()
-      hud.showStart(game.phase === 'playing')
+      hud.showStart(game.phase === 'playing', game)
     }
     return
   }
@@ -286,68 +295,142 @@ function announceWave(wave: number): void {
   }
 }
 
-// settings: persisted sliders applied live to the audio buses and mouse look
+// settings: persisted sliders applied live to the audio buses, mouse look and camera
 const SETTINGS_KEY = 'aot-odm-settings'
-function loadSettings(): { music: number; sfx: number; sensitivity: number } {
+const SETTINGS_DEFAULTS: SettingsValues = { music: 0.7, sfx: 1, sensitivity: 1, invertY: false, fov: 75, shadows: true }
+function loadSettings(): SettingsValues {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<{ music: number; sfx: number; sensitivity: number }>
-      return { music: parsed.music ?? 0.7, sfx: parsed.sfx ?? 1, sensitivity: parsed.sensitivity ?? 1 }
+      const parsed = JSON.parse(raw) as Partial<SettingsValues>
+      return {
+        music: parsed.music ?? SETTINGS_DEFAULTS.music,
+        sfx: parsed.sfx ?? SETTINGS_DEFAULTS.sfx,
+        sensitivity: parsed.sensitivity ?? SETTINGS_DEFAULTS.sensitivity,
+        invertY: parsed.invertY ?? SETTINGS_DEFAULTS.invertY,
+        fov: parsed.fov ?? SETTINGS_DEFAULTS.fov,
+        shadows: parsed.shadows ?? SETTINGS_DEFAULTS.shadows,
+      }
     }
   } catch {
     // corrupt storage falls through to defaults
   }
-  return { music: 0.7, sfx: 1, sensitivity: 1 }
+  return { ...SETTINGS_DEFAULTS }
 }
 const settings = loadSettings()
-audio.setMusicVolume(settings.music)
-audio.setSfxVolume(settings.sfx)
-hud.initSettings(settings)
-hud.onOpenSettings = () => hud.showSettings()
-hud.onCloseSettings = () => {
-  hud.hideSettings()
-  hud.showStart(game.phase === 'playing')
+
+/** Toggling the shadow pass forces a material recompile, so only flip it on change. */
+function applyShadows(on: boolean): void {
+  if (renderer.shadowMap.enabled === on) return
+  renderer.shadowMap.enabled = on
+  scene.traverse((obj) => {
+    const mat = (obj as { material?: unknown }).material
+    if (!mat) return
+    for (const m of Array.isArray(mat) ? mat : [mat]) (m as { needsUpdate: boolean }).needsUpdate = true
+  })
 }
-hud.onSettingsChange = (values) => {
-  Object.assign(settings, values)
+
+function persistSettings(): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
   } catch {
     // private mode: settings just do not persist
   }
+}
+
+function applySettings(values: SettingsValues): void {
+  Object.assign(settings, values)
   audio.setMusicVolume(values.music)
   audio.setSfxVolume(values.sfx)
+  applyShadows(values.shadows)
+  // sensitivity, invertY and fov are read live each frame / mouse event
+}
+
+audio.setMusicVolume(settings.music)
+audio.setSfxVolume(settings.sfx)
+applyShadows(settings.shadows)
+hud.initSettings(settings)
+hud.onOpenSettings = () => hud.showSettings()
+hud.onCloseSettings = () => {
+  hud.hideSettings()
+  hud.showStart(game.phase === 'playing', game)
+}
+hud.onSettingsChange = (values) => {
+  applySettings(values)
+  persistSettings()
+}
+hud.onResetSettings = () => {
+  applySettings({ ...SETTINGS_DEFAULTS })
+  hud.initSettings(settings)
+  persistSettings()
+}
+
+/** A confirmed abandon must not resurrect: park the phase so pagehide skips the save. */
+function dropRunAndGo(navigate: () => void): void {
+  if (game.phase === 'playing' || game.phase === 'upgrading') {
+    saveBest(game) // the earned score still counts
+    game.phase = 'menu'
+    clearRun()
+  }
+  navigate()
+}
+
+/** Wraps a run-destroying action in the shared confirm plate while a run is live. */
+function confirmIfMidRun(text: string, yesLabel: string, action: () => void): void {
+  if (game.phase !== 'playing' && game.phase !== 'upgrading') {
+    action()
+    return
+  }
+  hud.showConfirm(text, yesLabel, action)
 }
 
 // game modes: pick in the menu; switching reloads into the new mode (URL carries it)
-hud.onOpenModes = () => hud.showModes(GAME_MODES, game.mode.id)
+hud.onOpenModes = () => {
+  // each card carries your record on it: what winning means, and where you stand
+  const bests: Record<string, string> = {}
+  if (game.best.bestScore > 0) bests.waves = `Best ${game.best.bestScore} · Wave ${game.best.bestWave}`
+  const raceBest = loadRaceBest(game.storage, seed)
+  if (raceBest) bests.race = `Best ${formatRaceTime(raceBest.time)} on this course`
+  const huntBest = loadHuntBest(game.storage, seed)
+  if (huntBest) bests.hunt = `Best Level ${huntBest.level} on this district`
+  hud.showModes(GAME_MODES, game.mode.id, bests)
+}
 hud.onCloseModes = () => {
   hud.hideModes()
-  hud.showStart(game.phase === 'playing')
+  hud.showStart(game.phase === 'playing', game)
 }
 hud.onPickMode = (id) => {
   if (id === game.mode.id) {
     hud.onCloseModes()
     return
   }
-  try {
-    localStorage.setItem(MODE_KEY, id)
-  } catch {
-    // private mode: the URL param below still carries the choice
-  }
-  const params = new URLSearchParams(location.search)
-  params.set('mode', id)
-  location.search = params.toString()
+  confirmIfMidRun(
+    `Switching to ${GAME_MODES.find((m) => m.id === id)?.name ?? id} ends your current run.`,
+    'Switch Mode',
+    () =>
+      dropRunAndGo(() => {
+        try {
+          localStorage.setItem(MODE_KEY, id)
+        } catch {
+          // private mode: the URL param below still carries the choice
+        }
+        const params = new URLSearchParams(location.search)
+        params.set('mode', id)
+        location.search = params.toString()
+      }),
+  )
 }
 
 // featured course: one seed the menu promotes so global times contest the same line
 hud.initFeatured(FEATURED_SEED, seed === FEATURED_SEED)
-hud.onFeatured = () => {
-  const params = new URLSearchParams(location.search)
-  params.set('seed', FEATURED_SEED)
-  location.search = params.toString()
-}
+hud.onFeatured = () =>
+  confirmIfMidRun('Deploying to the featured district ends your current run.', 'To the Course', () =>
+    dropRunAndGo(() => {
+      const params = new URLSearchParams(location.search)
+      params.set('seed', FEATURED_SEED)
+      location.search = params.toString()
+    }),
+  )
 
 /** A finished trial posts to the board when signed in; localStorage PBs always work. */
 function submitTrial(body: Parameters<typeof postTrial>[1]): void {
@@ -375,18 +458,32 @@ window.addEventListener('keydown', (e) => {
 hud.onRestart = () => {
   // abandon the current round and take the field again from wave 1, same seed and mode
   if (touchOnly) return
-  audio.init()
-  hud.hideStart()
-  pauseShown = false
-  clearRun()
-  startGame(game)
-  prevPhase = game.phase
-  if (waveBased()) announceWave(game.wave)
-  else hud.showBanner(game.mode.name)
-  persistRun()
-  track('run_started', { mode: game.mode.id, coop: coopMode, seed })
-  lockPointer()
+  confirmIfMidRun('Back to wave one, same district. Your current run ends here.', 'Restart Run', () => {
+    audio.init()
+    hud.hideStart()
+    pauseShown = false
+    saveBest(game) // the abandoned score still counts toward the record
+    clearRun()
+    startGame(game)
+    prevPhase = game.phase
+    if (waveBased()) announceWave(game.wave)
+    else hud.showBanner(game.mode.name)
+    persistRun()
+    track('run_started', { mode: game.mode.id, coop: coopMode, seed })
+    lockPointer()
+  })
 }
+hud.onGiveUp = () => {
+  // end the run deliberately: the report gets filed exactly as it stands
+  confirmIfMidRun('The report gets filed as it stands. There is no coming back.', 'Abandon Run', () => {
+    abandonedRun = true
+    saveBest(game)
+    track('run_abandoned', { mode: game.mode.id, wave: game.wave, score: game.score.score, seed })
+    game.phase = 'dead' // the main loop's phase transition files the report and clears the save
+  })
+}
+// declining a confirm lands back on the pause menu the action came from
+hud.onConfirmCancel = () => hud.showStart(game.phase === 'playing', game)
 hud.onPickUpgrade = (id) => {
   audio.init()
   audio.chime()
@@ -437,10 +534,10 @@ if (restored) {
     hud.hideStart()
     hud.showUpgrades(game.offers)
   } else {
-    hud.showStart(true) // straight back to the paused run: one click resumes
+    hud.showStart(true, game) // straight back to the paused run: one click resumes
   }
 } else if (!coopMode && !playgroundMode) {
-  hud.showStart()
+  hud.showStart(false, game)
 }
 
 // --- co-op: lobby flow, match mirrors, server events -------------------------
@@ -765,7 +862,7 @@ hud.onOpenCoop = () => {
 hud.onCloseCoop = () => {
   hud.hideCoop()
   if (coopMode) gotoLobby(null)
-  else hud.showStart(game.phase === 'playing')
+  else hud.showStart(game.phase === 'playing', game)
 }
 hud.onAuth = (mode, username, password) => {
   const request = mode === 'register' ? register(username, password) : login(username, password)
@@ -811,10 +908,12 @@ try {
   // corrupt cache: first open shows skeletons instead
 }
 hud.onOpenLeaderboard = () => {
-  hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading')
+  const you = loadAccount()?.username ?? null
+  hud.setLeaderboardIdentity(you) // signed-out visitors learn how names get on the board
+  hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading', you)
   hud.showTrialBoards(seed, null, 'loading')
   void fetchTrials(seed).then((boards) => {
-    if (hud.leaderboardOpen) hud.showTrialBoards(seed, boards, boards ? 'ready' : 'error')
+    if (hud.leaderboardOpen) hud.showTrialBoards(seed, boards, boards ? 'ready' : 'error', you)
   })
   void fetchLeaderboard().then((data) => {
     if (data) {
@@ -824,7 +923,7 @@ hud.onOpenLeaderboard = () => {
       } catch {
         // cache is a nicety
       }
-      if (hud.leaderboardOpen) hud.showLeaderboard(data)
+      if (hud.leaderboardOpen) hud.showLeaderboard(data, 'ready', you)
     } else if (!leaderboardCache && hud.leaderboardOpen) {
       hud.showLeaderboard(null, 'error')
     }
@@ -832,7 +931,7 @@ hud.onOpenLeaderboard = () => {
 }
 hud.onCloseLeaderboard = () => {
   hud.hideLeaderboard()
-  if (!coopMode) hud.showStart(game.phase === 'playing')
+  if (!coopMode) hud.showStart(game.phase === 'playing', game)
 }
 
 // --- dev playground (compile-time false in production) -----------------------
@@ -1136,6 +1235,7 @@ let last = performance.now()
 let acc = 0
 let prevPhase = game.phase
 let pauseShown = false
+let abandonedRun = false // a Give Up retitles the death report; a real death never does
 let prevCrippled = new Set<number>()
 let saveTimer = 0
 let hitstop = 0 // brief sim freeze on kills; rendering continues
@@ -1221,7 +1321,7 @@ renderer.setAnimationLoop(() => {
       acc -= SIM_DT
     }
   } else if (!coopMode && game.phase === 'playing' && !debug.autopilot && !debug.silent && !pauseShown) {
-    hud.showStart(true)
+    hud.showStart(true, game)
     pauseShown = true
   }
 
@@ -1243,7 +1343,8 @@ renderer.setAnimationLoop(() => {
         if (game.mode.id === 'hunt' && game.wave > 1) {
           submitTrial({ mode: 'hunt', seed, level: game.wave - 1, score: game.score.score })
         }
-        hud.showDeath(game)
+        hud.showDeath(game, abandonedRun)
+        abandonedRun = false
         clearRun()
       }
     }
@@ -1264,8 +1365,11 @@ renderer.setAnimationLoop(() => {
     camera.position.copy(game.player.pos)
   }
   const speed = game.player.vel.length()
-  // the strike dash slams the FOV wide open; the snap-in is most of the ZOOM feel
-  const targetFov = game.strike ? 112 : 75 + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
+  // the strike dash slams the FOV wide open; the snap-in is most of the ZOOM feel.
+  // The settings FOV is the base; speed widening and the strike offset ride on top.
+  const targetFov = game.strike
+    ? settings.fov + 37
+    : settings.fov + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
   camera.fov += (targetFov - camera.fov) * Math.min(1, dt * (game.strike ? 18 : 8))
   camera.updateProjectionMatrix()
   effects.applyShake(camera)
@@ -1467,12 +1571,7 @@ function snapshot() {
     },
     // toggle the whole real-time shadow pass; materials recompile on the flip
     shadows(on: boolean) {
-      renderer.shadowMap.enabled = on
-      scene.traverse((obj) => {
-        const mat = (obj as { material?: unknown }).material
-        if (!mat) return
-        for (const m of Array.isArray(mat) ? mat : [mat]) (m as { needsUpdate: boolean }).needsUpdate = true
-      })
+      applyShadows(on)
     },
     info: () => ({ ...renderer.info.render, ...renderer.info.memory, pixelRatio: renderer.getPixelRatio() }),
   },

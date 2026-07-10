@@ -4,6 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wings of Freedom — ODM Wave Survival</title>
+    <meta
+      name="description"
+      content="Free browser game: swing through a procedural walled city on ODM gear and cut titan napes at speed. Wave survival, time trials and 4-player co-op. No install, no ads."
+    />
+    <meta property="og:title" content="Wings of Freedom — ODM Wave Survival" />
+    <meta
+      property="og:description"
+      content="Free browser game: swing through a procedural walled city on ODM gear and cut titan napes at speed. Wave survival, time trials and 4-player co-op. No install, no ads."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://attack-on-titan.magnusrodseth.com/" />
+    <meta property="og:image" content="https://attack-on-titan.magnusrodseth.com/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Wings of Freedom" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Wings of Freedom — ODM Wave Survival" />
+    <meta
+      name="twitter:description"
+      content="Free browser game: swing through a procedural walled city on ODM gear and cut titan napes at speed. Wave survival, time trials and 4-player co-op. No install, no ads."
+    />
+    <meta name="twitter:image" content="https://attack-on-titan.magnusrodseth.com/og.jpg" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚔️</text></svg>" />
     <style>
       @font-face {
@@ -245,13 +267,21 @@
       #grab-hint kbd { vertical-align: 2px; margin: 0 4px; }
       @keyframes grab-mash { 50% { transform: scale(1.1); } }
 
-      /* overlays */
+      /* overlays. Centering comes from the auto margins on the first/last child, not
+         justify-content: centered flex overflow clips off BOTH screen edges with no way
+         to scroll to it, while auto margins collapse to zero and let the panel scroll. */
       .overlay {
-        position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
         background: radial-gradient(ellipse at 50% 30%, #16111ae6 0%, #07060af5 78%);
         pointer-events: auto; text-align: center; gap: 16px;
+        overflow-y: auto; padding: 26px 20px;
+        scrollbar-width: thin; scrollbar-color: #6b5124 transparent;
       }
+      .overlay > :first-child { margin-top: auto; }
+      .overlay > :last-child { margin-bottom: auto; }
       .overlay.hidden { display: none; }
+      /* an open menu hides the combat chrome behind it; the dark plate reads clean */
+      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #race-dist, #race-caret) { visibility: hidden; }
       .overlay h1 { font-size: 84px; }
       .overlay h2 { font-size: 58px; }
       #mobile-gate { z-index: 10; background: radial-gradient(ellipse at 50% 30%, #16111afb, #07060aff 78%); }
@@ -263,12 +293,28 @@
         #start.paused .menu-col { grid-template-columns: 1fr; }
       }
       .overlay .sub { color: var(--parchment); opacity: 0.85; font-size: 21px; max-width: 720px; line-height: 1.6; }
-      .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.3; letter-spacing: 0.5px; max-width: 1060px; }
+      .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.05; letter-spacing: 0.5px; max-width: 1060px; }
       .overlay .keys kbd { margin: 0 2px; vertical-align: 1px; }
       .overlay .keys .key-item { white-space: nowrap; } /* a key never wraps away from its label */
+      /* each control cluster opens with a small brass label so the wall scans as rows */
+      .overlay .keys .key-group {
+        font-family: var(--header-font); font-size: 12px; font-weight: 700;
+        letter-spacing: 3px; text-transform: uppercase; color: var(--brass-bright);
+        margin-right: 10px;
+      }
       .menu-col { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 6px; }
       .menu-col button.hidden { display: none; }
-      #start.paused .menu-col { display: grid; grid-template-columns: 1fr 1fr; }
+      /* pause layout: Resume owns its own row; the grid caps its cells so the widest
+         label cannot inflate every button to half the screen */
+      #start.paused .menu-col { display: grid; grid-template-columns: repeat(2, minmax(300px, 420px)); justify-content: center; }
+      #start.paused #start-btn, #start.paused #featured-btn, #start.paused .menu-row { grid-column: 1 / -1; justify-self: center; }
+      #start.paused #featured-note { display: none; }
+      /* races hide Abandon (nothing to report), so Restart takes the full row instead */
+      body.race #start.paused #restart-btn { grid-column: 1 / -1; justify-self: center; }
+      /* small utility row: secondary destinations that don't deserve full plates */
+      .menu-row { display: flex; gap: 14px; justify-content: center; align-items: center; }
+      .overlay button.compact { min-width: 150px; font-size: 14px; letter-spacing: 3px; padding: 11px 26px; }
+      .menu-note { font-size: 15px; color: var(--parchment); opacity: 0.6; letter-spacing: 0.5px; max-width: 560px; line-height: 1.5; margin-top: -6px; }
 
       /* AoT plate buttons: chamfered steel over dark linen, brass rim, crimson underglow.
          The plate lives on ::before (clipped); the rim is offset drop-shadows on the
@@ -338,6 +384,8 @@
           drop-shadow(0 0 12px #c1121f88) drop-shadow(0 8px 12px #000b);
       }
       .card .card-tag { font-family: var(--header-font); font-size: 13px; font-weight: 700; letter-spacing: 4px; color: var(--brass-bright); margin-top: 12px; }
+      .card .card-pb { font-family: var(--header-font); font-size: 13px; letter-spacing: 2px; color: #ffd57a; margin-top: 12px; }
+      .card:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 3px; }
       .card {
         pointer-events: auto; cursor: pointer; position: relative; width: 230px; padding: 24px 18px;
         filter:
@@ -374,6 +422,9 @@
       /* settings */
       .set-rows { display: flex; flex-direction: column; gap: 20px; margin: 10px 0 14px; }
       .set-row { display: flex; align-items: center; gap: 18px; }
+      /* on/off plates line up where the sliders start; the lit state reads brass */
+      .overlay button.toggle { min-width: 120px; font-size: 14px; letter-spacing: 3px; padding: 10px 22px; }
+      .overlay button.toggle[data-on='1'] { color: var(--brass-bright); text-shadow: 0 0 10px #ffd57a55, 0 2px 3px #000d; }
       .set-label { font-family: var(--header-font); font-size: 17px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--parchment); width: 260px; text-align: right; }
       .set-val { font-size: 19px; color: var(--brass-bright); width: 68px; text-align: left; }
       .set-row input[type='range'] {
@@ -464,6 +515,7 @@
         font-size: 16px; color: var(--parchment); }
       .lb-row b { color: #ffd57a; font-family: var(--header-font); letter-spacing: 1px; }
       .lb-row .lb-sub { color: #9b8a68; font-size: 13px; letter-spacing: 1px; }
+      .lb-row.mine { border-color: var(--brass-bright); box-shadow: 0 0 12px #c1121f44; }
       .lb-empty { color: #9b8a68; font-size: 16px; padding: 12px; min-height: 22px; }
       .lb-rows { min-height: 230px; } /* five rows: data replaces skeletons without layout shift */
       .lb-row.skeleton { pointer-events: none; }
@@ -558,6 +610,7 @@
         <div class="ctl-row"><span class="ctl-label">spear</span><kbd>E</kbd></div>
         <div class="ctl-row ctl-focus"><span class="ctl-label">focus</span><kbd>Q</kbd></div>
         <div class="ctl-row"><span class="ctl-label">resupply</span><kbd>R</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">pause</span><kbd>Esc</kbd></div>
       </div>
       <div id="banner" class="aot-title"></div>
       <div id="popup"></div>
@@ -577,26 +630,37 @@
 
       <div id="start" class="overlay">
         <h1 class="aot-title">Wings of Freedom</h1>
-        <div class="sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
+        <div class="sub" id="start-sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
+        <div class="seedline" id="start-context"></div>
         <div class="keys">
-          <span class="key-item"><kbd>Mouse</kbd> look</span> ·
-          <span class="key-item"><kbd>LMB</kbd> / <kbd>RMB</kbd> (or <kbd>J</kbd> / <kbd>K</kbd>) hold to hook &amp; winch in, release to let go</span><br />
-          <span class="key-item"><kbd>Space</kbd> jump</span> ·
-          <span class="key-item"><kbd>Shift</kbd> boost burst</span> ·
-          <span class="key-item"><kbd>Q</kbd> focus (3 kills charge it; slows time)</span> ·
-          <span class="key-item"><kbd>F</kbd> slash — or nape strike in focus</span> ·
-          <span class="key-item"><kbd>E</kbd> / <kbd>MMB</kbd> thunder spear</span> ·
-          <span class="key-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> run</span> ·
-          <span class="key-item"><kbd>R</kbd> resupply</span>
+          <div><span class="key-group">Move</span>
+            <span class="key-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> run</span> ·
+            <span class="key-item"><kbd>Mouse</kbd> look</span> ·
+            <span class="key-item"><kbd>Space</kbd> jump</span> ·
+            <span class="key-item"><kbd>Shift</kbd> boost burst</span></div>
+          <div><span class="key-group">Grapple</span>
+            <span class="key-item"><kbd>LMB</kbd> / <kbd>RMB</kbd> (or <kbd>J</kbd> / <kbd>K</kbd>)</span>
+            hold to hook &amp; winch in, release to let go</div>
+          <div><span class="key-group">Fight</span>
+            <span class="key-item"><kbd>F</kbd> slash</span> ·
+            <span class="key-item"><kbd>E</kbd> / <kbd>MMB</kbd> thunder spear</span> ·
+            <span class="key-item"><kbd>Q</kbd> focus</span> (3 kills charge it; slows time, then <span class="key-item"><kbd>F</kbd> strikes the nape</span>)</div>
+          <div><span class="key-group">Field</span>
+            <span class="key-item"><kbd>R</kbd> resupply</span> ·
+            <span class="key-item"><kbd>Esc</kbd> pause</span></div>
         </div>
         <div class="menu-col">
           <button id="start-btn" class="primary">Deploy Your Soldier</button>
           <button id="restart-btn" class="hidden solo-only">Restart Run</button>
+          <button id="giveup-btn" class="hidden solo-only">Abandon Run</button>
           <button id="coop-btn" class="solo-only">Multiplayer</button>
           <button id="modes-btn" class="solo-only">Game Mode</button>
           <button id="featured-btn" class="solo-only"></button>
-          <button id="leaderboard-btn">Leaderboard</button>
-          <button id="settings-btn">Settings</button>
+          <div class="menu-note solo-only" id="featured-note">One fixed district shared by every soldier: its trial times fill the global boards.</div>
+          <div class="menu-row" id="menu-row">
+            <button id="leaderboard-btn" class="compact">Leaderboard</button>
+            <button id="settings-btn" class="compact">Settings</button>
+          </div>
         </div>
       </div>
 
@@ -676,6 +740,7 @@
             <div class="lb-rows" id="lb-hunt"></div>
           </div>
         </div>
+        <div class="coop-note" id="lb-signin"></div>
         <button id="leaderboard-back">Back</button>
       </div>
 
@@ -704,7 +769,25 @@
             <input id="set-sens" type="range" min="30" max="200" step="5" />
             <span class="set-val" id="set-sens-val"></span>
           </div>
+          <div class="set-row">
+            <span class="set-label">Field of View</span>
+            <input id="set-fov" type="range" min="60" max="110" step="5" />
+            <span class="set-val" id="set-fov-val"></span>
+          </div>
+          <div class="set-row">
+            <span class="set-label">Invert Mouse Y</span>
+            <button id="set-invert" class="toggle">Off</button>
+          </div>
+          <div class="set-row">
+            <span class="set-label">Shadows</span>
+            <button id="set-shadows" class="toggle">On</button>
+          </div>
+          <div class="set-row">
+            <span class="set-label">Fullscreen</span>
+            <button id="set-fullscreen" class="toggle">Off</button>
+          </div>
         </div>
+        <button id="settings-reset" class="textlink">Reset to defaults</button>
         <button id="settings-back">Back</button>
       </div>
 
@@ -737,6 +820,15 @@
         <div id="race-splits"></div>
         <button id="race-again-btn" class="primary">Run It Again — R</button>
         <div class="seedline" id="race-seed"></div>
+      </div>
+
+      <div id="confirm" class="overlay hidden">
+        <h2 class="aot-title">Abandon the Run?</h2>
+        <div class="sub" id="confirm-text"></div>
+        <div class="menu-col">
+          <button id="confirm-yes" class="primary"></button>
+          <button id="confirm-no">Back to Safety</button>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
