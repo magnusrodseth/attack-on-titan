@@ -99,6 +99,7 @@ const minimap = new Minimap(game.arena)
 const spearsView = new SpearsView(scene)
 const gatesView = new GatesView(scene)
 hud.setRaceUi(game.mode.id === 'race')
+hud.setHuntUi(game.mode.id === 'hunt')
 let roarTimer = 3
 
 // --- input -----------------------------------------------------------------
@@ -233,11 +234,16 @@ function beginRun(): void {
   lockPointer()
 }
 
-const waveBased = () => game.mode.id === 'waves' || game.mode.id === 'matchday'
+const waveBased = () =>
+  game.mode.id === 'waves' || game.mode.id === 'matchday' || game.mode.id === 'hunt'
 
 /** Every 3rd wave the footballers walk; in Matchday mode, every wave is theirs. */
 function announceWave(wave: number): void {
-  if (game.mode.id === 'matchday' || isMatchday(wave)) {
+  if (game.mode.id === 'hunt') {
+    // The Culling speaks in levels; the matchday duo still gets its drum
+    hud.showBanner(`Level ${wave}`, 2400)
+    if (isMatchday(wave)) audio.boom()
+  } else if (game.mode.id === 'matchday' || isMatchday(wave)) {
     hud.showBanner(`Matchday · Wave ${wave}`, 3000)
     audio.boom()
   } else {
@@ -850,6 +856,7 @@ function handleEvents(events: GameEvent[]): void {
           effects.burst(nape.clone().add(new Vector3(0, 2.2, 0)), 0xbfc7cc, 26) // steam
           audio.playAt('death-groan', titan.pos.distanceTo(game.player.pos), { volume: 1.2 })
         }
+        if (game.mode.id === 'hunt') hud.huntKillFlash()
         effects.addShake(aberrant ? 0.6 : 0.45)
         hitstop = aberrant ? 0.14 : 0.09 // a heartbeat of frozen time sells the cut
         audio.killHit(aberrant ? 0.85 : 0.65)
@@ -982,6 +989,15 @@ function handleEvents(events: GameEvent[]): void {
       case 'raceArmed':
       case 'raceRestart':
         break // the HUD and the columns re-derive from race state
+      case 'huntUrgency':
+        // the heartbeat layer rises from state each frame; this is the moment it turns
+        hud.showBanner('The Clock Runs Thin', 2000)
+        audio.thud(0.55)
+        break
+      case 'huntTimeout':
+        effects.addShake(0.8)
+        audio.boom()
+        break
     }
   }
 }
@@ -1196,6 +1212,10 @@ renderer.setAnimationLoop(() => {
   const lamp =
     lampOn(clock) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
   hud.update(game, { speed, nearStation, hookInRange, lamp })
+
+  if (game.mode.id === 'hunt') {
+    audio.setHeartbeat(game.hunt !== null && hud.updateHunt(game))
+  }
 
   if (game.race) {
     // project the active gate: distance readout on screen, an edge caret when it is not

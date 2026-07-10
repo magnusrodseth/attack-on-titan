@@ -59,6 +59,9 @@ export class AudioSystem {
   private buffers = new Map<string, AudioBuffer>()
   private musicTracks: HTMLAudioElement[] = []
   private musicIndex = 0
+  private heartGain: GainNode | null = null
+  private heartTimer: number | undefined
+  private heartOn = false
 
   /** Idempotent; must be called from a user gesture (DEPLOY / retry / upgrade click). */
   init(): void {
@@ -342,6 +345,52 @@ export class AudioSystem {
     osc.connect(gain).connect(this.sfx)
     osc.start()
     osc.stop(ctx.currentTime + 0.55)
+  }
+
+  /**
+   * The Culling's urgency layer: a low heartbeat that rises on its own gain when the
+   * countdown enters panic range and fades out the moment the pressure lifts. Rides the
+   * sfx bus so the volume slider and menu ducking own it like everything else.
+   */
+  setHeartbeat(on: boolean): void {
+    if (on === this.heartOn) return
+    this.heartOn = on
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    if (!this.heartGain) {
+      this.heartGain = ctx.createGain()
+      this.heartGain.gain.value = 0
+      this.heartGain.connect(this.sfx)
+    }
+    this.heartGain.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, on ? 1.1 : 0.25)
+    if (on && this.heartTimer === undefined) {
+      const beat = () => {
+        this.heartThump(0)
+        this.heartThump(0.22)
+      }
+      beat()
+      this.heartTimer = window.setInterval(beat, 900)
+    } else if (!on && this.heartTimer !== undefined) {
+      window.clearInterval(this.heartTimer)
+      this.heartTimer = undefined
+    }
+  }
+
+  private heartThump(delay: number): void {
+    const ctx = this.ctx
+    if (!ctx || !this.heartGain) return
+    const at = ctx.currentTime + delay
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(58, at)
+    osc.frequency.exponentialRampToValueAtTime(34, at + 0.14)
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, at)
+    gain.gain.exponentialRampToValueAtTime(0.5, at + 0.015)
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.2)
+    osc.connect(gain).connect(this.heartGain)
+    osc.start(at)
+    osc.stop(at + 0.25)
   }
 
   /** Player-death sub boom. */

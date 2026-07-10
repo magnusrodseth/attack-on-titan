@@ -61,6 +61,10 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   GATE n/N, PB split deltas flashed green/red, meters-to-gate with an edge caret from camera
   projection; `body.race` hides combat rows (gas stays, speedo goes m/s); results overlay
   with split table + "Run It Again — R"; `__aot.step` now routes events like the live loop.
+- [Hunt HUD](tickets/tt-007-hunt-hud.md) — countdown strip (m:ss + TITANS LEFT kill-flash),
+  levels in the wave banners, urgency at 20%: red pulsing clock, creeping vignette, and a
+  procedural heartbeat GainNode on the sfx bus driven from state each frame; run-over card
+  shows level/cleared/kills/score + best-level PB ("The Clock Ran Out" on timeout).
 
 ## Not yet specified
 

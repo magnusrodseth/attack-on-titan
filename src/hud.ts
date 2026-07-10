@@ -1,6 +1,7 @@
 import type { Leaderboard, LobbyMsg } from './net/protocol'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
+import { HUNT_URGENCY_FRACTION } from './sim/hunt'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
 
@@ -91,6 +92,10 @@ export class Hud {
   private raceCaret = el('race-caret')
   private raceResults = el('race-results')
   private raceSplitTimer: number | undefined
+  private huntStrip = el('hunt-strip')
+  private huntTimer = el('hunt-timer')
+  private huntLeft = el('hunt-left')
+  private huntVignette = el('hunt-vignette')
 
   private coopPanel = el('coop')
   private lobbyPanel = el('lobby')
@@ -354,6 +359,37 @@ export class Hud {
 
   hideRaceResults(): void {
     this.raceResults.classList.add('hidden')
+  }
+
+  // --- The Culling countdown strip ----------------------------------------------
+
+  setHuntUi(active: boolean): void {
+    this.huntStrip.classList.toggle('hidden', !active)
+  }
+
+  /**
+   * Per-frame hunt readout: countdown, titans left, urgency styling.
+   * Returns whether the urgency layer is live so main can drive the heartbeat.
+   */
+  updateHunt(game: GameState): boolean {
+    const hunt = game.hunt
+    if (!hunt) return false
+    const total = Math.max(0, Math.ceil(hunt.timeLeft))
+    this.huntTimer.textContent = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+    const alive = game.titans.filter((t) => t.hp > 0).length
+    this.huntLeft.textContent = `TITANS LEFT · ${alive}`
+    const urgent =
+      game.phase === 'playing' && hunt.timeLeft <= hunt.budget * HUNT_URGENCY_FRACTION
+    this.huntTimer.classList.toggle('urgent', urgent)
+    this.huntVignette.classList.toggle('on', urgent)
+    return urgent
+  }
+
+  /** A kill flashes the TITANS LEFT counter: one fewer between you and the next breath. */
+  huntKillFlash(): void {
+    this.huntLeft.classList.remove('pop')
+    void this.huntLeft.offsetWidth // restart the CSS animation
+    this.huntLeft.classList.add('pop')
   }
 
   showBanner(text: string, ms = 1800): void {
@@ -628,11 +664,27 @@ export class Hud {
   }
 
   showDeath(game: GameState): void {
-    this.deathStats.innerHTML = [
-      `SCORE <b>${game.score.score}</b>`,
-      `WAVE <b>${game.wave}</b> · KILLS <b>${game.score.kills}</b> · BEST CHAIN <b>${game.score.bestChain}</b>`,
-      `ALL-TIME BEST <b>${game.best.bestScore}</b> · WAVE <b>${game.best.bestWave}</b>`,
-    ].join('<br />')
+    const title = this.death.querySelector('h2')!
+    if (game.mode.id === 'hunt') {
+      // the hunt's run-over card: how deep you got, and what the seed's record is
+      const timedOut = game.hunt !== null && game.hunt.timeLeft <= 0
+      title.textContent = timedOut ? 'The Clock Ran Out' : 'Devoured'
+      const best = game.hunt?.best
+      this.deathStats.innerHTML = [
+        `LEVEL <b>${game.wave}</b> · CLEARED <b>${Math.max(0, game.wave - 1)}</b>`,
+        `KILLS <b>${game.score.kills}</b> · SCORE <b>${game.score.score}</b>`,
+        best ? `BEST · LEVEL <b>${best.level}</b> · SCORE <b>${best.score}</b>` : '',
+      ]
+        .filter(Boolean)
+        .join('<br />')
+    } else {
+      title.textContent = 'Devoured'
+      this.deathStats.innerHTML = [
+        `SCORE <b>${game.score.score}</b>`,
+        `WAVE <b>${game.wave}</b> · KILLS <b>${game.score.kills}</b> · BEST CHAIN <b>${game.score.bestChain}</b>`,
+        `ALL-TIME BEST <b>${game.best.bestScore}</b> · WAVE <b>${game.best.bestWave}</b>`,
+      ].join('<br />')
+    }
     this.death.classList.remove('hidden')
   }
 
