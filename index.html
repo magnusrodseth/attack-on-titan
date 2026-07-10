@@ -115,6 +115,37 @@
       #speedo { position: absolute; right: 24px; bottom: 24px; font-family: var(--header-font); font-size: 15px; letter-spacing: 2px; opacity: 0.8; text-align: right; }
       #speedo .fast { color: #9fe2ff; }
 
+      /* keycaps: brass-rimmed steel caps shared by the menu legend and the in-game controls */
+      kbd {
+        display: inline-block; font-family: var(--header-font); font-weight: 700;
+        font-size: 12px; line-height: 1; letter-spacing: 1px; color: var(--parchment);
+        padding: 4px 7px 3px; min-width: 24px; text-align: center;
+        background: linear-gradient(180deg, #3a3121, #241c10 60%, #1a1309);
+        border: 1px solid var(--brass); border-bottom-width: 3px; border-bottom-color: #4a3818;
+        border-radius: 4px;
+        box-shadow: inset 0 1px 0 #ffffff1f, 0 2px 3px #000b;
+        text-shadow: 0 1px 2px #000c;
+      }
+
+      /* lower right: always-on control reference, stacked above the speedometer.
+         The dark plate keeps it readable over bright daylight pavement. */
+      #controls {
+        position: absolute; right: 24px; bottom: 54px;
+        display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
+        padding: 11px 13px;
+        background: linear-gradient(180deg, #16111ac2, #0b0e12d6);
+        border: 1px solid #6b512466;
+        box-shadow: inset 0 0 16px #0008, 0 2px 8px #0007;
+      }
+      #controls .ctl-row { display: flex; align-items: center; gap: 4px; }
+      #controls .ctl-label {
+        font-family: var(--header-font); font-size: 10px; letter-spacing: 2px;
+        text-transform: uppercase; color: var(--parchment); opacity: 0.85;
+        margin-right: 5px; text-shadow: 0 1px 2px #000c;
+      }
+      #controls kbd { font-size: 10px; padding: 3px 5px 2px; min-width: 18px; }
+      body.coop #controls .ctl-focus { display: none; } /* focus does not exist in the shared world */
+
       /* wave banner + point popups */
       #banner {
         position: absolute; left: 50%; top: 18%; transform: translateX(-50%);
@@ -174,8 +205,9 @@
         #start.paused .menu-col { grid-template-columns: 1fr; }
       }
       .overlay .sub { color: var(--parchment); opacity: 0.85; font-size: 21px; max-width: 720px; line-height: 1.6; }
-      .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.1; letter-spacing: 0.5px; }
-      .overlay .keys b { font-family: var(--header-font); font-size: 15px; color: var(--brass-bright); letter-spacing: 1px; }
+      .overlay .keys { font-size: 18px; color: #d9cfbc; opacity: 0.9; line-height: 2.3; letter-spacing: 0.5px; max-width: 1060px; }
+      .overlay .keys kbd { margin: 0 2px; vertical-align: 1px; }
+      .overlay .keys .key-item { white-space: nowrap; } /* a key never wraps away from its label */
       .menu-col { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 6px; }
       .menu-col button.hidden { display: none; }
       #start.paused .menu-col { display: grid; grid-template-columns: 1fr 1fr; }
@@ -447,6 +479,16 @@
       <div id="feed"></div>
       <div id="focus-vignette"></div>
       <div id="speedo"></div>
+      <div id="controls">
+        <div class="ctl-row"><span class="ctl-label">hook</span><kbd>LMB</kbd><kbd>RMB</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">run</span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">jump</span><kbd>Space</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">boost</span><kbd>Shift</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">slash</span><kbd>F</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">spear</span><kbd>E</kbd></div>
+        <div class="ctl-row ctl-focus"><span class="ctl-label">focus</span><kbd>Q</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">resupply</span><kbd>R</kbd></div>
+      </div>
       <div id="banner" class="aot-title"></div>
       <div id="popup"></div>
       <div id="prompt"></div>
@@ -460,8 +502,15 @@
         <h1 class="aot-title">Wings of Freedom</h1>
         <div class="sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
         <div class="keys">
-          <b>Mouse</b> look &nbsp;·&nbsp; <b>LMB / RMB</b> (or <b>J / K</b>) hold to hook &amp; winch in, release to let go<br />
-          <b>Space</b> jump &nbsp;·&nbsp; <b>Shift</b> boost burst &nbsp;·&nbsp; <b>Q</b> focus (3 kills charge it; slows time) &nbsp;·&nbsp; <b>F</b> slash — or nape strike in focus &nbsp;·&nbsp; <b>E / MMB</b> thunder spear &nbsp;·&nbsp; <b>W A S D</b> run &nbsp;·&nbsp; <b>R</b> resupply
+          <span class="key-item"><kbd>Mouse</kbd> look</span> ·
+          <span class="key-item"><kbd>LMB</kbd> / <kbd>RMB</kbd> (or <kbd>J</kbd> / <kbd>K</kbd>) hold to hook &amp; winch in, release to let go</span><br />
+          <span class="key-item"><kbd>Space</kbd> jump</span> ·
+          <span class="key-item"><kbd>Shift</kbd> boost burst</span> ·
+          <span class="key-item"><kbd>Q</kbd> focus (3 kills charge it; slows time)</span> ·
+          <span class="key-item"><kbd>F</kbd> slash — or nape strike in focus</span> ·
+          <span class="key-item"><kbd>E</kbd> / <kbd>MMB</kbd> thunder spear</span> ·
+          <span class="key-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> run</span> ·
+          <span class="key-item"><kbd>R</kbd> resupply</span>
         </div>
         <div class="menu-col">
           <button id="start-btn" class="primary">Deploy Your Soldier</button>
