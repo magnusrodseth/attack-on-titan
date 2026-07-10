@@ -41,6 +41,12 @@ export class CoopSession {
   private socket: RoomSocket | null = null
   private fatalSent = false
   private leftOnPurpose = false
+  // snapshot arrival cadence — the server sends every 50 ms, so gaps well above that
+  // mean a server stall or network jitter (remote entities rubber-band even at high fps)
+  private lastSnapAt = 0
+  private snapCount = 0
+  private snapGapAcc = 0
+  private snapGapWorst = 0
 
   constructor(code: string, account: Account, private hooks: CoopHooks) {
     this.code = code
@@ -72,7 +78,15 @@ export class CoopSession {
         return
       }
       case 'snapshot': {
-        pushSnapshot(this.buf, msg.snap, performance.now())
+        const now = performance.now()
+        if (this.lastSnapAt > 0) {
+          const gap = now - this.lastSnapAt
+          this.snapCount++
+          this.snapGapAcc += gap
+          if (gap > this.snapGapWorst) this.snapGapWorst = gap
+        }
+        this.lastSnapAt = now
+        pushSnapshot(this.buf, msg.snap, now)
         return
       }
       case 'events': {
@@ -126,6 +140,19 @@ export class CoopSession {
       if (soldier.alive && soldier.connected) return soldier
     }
     return null
+  }
+
+  /** Snapshot-gap stats since the previous call, then reset (healthy ≈ avg 50 ms). */
+  netStats(): { snaps: number; avgGapMs: number; worstGapMs: number } {
+    const out = {
+      snaps: this.snapCount,
+      avgGapMs: this.snapCount > 0 ? this.snapGapAcc / this.snapCount : 0,
+      worstGapMs: this.snapGapWorst,
+    }
+    this.snapCount = 0
+    this.snapGapAcc = 0
+    this.snapGapWorst = 0
+    return out
   }
 
   myPickTimer(): number {

@@ -9,6 +9,7 @@ import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { FlashlightBeam } from './render/flashlight'
+import { PerfHud } from './render/perf'
 import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
 import { SpearsView } from './render/spears'
@@ -82,6 +83,7 @@ renderer.setSize(innerWidth, innerHeight)
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
 renderer.shadowMap.enabled = true
 document.body.appendChild(renderer.domElement)
+const perf = new PerfHud()
 
 scene.add(camera) // camera children (blade viewmodel) need the camera in the scene graph
 const titanPool = new TitanPool(scene)
@@ -108,6 +110,10 @@ const debug = { autopilot: false, silent: false, clockOverride: null as number |
 window.addEventListener('keydown', (e) => {
   keys.add(e.code)
   if (['Space', 'ShiftLeft', 'ShiftRight', 'KeyF', 'KeyR'].includes(e.code)) e.preventDefault()
+  if (e.code === 'F3') {
+    perf.toggle()
+    e.preventDefault()
+  }
 })
 window.addEventListener('keyup', (e) => keys.delete(e.code))
 renderer.domElement.addEventListener('mousedown', (e) => {
@@ -1156,6 +1162,7 @@ renderer.setAnimationLoop(() => {
   }
 
   renderer.render(scene, camera)
+  perf.sample(dt, renderer)
 })
 
 // --- debug hook for browser automation (playwriter) --------------------------
@@ -1223,6 +1230,25 @@ function snapshot() {
   setClock(fraction: number | null) {
     debug.clockOverride = fraction
   },
+  // live graphics toggles for bisecting frame-budget cost (see src/render/perf.ts)
+  gfx: {
+    perf: (on?: boolean) => perf.toggle(on),
+    // drop to 1 to test retina fill-rate; back to min(dpr,2) for the shipped look
+    pixelRatio(n: number) {
+      renderer.setPixelRatio(n)
+      renderer.setSize(innerWidth, innerHeight)
+    },
+    // toggle the whole real-time shadow pass; materials recompile on the flip
+    shadows(on: boolean) {
+      renderer.shadowMap.enabled = on
+      scene.traverse((obj) => {
+        const mat = (obj as { material?: unknown }).material
+        if (!mat) return
+        for (const m of Array.isArray(mat) ? mat : [mat]) (m as { needsUpdate: boolean }).needsUpdate = true
+      })
+    },
+    info: () => ({ ...renderer.info.render, ...renderer.info.memory, pixelRatio: renderer.getPixelRatio() }),
+  },
   // aim the camera without pointer lock (headless verification)
   setView(newYaw: number, newPitch: number) {
     yaw = newYaw
@@ -1277,6 +1303,20 @@ function snapshot() {
       titans: game.titans.length,
       teammates: [...coop.soldiers.keys()],
       squad: coop.buf.b?.players ?? [],
+      net: coop.netStats(),
     }
+  },
+  // lobby controls for two-browser automation (mirrors the Ready/Start buttons)
+  coopReady(ready = true) {
+    coop?.sendReady(ready)
+  },
+  coopStart() {
+    coop?.sendStart()
+  },
+  coopRematch() {
+    coop?.sendRematch()
+  },
+  frameStats() {
+    return perf.stats()
   },
 }
