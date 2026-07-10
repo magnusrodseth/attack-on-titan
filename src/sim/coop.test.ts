@@ -5,6 +5,7 @@ import {
   type CoopEvent,
   type CoopWorld,
   applyPlayerUpdate,
+  coopFire,
   coopPickUpgrade,
   coopResupply,
   coopSlash,
@@ -15,6 +16,7 @@ import {
 } from './coop'
 import { SIM_DT } from './constants'
 import { createRng, hashSeed } from './rng'
+import { worldToTitanLocal } from './rope'
 import { napeCenter } from './titan'
 import { waveComposition } from './waves'
 
@@ -90,6 +92,93 @@ describe('titan targeting', () => {
 function byType(events: CoopEvent[], type: CoopEvent['type']) {
   return events.filter((e) => e.type === type)
 }
+
+describe('thunder spears in the shared world', () => {
+  it('a fire intent launches a server spear and spends the rack; a dry rack fires nothing', () => {
+    const w = createCoopWorld('spear-coop', ['levi'])
+    const p = w.players.get('levi')!
+    expect(p.body.spears).toBe(2)
+    const events = coopFire(w, 'levi', new Vector3(1, 0, 0))
+    expect(byType(events, 'spearFired')).toHaveLength(1)
+    expect(w.spears).toHaveLength(1)
+    expect(p.body.spears).toBe(1)
+
+    p.body.spears = 0
+    p.body.fireTimer = 0
+    expect(coopFire(w, 'levi', new Vector3(1, 0, 0))).toHaveLength(0)
+    expect(w.spears).toHaveLength(1)
+  })
+
+  it('a blast kill credits the firing soldier: spear tier, footballer jackpot, heart back', () => {
+    const w = createCoopWorld('spear-coop', ['levi'])
+    const titan = w.titans[0]!
+    titan.kind = 'striker'
+    const p = w.players.get('levi')!
+    p.body.hp = p.body.config.maxHp - 1
+    applyPlayerUpdate(w, 'levi', { pos: new Vector3(0, 10, 8), vel: new Vector3(), onGround: false })
+    const fired = coopFire(w, 'levi', new Vector3(1, 0, 0))
+    expect(byType(fired, 'spearFired')).toHaveLength(1)
+    // pin the flight outcome (spear.test.ts owns ballistics): stick it to the nape and
+    // let the coop tick run the fuse, the blast, and the credit
+    const spear = w.spears[0]!
+    spear.phase = 'stuck'
+    spear.titanId = titan.id
+    worldToTitanLocal(titan, napeCenter(titan), spear.local)
+    const events = stepSeconds(w, 3)
+    const kills = byType(events, 'kill')
+    expect(kills).toHaveLength(1)
+    expect(kills[0]).toMatchObject({
+      playerId: 'levi',
+      weapon: 'spear',
+      points: 75 * 3, // footballer jackpot, no chain yet
+      heartGained: true,
+    })
+    expect(titan.hp).toBe(0)
+  })
+
+  it('friendly fire is knockback only: the owner pays a heart, the teammate just flies', () => {
+    const w = createCoopWorld('spear-coop', ['levi', 'mikasa'])
+    for (const t of w.titans) t.pos.set(150, 0, 150) // keep the wave clear of the plaza
+    const spot = new Vector3(0, 2, 8)
+    applyPlayerUpdate(w, 'levi', { pos: spot, vel: new Vector3(), onGround: true })
+    applyPlayerUpdate(w, 'mikasa', { pos: spot.clone(), vel: new Vector3(), onGround: true })
+    const levi = w.players.get('levi')!
+    const mikasa = w.players.get('mikasa')!
+    const events = [...coopFire(w, 'levi', new Vector3(0, -1, 0)), ...stepSeconds(w, 4)]
+    const hits = byType(events, 'playerHit')
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toMatchObject({ playerId: 'levi' })
+    expect(levi.body.hp).toBe(levi.body.config.maxHp - 1)
+    const thrown = byType(events, 'blasted')
+    expect(thrown.some((e) => 'playerId' in e && e.playerId === 'mikasa')).toBe(true)
+    expect(mikasa.body.hp).toBe(mikasa.body.config.maxHp)
+  })
+
+  it('street caches scale with the squad and go to the first taker', () => {
+    expect(createCoopWorld('s', ['a']).pickups).toHaveLength(3)
+    const w = createCoopWorld('s', ['a', 'b'])
+    expect(w.pickups).toHaveLength(5)
+    expect(createCoopWorld('s', ['a', 'b', 'c']).pickups).toHaveLength(7)
+
+    const cache = w.pickups[0]!
+    const a = w.players.get('a')!
+    const b = w.players.get('b')!
+    a.body.spears = 0
+    b.body.spears = 0
+    for (const t of w.titans) t.pos.set(150, 0, 150)
+    applyPlayerUpdate(w, 'a', { pos: new Vector3(cache.x, 1, cache.z), vel: new Vector3(), onGround: true })
+    applyPlayerUpdate(w, 'b', { pos: new Vector3(-140, 1, -140), vel: new Vector3(), onGround: true })
+    const first = coopStep(w, SIM_DT)
+    expect(byType(first, 'spearPickup')).toHaveLength(1)
+    expect(a.body.spears).toBe(1)
+    expect(cache.taken).toBe(true)
+
+    applyPlayerUpdate(w, 'b', { pos: new Vector3(cache.x, 1, cache.z), vel: new Vector3(), onGround: true })
+    const second = coopStep(w, SIM_DT)
+    expect(byType(second, 'spearPickup')).toHaveLength(0)
+    expect(b.body.spears).toBe(0)
+  })
+})
 
 describe('coopSlash', () => {
   it('credits a nape kill to the slashing player only, with a heart back', () => {

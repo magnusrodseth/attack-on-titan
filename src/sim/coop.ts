@@ -10,7 +10,9 @@ import { createPlayer } from './player'
 import type { Rng } from './rng'
 import { createRng, hashSeed } from './rng'
 import type { ScoreState } from './score'
-import { createScore, registerKill, stepScore } from './score'
+import { createScore, registerKill, registerSpearKill, stepScore } from './score'
+import type { SpearPickup, SpearState } from './spear'
+import { BLAST_RADIUS, collectPickups, fireSpear, PICKUPS_PER_WAVE, spawnPickups, stepSpears } from './spear'
 import type { TitanBehavior, TitanKind, TitanState } from './titan'
 import { aggroRange, createTitan, isFootballer, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
@@ -93,7 +95,16 @@ export type CoopEvent =
       speed: number
       heartGained: boolean
       kind: TitanKind
+      weapon: 'blade' | 'spear'
     }
+  | { type: 'spearFired'; playerId: string; remaining: number }
+  | { type: 'spearStuck'; titanId: number | null }
+  | { type: 'spearFizzled' }
+  | { type: 'spearDetonated'; pos: { x: number; y: number; z: number } }
+  | { type: 'staggered'; titanId: number }
+  | { type: 'spearPickup'; playerId: string; remaining: number }
+  /** Thrown by a blast without losing hearts: friendly fire is knockback only. */
+  | { type: 'blasted'; playerId: string; knockback: { x: number; y: number; z: number } }
   | { type: 'playerHit'; playerId: string; hp: number; knockback: { x: number; y: number; z: number } }
   | { type: 'playerDied'; playerId: string }
   | { type: 'respawn'; playerId: string; pos: { x: number; y: number; z: number } }
@@ -118,10 +129,16 @@ export interface CoopWorld {
   tick: number
   players: Map<string, CoopPlayer>
   titans: TitanState[]
+  /** Thunder spears in flight or fusing, server-authoritative like the titans. */
+  spears: SpearState[]
+  /** Who fired each live spear (by spear id): blast kills credit the owner. */
+  spearOwners: Map<number, string>
+  pickups: SpearPickup[]
   arena: Arena
   nav: NavGrid
   rngLive: Rng
   nextTitanId: number
+  nextSpearId: number
   pickTimer: number
   history: Map<number, TitanSample[]>
   historyTimer: number
@@ -146,10 +163,14 @@ export function createCoopWorld(seed: string, playerIds: string[], citySeed = se
     tick: 0,
     players: new Map(),
     titans: [],
+    spears: [],
+    spearOwners: new Map(),
+    pickups: [],
     arena,
     nav: buildNavGrid(arena),
     rngLive: createRng(hashSeed(`${seed}:live`)),
     nextTitanId: 1,
+    nextSpearId: 1,
     pickTimer: 0,
     history: new Map(),
     historyTimer: 0,
@@ -184,12 +205,20 @@ function connectedCount(w: CoopWorld): number {
 
 function spawnWave(w: CoopWorld): void {
   const rng = createRng(hashSeed(`${w.seed}:wave:${w.wave}`))
-  const scale = 1 + COOP_SCALE_PER_PLAYER * (Math.max(1, connectedCount(w)) - 1)
+  const squad = Math.max(1, connectedCount(w))
+  const scale = 1 + COOP_SCALE_PER_PLAYER * (squad - 1)
   w.titans = waveComposition(w.wave, rng, scale).map((s) => {
     const [x, z] = nearestWalkable(w.nav, s.x, s.z)
     return createTitan({ id: w.nextTitanId++, kind: s.kind, height: s.height, x, z })
   })
   w.history.clear()
+  // fresh caches scale with the squad (user decision, 2026-07-10): everyone can restock,
+  // but spears stay scarce enough to spend thoughtfully; first come, first served
+  w.pickups = spawnPickups(w.seed, w.wave, w.nav, PICKUPS_PER_WAVE + 2 * (squad - 1))
+  w.spears = w.spears.filter((s) => s.titanId !== null) // spears riding corpses go with the wave
+  for (const [id] of w.spearOwners) {
+    if (!w.spears.some((s) => s.id === id)) w.spearOwners.delete(id)
+  }
 }
 
 export function applyPlayerUpdate(w: CoopWorld, playerId: string, update: PlayerUpdate): void {
@@ -282,6 +311,7 @@ export function coopStep(w: CoopWorld, dt: number): CoopEvent[] {
     if (!p.connected) continue
     p.body.slashTimer = Math.max(0, p.body.slashTimer - dt)
     p.body.invulnTimer = Math.max(0, p.body.invulnTimer - dt)
+    p.body.fireTimer = Math.max(0, p.body.fireTimer - dt)
     stepScore(p.score, dt)
   }
 
@@ -307,6 +337,17 @@ export function coopStep(w: CoopWorld, dt: number): CoopEvent[] {
     w.historyTimer -= HISTORY_INTERVAL
     sampleHistory(w)
   }
+
+  // fly-through cache collection, first come first served in roster order
+  for (const p of w.players.values()) {
+    if (!p.connected || !p.alive) continue
+    for (const _id of collectPickups(w.pickups, p.body)) {
+      events.push({ type: 'spearPickup', playerId: p.id, remaining: p.body.spears })
+    }
+  }
+
+  // spears resolve before titan AI so a fresh stagger suppresses this tick's swat
+  events.push(...stepCoopSpears(w, dt))
 
   const targets = pickTargets(w)
   const chasers = pickCoopChasers(w, targets)
@@ -467,7 +508,91 @@ export function coopSlash(w: CoopWorld, playerId: string, rewindS = SLASH_REWIND
       speed: result.speed,
       heartGained,
       kind: killed?.kind ?? 'normal',
+      weapon: 'blade',
     })
+  }
+  return events
+}
+
+/** A client's fire intent: server-authoritative launch along the client-owned aim. */
+export function coopFire(w: CoopWorld, playerId: string, look: Vector3): CoopEvent[] {
+  if (w.phase !== 'playing') return []
+  const p = w.players.get(playerId)
+  if (!p || !p.connected || !p.alive) return []
+  if (![look.x, look.y, look.z].every(Number.isFinite)) return []
+  const spear = fireSpear(p.body, w.nextSpearId, look)
+  if (!spear) return []
+  w.nextSpearId += 1
+  w.spears.push(spear)
+  w.spearOwners.set(spear.id, playerId)
+  return [{ type: 'spearFired', playerId, remaining: p.body.spears }]
+}
+
+/** Advances the shared spears and resolves blasts against every soldier and titan. */
+function stepCoopSpears(w: CoopWorld, dt: number): CoopEvent[] {
+  const events: CoopEvent[] = []
+  if (w.spears.length === 0) return events
+  const result = stepSpears(w.spears, w.titans, null, w.arena, dt)
+  for (const stuck of result.stuck) events.push({ type: 'spearStuck', titanId: stuck.titanId })
+  for (const id of result.fizzled) {
+    events.push({ type: 'spearFizzled' })
+    w.spearOwners.delete(id)
+  }
+  for (const blast of result.blasts) {
+    events.push({ type: 'spearDetonated', pos: { x: blast.pos.x, y: blast.pos.y, z: blast.pos.z } })
+    for (const titanId of blast.staggered) events.push({ type: 'staggered', titanId })
+    // credit the owner; a spear whose owner left still kills, it just pays nobody
+    const ownerId = w.spearOwners.get(blast.spearId)
+    const owner = ownerId !== undefined ? w.players.get(ownerId) : undefined
+    for (const kill of blast.kills) {
+      const points = owner
+        ? registerSpearKill(owner.score, {
+            abnormal: kill.kind === 'abnormal',
+            footballer: isFootballer(kill.kind),
+          })
+        : 0
+      let heartGained = false
+      if (owner) {
+        heartGained = owner.body.hp < owner.body.config.maxHp
+        if (heartGained) owner.body.hp += 1
+      }
+      events.push({
+        type: 'kill',
+        playerId: ownerId ?? '',
+        titanId: kill.titanId,
+        points,
+        oneCut: false,
+        speed: 0,
+        heartGained,
+        kind: kill.kind,
+        weapon: 'spear',
+      })
+    }
+    // every soldier in the radius gets thrown; only the owner pays a heart
+    for (const p of w.players.values()) {
+      if (!p.connected || !p.alive) continue
+      if (p.body.pos.distanceTo(blast.pos) > BLAST_RADIUS) continue
+      const away = new Vector3(p.body.pos.x - blast.pos.x, 0, p.body.pos.z - blast.pos.z)
+      if (away.lengthSq() > 0) away.normalize()
+      else away.set(0, 0, 1) // standing exactly on the spear: any direction will do
+      const knockback = { x: away.x * 22, y: 10, z: away.z * 22 }
+      if (p.id === ownerId && p.body.invulnTimer <= 0) {
+        p.body.hp -= 1
+        p.body.invulnTimer = 1.2
+        events.push({ type: 'playerHit', playerId: p.id, hp: p.body.hp, knockback })
+        if (p.body.hp <= 0) {
+          p.alive = false
+          p.deaths += 1
+          events.push({ type: 'playerDied', playerId: p.id })
+        }
+      } else {
+        events.push({ type: 'blasted', playerId: p.id, knockback })
+      }
+    }
+  }
+  // exploded spears are gone from w.spears; drop their owner entries
+  for (const [id] of w.spearOwners) {
+    if (!w.spears.some((s) => s.id === id)) w.spearOwners.delete(id)
   }
   return events
 }
@@ -555,8 +680,19 @@ export interface CoopSnapshot {
     combo: number
     blades: number
     bladeHp: number
+    spears: number
     picked: boolean
   }[]
+  spears: {
+    id: number
+    x: number
+    y: number
+    z: number
+    phase: 'flying' | 'stuck'
+    fuse: number
+    titanId: number | null
+  }[]
+  pickups: { id: number; x: number; z: number; taken: boolean }[]
   results: MatchResults | null
 }
 
@@ -602,8 +738,19 @@ export function coopSnapshot(w: CoopWorld): CoopSnapshot {
       combo: p.score.combo,
       blades: p.body.blades,
       bladeHp: p.body.bladeHp,
+      spears: p.body.spears,
       picked: p.picked,
     })),
+    spears: w.spears.map((s) => ({
+      id: s.id,
+      x: r2(s.pos.x),
+      y: r2(s.pos.y),
+      z: r2(s.pos.z),
+      phase: s.phase,
+      fuse: r2(s.fuse),
+      titanId: s.titanId,
+    })),
+    pickups: w.pickups.map((p) => ({ id: p.id, x: r2(p.x), z: r2(p.z), taken: p.taken })),
     results: w.results,
   }
 }

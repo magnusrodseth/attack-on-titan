@@ -8,6 +8,7 @@ import {
   createSnapshotBuffer,
   pushSnapshot,
   syncSoldierMirror,
+  syncSpearMirror,
   syncTitanMirror,
 } from './sim/coopClient'
 import type { GameState } from './sim/game'
@@ -115,6 +116,7 @@ export class CoopSession {
     if (this.phase !== 'match') return
     syncTitanMirror(g, this.buf, now, frameDt)
     syncSoldierMirror(this.soldiers, this.buf, this.me, now)
+    syncSpearMirror(g, this.buf, now)
     if (this.playing) applySelfSnapshot(g, this.buf, this.me)
   }
 
@@ -164,6 +166,10 @@ export class CoopSession {
 
   sendSlash(): void {
     this.socket?.send(clientMsg({ type: 'slash' }))
+  }
+
+  sendFire(look: { x: number; y: number; z: number }): void {
+    this.socket?.send(clientMsg({ type: 'fire', look: { x: r2(look.x), y: r2(look.y), z: r2(look.z) } }))
   }
 
   sendPick(upgradeId: string): void {

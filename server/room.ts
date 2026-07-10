@@ -12,6 +12,7 @@ import {
 import { SIM_DT } from '../src/sim/constants'
 import {
   applyPlayerUpdate,
+  coopFire,
   coopPickUpgrade,
   coopResupply,
   coopSlash,
@@ -128,6 +129,11 @@ export class MatchRoom extends Server<Env> {
       case 'slash': {
         if (!this.world || this.phase !== 'match' || member.spectator) return
         this.relayEvents(coopSlash(this.world, member.handle))
+        return
+      }
+      case 'fire': {
+        if (!this.world || this.phase !== 'match' || member.spectator) return
+        this.relayEvents(coopFire(this.world, member.handle, new Vector3(msg.look.x, msg.look.y, msg.look.z)))
         return
       }
       case 'pick': {

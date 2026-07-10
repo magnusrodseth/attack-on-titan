@@ -56,6 +56,7 @@ export type GameEvent =
   | { type: 'death' }
   // client intents in co-op: the net layer forwards these to the room server
   | { type: 'coopSlash' }
+  | { type: 'coopFire' }
   | { type: 'coopResupply' }
 
 export interface BestStats {

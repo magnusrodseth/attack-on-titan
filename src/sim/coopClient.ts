@@ -4,6 +4,8 @@ import type { GameState } from './game'
 import { copyInput, handleHookEdge, stepLamp, syncTitanHooks } from './game'
 import type { InputState } from './player'
 import { BOOST_COST, stepPlayer, tryBoost } from './player'
+import type { SpearState } from './spear'
+import { FIRE_COOLDOWN } from './spear'
 import type { TitanState } from './titan'
 import { createTitan } from './titan'
 
@@ -42,6 +44,15 @@ export function stepCoopClient(g: GameState, input: InputState, dt: number): voi
     } else if (p.slashTimer <= 0) {
       p.slashTimer = p.config.slashCooldown // local cooldown; the server enforces its own
       g.events.push({ type: 'coopSlash' })
+    }
+  }
+
+  if (input.fire && !g.prevInput.fire) {
+    if (p.spears <= 0) {
+      g.events.push({ type: 'empty', kind: 'spears' }) // dry rack clicks locally
+    } else if (p.fireTimer <= 0) {
+      p.fireTimer = FIRE_COOLDOWN // local prediction; the server owns the launch
+      g.events.push({ type: 'coopFire' })
     }
   }
 
@@ -215,6 +226,51 @@ export function syncSoldierMirror(
   }
 }
 
+/**
+ * Writes interpolated spears and the wave's caches into g.spears/g.pickups as real sim
+ * shapes, so SpearsView, the minimap diamonds, the HUD gauge, and the fuse beeps all
+ * work untouched. The server owns flight and fuses; this is display only.
+ */
+export function syncSpearMirror(g: GameState, buf: SnapshotBuffer, now: number): void {
+  const b = buf.b
+  if (!b) return
+  const alpha = interpAlpha(buf, now)
+  const prevById = new Map(buf.a?.spears.map((s) => [s.id, s]) ?? [])
+  const liveById = new Map(g.spears.map((s) => [s.id, s]))
+  const next: SpearState[] = []
+  for (const snap of b.spears) {
+    let spear = liveById.get(snap.id)
+    if (!spear) {
+      spear = {
+        id: snap.id,
+        phase: snap.phase,
+        pos: new Vector3(snap.x, snap.y, snap.z),
+        vel: new Vector3(),
+        traveled: 0,
+        titanId: snap.titanId,
+        local: new Vector3(),
+        fuse: snap.fuse,
+      }
+    }
+    const prev = prevById.get(snap.id)
+    if (prev) {
+      spear.pos.set(
+        prev.x + (snap.x - prev.x) * alpha,
+        prev.y + (snap.y - prev.y) * alpha,
+        prev.z + (snap.z - prev.z) * alpha,
+      )
+    } else {
+      spear.pos.set(snap.x, snap.y, snap.z)
+    }
+    spear.phase = snap.phase
+    spear.fuse = snap.fuse
+    spear.titanId = snap.titanId
+    next.push(spear)
+  }
+  g.spears = next
+  g.pickups = b.pickups.map((pk) => ({ id: pk.id, x: pk.x, z: pk.z, taken: pk.taken }))
+}
+
 /** Mirrors the server-authoritative bits of MY soldier into the local player + score. */
 export function applySelfSnapshot(g: GameState, buf: SnapshotBuffer, me: string): void {
   const snap = buf.b?.players.find((p) => p.id === me)
@@ -223,6 +279,7 @@ export function applySelfSnapshot(g: GameState, buf: SnapshotBuffer, me: string)
   g.player.config.maxHp = snap.maxHp
   g.player.blades = snap.blades
   g.player.bladeHp = snap.bladeHp
+  g.player.spears = snap.spears
   g.score.score = snap.score
   g.score.kills = snap.kills
   g.score.combo = snap.combo

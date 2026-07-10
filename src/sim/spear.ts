@@ -61,6 +61,7 @@ export function fireSpear(p: PlayerState, id: number, lookDir: Vector3): SpearSt
 }
 
 export interface BlastResult {
+  spearId: number
   pos: Vector3
   kills: { titanId: number; kind: TitanKind }[]
   staggered: number[]
@@ -81,7 +82,7 @@ export interface SpearStepResult {
 export function stepSpears(
   spears: SpearState[],
   titans: TitanState[],
-  playerPos: Vector3,
+  playerPos: Vector3 | null, // null in co-op: the caller checks every soldier against the blast
   arena: Arena,
   dt: number,
 ): SpearStepResult {
@@ -151,12 +152,13 @@ export function stepSpears(
   return result
 }
 
-function detonate(spear: SpearState, titans: TitanState[], playerPos: Vector3): BlastResult {
+function detonate(spear: SpearState, titans: TitanState[], playerPos: Vector3 | null): BlastResult {
   const blast: BlastResult = {
+    spearId: spear.id,
     pos: spear.pos.clone(),
     kills: [],
     staggered: [],
-    playerInBlast: playerPos.distanceTo(spear.pos) <= BLAST_RADIUS,
+    playerInBlast: playerPos !== null && playerPos.distanceTo(spear.pos) <= BLAST_RADIUS,
   }
   for (const t of titans) {
     if (t.hp <= 0) continue
@@ -187,10 +189,10 @@ function blastDistanceToTitan(t: TitanState, point: Vector3): number {
 }
 
 /** The wave's spear caches, seeded from `seed:spears:wave` and snapped to walkable streets. */
-export function spawnPickups(seed: string, wave: number, nav: NavGrid): SpearPickup[] {
+export function spawnPickups(seed: string, wave: number, nav: NavGrid, count = PICKUPS_PER_WAVE): SpearPickup[] {
   const rng = createRng(hashSeed(`${seed}:spears:${wave}`))
   const pickups: SpearPickup[] = []
-  for (let i = 0; i < PICKUPS_PER_WAVE; i++) {
+  for (let i = 0; i < count; i++) {
     const angle = rng() * Math.PI * 2
     const radius = 20 + rng() * 90 // inside the district, never against the wall
     const [x, z] = nearestWalkable(nav, Math.cos(angle) * radius, Math.sin(angle) * radius)

@@ -457,6 +457,11 @@ function handleCoopIntents(events: GameEvent[]): void {
       blade.slash()
       audio.play(SLASHES, { volume: 0.55 })
       coop?.sendSlash()
+    } else if (event.type === 'coopFire') {
+      audio.spearLaunch() // whoosh instantly; the server launches the real spear
+      effects.addShake(0.1)
+      const look = camera.getWorldDirection(new Vector3())
+      coop?.sendFire({ x: look.x, y: look.y, z: look.z })
     } else if (event.type === 'coopResupply') {
       coop?.sendResupply()
     } else {
@@ -575,6 +580,42 @@ function handleCoopEvents(events: CoopEvent[]): void {
           game.player.lamp = LAMP_BATTERY_SECONDS
           hud.showBanner('Resupplied', 900)
           audio.refill()
+        }
+        break
+      case 'spearFired':
+        if (event.playerId !== me) audio.spearLaunch() // mine whooshed on the intent already
+        break
+      case 'spearStuck':
+        audio.thud(0.35)
+        break
+      case 'spearFizzled':
+        audio.fizzle()
+        break
+      case 'spearDetonated': {
+        const pos = new Vector3(event.pos.x, event.pos.y, event.pos.z)
+        effects.burst(pos, 0xffb347, 60) // fireball
+        effects.burst(pos.clone().add(new Vector3(0, 1.5, 0)), 0x8a8a90, 40) // smoke
+        effects.addShake(0.7)
+        audio.spearBoom(pos.distanceTo(game.player.pos))
+        break
+      }
+      case 'staggered':
+        hud.popText('Staggered!')
+        break
+      case 'spearPickup':
+        if (event.playerId === me) {
+          hud.showBanner(`Thunder Spear Racked · ${event.remaining}`, 1200)
+          audio.pickupChime()
+        }
+        break
+      case 'blasted':
+        // thrown by a teammate's blast: knockback only, no heart lost
+        if (event.playerId === me) {
+          game.player.vel.x += event.knockback.x
+          game.player.vel.y += event.knockback.y
+          game.player.vel.z += event.knockback.z
+          effects.addShake(0.5)
+          audio.play(GRUNTS, { volume: 0.6, rate: 0.85 })
         }
         break
       case 'waveClear':
