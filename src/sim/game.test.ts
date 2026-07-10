@@ -749,6 +749,55 @@ describe('titan grabs', () => {
     expect(game.player.hp).toBe(game.player.config.maxHp)
   })
 
+  it('reaches for a catchable soldier instead of swatting: the fist outranks the palm', () => {
+    const { game, titan } = loiterGame()
+    titan.attackCooldown = 0 // swats live, exactly like real play
+    titan.state = 'chase'
+    // square up so the swat would land dead-on if it were allowed to swing
+    titan.facing = Math.atan2(game.player.pos.x - titan.pos.x, game.player.pos.z - titan.pos.z)
+    const events = stepUntilGrabbed(game)
+    expect(game.grab).not.toBeNull()
+    expect(events).toContainEqual({ type: 'grabbed', titanId: titan.id })
+    // the held swing never landed: no hit, no fling, full hearts at the moment of the grab
+    expect(events.filter((e) => e.type === 'playerHit')).toHaveLength(0)
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+
+  it('with two fists in range neither swats, and the nearest one grabs', () => {
+    const { game, titan } = loiterGame()
+    titan.attackCooldown = 0
+    titan.state = 'chase'
+    titan.facing = Math.atan2(game.player.pos.x - titan.pos.x, game.player.pos.z - titan.pos.z)
+    const second = createTitan({ id: game.nextTitanId++, kind: 'normal', height: 10, x: -4, z: 0 })
+    second.state = 'chase'
+    second.facing = Math.atan2(game.player.pos.x + 4, 0)
+    game.titans.push(second)
+    const events = stepUntilGrabbed(game)
+    // both walked in swinging distance for the full linger, yet neither palm landed
+    // (which fist wins is a walking race; nearest-wins is covered at the module seam)
+    expect(game.grab).not.toBeNull()
+    expect(events.filter((e) => e.type === 'playerHit')).toHaveLength(0)
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+
+  it('a moving soldier still eats the swat as before', () => {
+    const { game, titan } = loiterGame()
+    titan.attackCooldown = 0
+    titan.state = 'chase'
+    titan.facing = Math.atan2(game.player.pos.x - titan.pos.x, game.player.pos.z - titan.pos.z)
+    const seen: GameEvent[] = []
+    for (let t = 0; t < 3 && game.player.hp === game.player.config.maxHp; t += DT) {
+      // darting through its reach: too fast to catch, re-pinned in the swat's arc each
+      // tick so the swing has something to land on
+      game.player.pos.set(0, 1.6, 0)
+      game.player.vel.set(6, 0, 0)
+      stepGame(game, neutralInput(), DT)
+      seen.push(...game.events)
+    }
+    expect(seen.some((e) => e.type === 'playerHit')).toBe(true)
+    expect(seen.some((e) => e.type === 'grabbed')).toBe(false)
+  })
+
   it('mashing space fills the bar and flings the soldier free unharmed', () => {
     const { game, titan } = loiterGame()
     stepUntilGrabbed(game)

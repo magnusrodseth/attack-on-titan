@@ -12,6 +12,7 @@ import {
   GRAB_HP_COST,
   GRAB_REGRAB_COOLDOWN,
   createGrabWatch,
+  findGrabCandidates,
   grabHoldPoint,
   startGrab,
   stepGrab,
@@ -296,7 +297,16 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       stepPlayerActions(g, input, dt)
       // loitering slow inside a titan's reach arms the grab; being flung around does not
       const grabber = updateGrabWatch(g.grabWatch, p, g.titans, dt, p.invulnTimer > 0)
-      if (grabber) beginGrab(g, grabber)
+      if (grabber) {
+        beginGrab(g, grabber)
+      } else if (g.grabWatch.linger > 0) {
+        // a catchable soldier gets reached for, not slapped: every fist in range holds
+        // its swat while the linger fills (a slap would fling them out of the grab's
+        // reach, so the grab could otherwise never fire in a converging wave)
+        for (const reaching of findGrabCandidates(p, g.titans)) {
+          reaching.attackCooldown = Math.max(reaching.attackCooldown, 0.2)
+        }
+      }
     }
   }
 

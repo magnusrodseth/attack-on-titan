@@ -55,6 +55,31 @@ function inGrabZone(t: TitanState, pos: Vector3): boolean {
 }
 
 /**
+ * Every titan whose reach a catchable (slow) soldier is idling in; empty while moving
+ * fast. Game.ts holds ALL of their swats while the linger fills — titans reach for a
+ * catchable soldier, they do not slap one (any slap would fling the soldier away and
+ * the grab could never fire, least of all with several titans converging).
+ */
+export function findGrabCandidates(p: PlayerState, titans: TitanState[]): TitanState[] {
+  if (p.vel.length() > GRAB_SPEED_LIMIT) return []
+  return titans.filter((t) => canGrab(t) && inGrabZone(t, p.pos))
+}
+
+/** The titan whose fist closes when the linger fills: the nearest candidate. */
+export function findGrabCandidate(p: PlayerState, titans: TitanState[]): TitanState | null {
+  let nearest: TitanState | null = null
+  let nearestDist = Infinity
+  for (const t of findGrabCandidates(p, titans)) {
+    const dist = Math.hypot(p.pos.x - t.pos.x, p.pos.z - t.pos.z)
+    if (dist < nearestDist) {
+      nearest = t
+      nearestDist = dist
+    }
+  }
+  return nearest
+}
+
+/**
  * Accrues loiter time while the soldier idles inside some titan's reach and returns the
  * grabbing titan the tick the linger fills. `blocked` ticks (invulnerable, mid-strike)
  * reset the clock, as does moving fast or stepping out of every titan's reach.
@@ -71,20 +96,11 @@ export function updateGrabWatch(
     watch.linger = 0
     return null
   }
-  if (blocked || p.vel.length() > GRAB_SPEED_LIMIT) {
+  if (blocked) {
     watch.linger = 0
     return null
   }
-  let nearest: TitanState | null = null
-  let nearestDist = Infinity
-  for (const t of titans) {
-    if (!canGrab(t) || !inGrabZone(t, p.pos)) continue
-    const dist = Math.hypot(p.pos.x - t.pos.x, p.pos.z - t.pos.z)
-    if (dist < nearestDist) {
-      nearest = t
-      nearestDist = dist
-    }
-  }
+  const nearest = findGrabCandidate(p, titans)
   if (!nearest) {
     watch.linger = 0
     return null
