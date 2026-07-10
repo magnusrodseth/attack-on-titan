@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { GamePhase, GameState } from './game'
+import { loadHuntBest } from './hunt'
 import type { PlayerConfig } from './player'
 import { neutralInput } from './player'
 import { resumeRng } from './rng'
@@ -77,6 +78,12 @@ export interface SavedRun {
   spears: SavedSpear[]
   pickups: SpearPickup[]
   view?: { yaw: number; pitch: number }
+  /**
+   * The Culling's countdown, carried across a refresh so reloading never resets the
+   * clock. Absent in other modes and in older saves (the mode then rebuilds a full
+   * clock). Signal Run deliberately saves nothing: a timed run restarts, never resumes.
+   */
+  hunt?: { timeLeft: number; budget: number; urgencyFired: boolean }
 }
 
 export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }): SavedRun {
@@ -119,6 +126,9 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     spears: g.spears.map((s) => ({ ...s, pos: v3(s.pos), vel: v3(s.vel), local: v3(s.local) })),
     pickups: g.pickups.map((pk) => ({ ...pk })),
     ...(view ? { view: { ...view } } : {}),
+    ...(g.hunt
+      ? { hunt: { timeLeft: g.hunt.timeLeft, budget: g.hunt.budget, urgencyFired: g.hunt.urgencyFired } }
+      : {}),
   }
 }
 
@@ -196,5 +206,10 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
     local: new Vector3(...s.local),
   }))
   g.pickups = save.pickups.map((pk) => ({ ...pk }))
+
+  // mode state: the relentless rule is The Culling's, and its clock rides the save
+  g.relentless = g.mode.id === 'hunt'
+  g.hunt = save.hunt ? { ...save.hunt, best: loadHuntBest(g.storage, g.seed) } : null
+  g.race = null // Signal Run self-heals: a restored race relights the line
   return true
 }

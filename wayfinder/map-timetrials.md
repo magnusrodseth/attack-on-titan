@@ -46,6 +46,12 @@ Built together in one worktree branch, verified in a real browser, merged to mai
   course instantly, finish → new phase `finished` with splits; PB + splits persist at
   `aot-odm-tt:race:<seed>`; `GameMode.step` now receives the tick's input; a mid-run refresh
   relights the line instead of resuming the clock.
+- [The Culling sim](tickets/tt-006-culling-sim.md) — mode `hunt` in `src/sim/hunt.ts` on the
+  waveLoop skeleton: relentless = no aggro range, no chase cap, no leash (kind stats intact);
+  countdown budget = roster x allowance, allowance 22 s/kill decaying 0.85/level to a 9 s
+  floor (constants exported for tt-009); clock pauses through upgrades; `huntUrgency` at 20%,
+  `huntTimeout` at zero; deepest-cleared PB (score tiebreak) at `aot-odm-tt:hunt:<seed>`; the
+  countdown rides the refresh save.
 
 ## Not yet specified
 

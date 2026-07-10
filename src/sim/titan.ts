@@ -185,6 +185,7 @@ export function stepTitan(
   arena?: Arena,
   nav?: NavGrid,
   allowChase = true,
+  relentless = false,
 ): TitanEvent[] {
   if (t.hp <= 0) {
     if (t.state !== 'dead') {
@@ -234,7 +235,8 @@ export function stepTitan(
         t.wanderTimer = 2 + rng() * 4
       }
       walkTitan(t, walkSpeed * 0.5 * dt, arena, rng)
-      if (horizDist < aggro && allowChase) {
+      // relentless (The Culling): the aggro range is the whole map
+      if ((horizDist < aggro || relentless) && allowChase) {
         t.state = 'chase'
         t.stateTime = 0
         t.path = null
@@ -294,7 +296,8 @@ export function stepTitan(
       if (horizDist > reach * 0.6) {
         walkTitan(t, walkSpeed * 1.35 * dt, arena, rng)
       }
-      if (horizDist > aggro * 1.5) {
+      // relentless titans never abandon a chase, however far the soldier runs
+      if (!relentless && horizDist > aggro * 1.5) {
         t.state = 'wander'
         t.path = null
       }

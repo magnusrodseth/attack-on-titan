@@ -1,5 +1,6 @@
 import type { GameState } from './game'
 import { saveBest } from './game'
+import { createHuntMode } from './hunt'
 import { nearestWalkable } from './nav'
 import type { InputState } from './player'
 import { raceMode } from './race'
@@ -90,7 +91,10 @@ const matchdayMode: GameMode = {
   ...waveLoop(matchdayComposition),
 }
 
-export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode, raceMode]
+/** The Culling rides the same wave skeleton; the countdown and relentless rule wrap it. */
+const huntMode: GameMode = createHuntMode(waveLoop(waveComposition))
+
+export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode, raceMode, huntMode]
 
 export const DEFAULT_MODE_ID = 'waves'
 

@@ -5,6 +5,7 @@ import { EYE_HEIGHT } from './constants'
 import { trySlash } from './combat'
 import { clockFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
+import type { HuntState } from './hunt'
 import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { NavGrid } from './nav'
@@ -60,6 +61,9 @@ export type GameEvent =
   | { type: 'gatePass'; index: number; total: number; split: number; delta: number | null }
   | { type: 'raceFinished'; time: number; splits: number[]; pb: boolean; delta: number | null }
   | { type: 'raceRestart' }
+  // The Culling: the countdown entering panic range, and the run dying at zero
+  | { type: 'huntUrgency' }
+  | { type: 'huntTimeout'; level: number; cleared: number }
   // client intents in co-op: the net layer forwards these to the room server
   | { type: 'coopSlash' }
   | { type: 'coopFire' }
@@ -103,6 +107,10 @@ export interface GameState {
   mode: GameMode
   /** Signal Run's course and clock; null in every other mode. */
   race: RaceState | null
+  /** The Culling's countdown; null in every other mode. */
+  hunt: HuntState | null
+  /** The Culling's rule: every titan tracks map-wide and never abandons a chase. */
+  relentless: boolean
 }
 
 const BEST_KEY = 'aot-odm-best'
@@ -165,6 +173,8 @@ export function createGame(
     focusActive: false,
     mode: getMode(modeId),
     race: null,
+    hunt: null,
+    relentless: false,
   }
 }
 
@@ -178,6 +188,9 @@ export function startGame(g: GameState): void {
   g.titans = []
   g.spears = []
   g.pickups = []
+  g.race = null
+  g.hunt = null
+  g.relentless = false
   g.phase = 'playing' // set first so the mode may override it from start()
   g.mode.start(g)
 }
@@ -351,7 +364,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
 
   const chasers = pickChasers(g)
   for (const titan of g.titans) {
-    for (const event of stepTitan(titan, p.pos, dt, g.rngLive, g.arena, g.nav, chasers.has(titan.id))) {
+    for (const event of stepTitan(titan, p.pos, dt, g.rngLive, g.arena, g.nav, chasers.has(titan.id), g.relentless)) {
       if (event.type !== 'swat') continue
       if (p.invulnTimer > 0) continue
       if (p.pos.distanceTo(event.pos) > event.radius) continue
@@ -406,11 +419,13 @@ function pickChasers(g: GameState): Set<number> {
     if (t.hp <= 0 || t.state === 'crippled' || t.state === 'staggered' || t.state === 'dead') continue
     const dist = Math.hypot(p.pos.x - t.pos.x, p.pos.z - t.pos.z)
     const engaged = t.state === 'chase' || t.state === 'attack' || t.state === 'leap'
-    if (!engaged && dist >= aggroRange(t.kind)) continue
+    if (!engaged && !g.relentless && dist >= aggroRange(t.kind)) continue
     candidates.push({ id: t.id, key: engaged ? dist - 20 : dist })
   }
   candidates.sort((a, b) => a.key - b.key || a.id - b.id)
-  return new Set(candidates.slice(0, MAX_CHASERS).map((c) => c.id))
+  // relentless (The Culling): no chase cap — the whole district converges
+  const cap = g.relentless ? candidates.length : MAX_CHASERS
+  return new Set(candidates.slice(0, cap).map((c) => c.id))
 }
 
 export function handleHookEdge(
