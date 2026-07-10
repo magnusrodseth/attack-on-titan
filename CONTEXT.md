@@ -21,6 +21,23 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 - **Focus** — the slow-motion meter (Q).
 - **Seed** — the string that determines the whole city and every random stream; same seed, same world.
 
+## Time trials
+
+- **Signal Run** — the parkour time trial: race a seeded Course of Gates from start to finish
+  against the clock; no titans.
+- **Course** — the start-to-finish sequence of Gates a seed lays through the city; same seed,
+  same course, so times are only comparable per seed.
+- **Gate** — one checkpoint on a Course, passed in order: a signal-flare smoke column marking
+  it from afar and a glowing ring at the pass point. Passing a Gate refills gas.
+- **Split** — the time difference against your best run, shown as each Gate is passed.
+- **Featured seed** — the shared Course the menu promotes so global times contest the same run.
+- **The Culling** — the hunt mode: clear each level's full titan roster before its countdown
+  expires; levels escalate forever.
+- **Relentless** — The Culling's rule: every titan tracks soldiers across the whole map and
+  never abandons a chase.
+- **Time budget** — a Culling level's countdown: seconds per titan in the roster, granted up
+  front and tightening every level.
+
 ## Multiplayer
 
 - **Soldier** — a player's in-world character: first-person for its owner, a visible body to teammates.
