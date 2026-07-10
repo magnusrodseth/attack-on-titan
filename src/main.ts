@@ -1,4 +1,5 @@
 import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeometry, Vector3, WebGLRenderer } from 'three'
+import { initAnalytics, track } from './analytics'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
 import { Hud } from './hud'
@@ -75,6 +76,7 @@ const coopMode = lobbyCode !== null
 const playgroundMode = import.meta.env.DEV && !coopMode && urlParams.get('playground') === '1'
 const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
+initAnalytics()
 const game = createGame(seed, undefined, modeId)
 const { scene, updateScenery, dayNight } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
@@ -247,6 +249,7 @@ function beginRun(): void {
     if (waveBased()) announceWave(game.wave)
     else hud.showBanner(game.mode.name)
     persistRun()
+    track('run_started', { mode: game.mode.id, coop: coopMode, seed })
   }
   lockPointer()
 }
@@ -347,6 +350,7 @@ hud.onRaceAgain = () => {
   hud.hideRaceResults()
   restartRace(game)
   prevPhase = game.phase
+  track('run_started', { mode: game.mode.id, coop: false, seed })
   lockPointer()
 }
 // R restarts straight off the finish screen; mid-run R is handled inside the sim
@@ -365,6 +369,7 @@ hud.onRestart = () => {
   if (waveBased()) announceWave(game.wave)
   else hud.showBanner(game.mode.name)
   persistRun()
+  track('run_started', { mode: game.mode.id, coop: coopMode, seed })
   lockPointer()
 }
 hud.onPickUpgrade = (id) => {
@@ -712,6 +717,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
       case 'teamWipe':
         effects.addShake(1)
         audio.boom()
+        track('run_ended', { mode: game.mode.id, coop: true, wave: game.wave })
         break
     }
   }
@@ -993,6 +999,7 @@ function handleEvents(events: GameEvent[]): void {
         effects.addShake(1)
         audio.boom()
         audio.play('player-death', { volume: 0.7, rate: 0.85 })
+        track('run_ended', { mode: game.mode.id, coop: false, wave: game.wave, score: game.score.score })
         break
       case 'hook':
         audio.click()
@@ -1040,6 +1047,7 @@ function handleEvents(events: GameEvent[]): void {
         audio.chime()
         effects.addShake(0.25)
         submitTrial({ mode: 'race', seed, timeS: event.time, splits: event.splits })
+        track('trial_finished', { mode: game.mode.id, seed, time_s: event.time, pb: event.pb })
         break
       case 'raceArmed':
       case 'raceRestart':
@@ -1062,6 +1070,27 @@ function handleEvents(events: GameEvent[]): void {
         hud.strikeFx()
         blade.slash()
         effects.addShake(0.25)
+        break
+      case 'grabbed': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        if (titan) {
+          audio.playAt(ROARS, titan.pos.distanceTo(game.player.pos), { volume: 1.3, rate: 0.8 })
+        }
+        audio.thud(0.8)
+        effects.addShake(0.6)
+        break
+      }
+      case 'grabEscaped':
+        hud.showBanner('Broke Free!', 1400)
+        audio.play(GRUNTS, { volume: 0.9, rate: 1.15 })
+        effects.addShake(0.3)
+        break
+      case 'grabFailed':
+        // the squeeze: the playerHit riding along already shakes, thuds and flashes red
+        hud.showBanner('Crushed · 2 Hearts Lost', 2000)
+        break
+      case 'grabReleased':
+        hud.showBanner('The Grip Falls Open', 1400)
         break
     }
   }
@@ -1371,6 +1400,13 @@ function snapshot() {
     focusActive: game.focusActive,
     striking: game.strike !== null,
     strikeTarget: game.strikeTargetId,
+    grab: game.grab
+      ? {
+          titanId: game.grab.titanId,
+          presses: game.grab.presses,
+          timeLeft: Math.round(game.grab.timeLeft * 100) / 100,
+        }
+      : null,
     hooks: game.player.hooks.map((h) => h.state),
     buildings: game.arena.buildings.length,
     clock: Math.round((debug.clockOverride ?? clockFraction(seed, game.time)) * 1000) / 1000,

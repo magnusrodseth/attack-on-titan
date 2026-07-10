@@ -2,6 +2,7 @@ import type { Leaderboard, LobbyMsg, TrialBoards } from './net/protocol'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
+import { GRAB_ESCAPE_PRESSES } from './sim/grab'
 import { HUNT_URGENCY_FRACTION } from './sim/hunt'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
@@ -65,6 +66,9 @@ export class Hud {
   private focusVignette = el('focus-vignette')
   private strikePrompt = el('strike-prompt')
   private strikeFxEl = el('strike-fx')
+  private grabQte = el('grab-qte')
+  private grabDialFill = el('grab-dial-fill')
+  private grabTime = el('grab-time')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
   private spearBar = el('spear-bar')
@@ -300,6 +304,16 @@ export class Hud {
         : game.focusCharge === 0
           ? 'KILL TITANS TO CHARGE'
           : `${game.focusCharge} / ${FOCUS_KILLS_TO_FILL}`
+
+    // grabbed: the dial fills per mash press while the countdown drains toward the squeeze
+    this.grabQte.classList.toggle('hidden', game.grab === null)
+    if (game.grab) {
+      this.grabDialFill.style.setProperty(
+        '--p',
+        Math.min(1, game.grab.presses / GRAB_ESCAPE_PRESSES).toFixed(3),
+      )
+      this.grabTime.textContent = Math.max(0, game.grab.timeLeft).toFixed(1)
+    }
 
     if (game.mode.id === 'race') {
       // racers think in meters per second; the station prompt is meaningless (R restarts)

@@ -4,6 +4,12 @@ import { CYCLE_SECONDS, startFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS } from './flashlight'
 import type { GameEvent } from './game'
 import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
+import {
+  GRAB_ESCAPE_PRESSES,
+  GRAB_ESCAPE_SECONDS,
+  GRAB_HP_COST,
+  GRAB_LINGER_SECONDS,
+} from './grab'
 import { isWalkable } from './nav'
 import { neutralInput } from './player'
 import type { SpearState } from './spear'
@@ -706,5 +712,105 @@ describe('thunder spears', () => {
     expect(game.pickups).toHaveLength(3)
     expect(game.pickups.map((pk) => [pk.x, pk.z])).not.toEqual(firstWave)
     expect(game.spears.map((s) => s.id)).toEqual([inWall.id])
+  })
+})
+
+describe('titan grabs', () => {
+  /** A lone titan looming over a standing soldier; the palm is disarmed so only the fist acts. */
+  function loiterGame() {
+    const game = playingGame()
+    game.arena.buildings.length = 0
+    game.titans.splice(1)
+    const titan = game.titans[0]!
+    titan.pos.set(3, 0, 0)
+    titan.attackCooldown = 600 // never swats: these tests are about the grab
+    game.player.pos.set(0, 1.6, 0)
+    game.player.vel.set(0, 0, 0)
+    return { game, titan }
+  }
+
+  function stepUntilGrabbed(game: ReturnType<typeof playingGame>): GameEvent[] {
+    const seen: GameEvent[] = []
+    for (let t = 0; t < GRAB_LINGER_SECONDS + 2 && !game.grab; t += DT) {
+      stepGame(game, neutralInput(), DT)
+      seen.push(...game.events)
+    }
+    return seen
+  }
+
+  it('plucks a soldier who loiters at its feet into the fist', () => {
+    const { game, titan } = loiterGame()
+    const events = stepUntilGrabbed(game)
+    expect(game.grab).not.toBeNull()
+    expect(game.grab!.titanId).toBe(titan.id)
+    expect(events).toContainEqual({ type: 'grabbed', titanId: titan.id })
+    // pinned to the hold point, not standing on the street anymore
+    expect(game.player.pos.y).toBeCloseTo(titan.pos.y + titan.height * 0.62, 1)
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+
+  it('mashing space fills the bar and flings the soldier free unharmed', () => {
+    const { game, titan } = loiterGame()
+    stepUntilGrabbed(game)
+    const seen: GameEvent[] = []
+    const input = neutralInput()
+    for (let tick = 0; game.grab && tick < GRAB_ESCAPE_PRESSES * 2 + 4; tick++) {
+      input.jump = tick % 2 === 0 // fresh press edges, not one long hold
+      stepGame(game, input, DT)
+      seen.push(...game.events)
+    }
+    expect(seen).toContainEqual({ type: 'grabEscaped', titanId: titan.id })
+    expect(game.grab).toBeNull()
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+    expect(game.player.vel.length()).toBeGreaterThan(5)
+    expect(game.player.invulnTimer).toBeGreaterThan(0)
+  })
+
+  it('failing the timer costs two hearts and drops the soldier', () => {
+    const { game, titan } = loiterGame()
+    stepUntilGrabbed(game)
+    const seen: GameEvent[] = []
+    for (let t = 0; t < GRAB_ESCAPE_SECONDS + 0.5 && game.grab; t += DT) {
+      stepGame(game, neutralInput(), DT)
+      seen.push(...game.events)
+    }
+    const maxHp = game.player.config.maxHp
+    expect(seen).toContainEqual({ type: 'grabFailed', titanId: titan.id, hp: maxHp - GRAB_HP_COST })
+    expect(seen).toContainEqual({ type: 'playerHit', hp: maxHp - GRAB_HP_COST })
+    expect(game.player.hp).toBe(maxHp - GRAB_HP_COST)
+    expect(game.phase).toBe('playing')
+    expect(game.grab).toBeNull()
+  })
+
+  it('a failed escape on the last two hearts is death', () => {
+    const { game } = loiterGame()
+    stepUntilGrabbed(game)
+    game.player.hp = GRAB_HP_COST
+    const seen: GameEvent[] = []
+    for (let t = 0; t < GRAB_ESCAPE_SECONDS + 0.5 && game.phase === 'playing'; t += DT) {
+      stepGame(game, neutralInput(), DT)
+      seen.push(...game.events)
+    }
+    expect(game.phase).toBe('dead')
+    expect(seen).toContainEqual({ type: 'death' })
+  })
+
+  it('the holder dying opens the fist without a scratch', () => {
+    const { game, titan } = loiterGame()
+    stepUntilGrabbed(game)
+    titan.hp = 0
+    stepGame(game, neutralInput(), DT)
+    expect(game.grab).toBeNull()
+    expect(game.events).toContainEqual({ type: 'grabReleased', titanId: titan.id })
+    expect(game.player.hp).toBe(game.player.config.maxHp)
+  })
+
+  it('the holder stands frozen while it holds', () => {
+    const { game, titan } = loiterGame()
+    stepUntilGrabbed(game)
+    const stateTime = titan.stateTime
+    for (let t = 0; t < 1; t += DT) stepGame(game, neutralInput(), DT)
+    expect(titan.stateTime).toBe(stateTime)
+    expect(titan.vel.length()).toBe(0)
   })
 })

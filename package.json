@@ -21,6 +21,7 @@
     "hono": "^4.12.28",
     "partyserver": "^0.5.8",
     "partysocket": "^1.3.0",
+    "posthog-js": "^1.399.1",
     "three": "^0.185.1"
   },
   "devDependencies": {

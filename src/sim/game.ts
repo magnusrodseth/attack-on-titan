@@ -7,6 +7,16 @@ import { stepSlashBuffer, trySlash } from './combat'
 import { clockFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
 import type { HuntState } from './hunt'
+import type { GrabState, GrabWatch } from './grab'
+import {
+  GRAB_HP_COST,
+  GRAB_REGRAB_COOLDOWN,
+  createGrabWatch,
+  grabHoldPoint,
+  startGrab,
+  stepGrab,
+  updateGrabWatch,
+} from './grab'
 import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { NavGrid } from './nav'
@@ -24,7 +34,7 @@ import { collectPickups, fireSpear, stepSpears } from './spear'
 import type { StrikeState } from './strike'
 import { createStrike, findStrikeTarget, stepStrike } from './strike'
 import type { TitanKind, TitanState } from './titan'
-import { aggroRange, isFootballer, raycastTitan, stepTitan } from './titan'
+import { aggroRange, forwardOf, isFootballer, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead' | 'finished'
@@ -60,6 +70,11 @@ export type GameEvent =
   | { type: 'staggered'; titanId: number }
   | { type: 'spearPickup'; remaining: number }
   | { type: 'playerHit'; hp: number }
+  // the grab QTE: fist closes, mash succeeds, timer empties, or the holder drops you
+  | { type: 'grabbed'; titanId: number }
+  | { type: 'grabEscaped'; titanId: number }
+  | { type: 'grabFailed'; titanId: number; hp: number }
+  | { type: 'grabReleased'; titanId: number }
   | { type: 'waveClear'; wave: number; bonus: number }
   | { type: 'resupply' }
   | { type: 'lampLow' }
@@ -121,6 +136,10 @@ export interface GameState {
   strike: StrikeState | null
   /** Titan whose nape the crosshair is locked onto during an active focus window. */
   strikeTargetId: number | null
+  /** The fist around the soldier and the mash-to-escape QTE; null while free (grab.ts). */
+  grab: GrabState | null
+  /** Loiter clock that arms a grab, plus the post-grab grace before it counts again. */
+  grabWatch: GrabWatch
   mode: GameMode
   /** Signal Run's course and clock; null in every other mode. */
   race: RaceState | null
@@ -191,6 +210,8 @@ export function createGame(
     focusCharge: 0,
     strike: null,
     strikeTargetId: null,
+    grab: null,
+    grabWatch: createGrabWatch(),
     mode: getMode(modeId),
     race: null,
     hunt: null,
@@ -216,6 +237,8 @@ export function startGame(g: GameState): void {
   g.focusCharge = 0
   g.strike = null
   g.strikeTargetId = null
+  g.grab = null
+  g.grabWatch = createGrabWatch()
   g.phase = 'playing' // set first so the mode may override it from start()
   g.mode.start(g)
 }
@@ -235,37 +258,46 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   const p = g.player
   stepLamp(g, dt)
 
-  // focus: a full charge buys one fixed slow-mo window (main loop applies FOCUS_TIME_SCALE).
-  // The tap only opens it; the window runs to the end of its 3 real seconds no matter what
-  // Q does afterwards — only the strike or an intermission cuts it short.
-  if (g.focusActive) {
-    g.focus = Math.max(0, g.focus - FOCUS_DRAIN * dt)
-    if (g.focus <= 0) g.focusActive = false
-  } else if (
-    input.focus &&
-    !g.prevInput.focus &&
-    g.focusCharge >= FOCUS_KILLS_TO_FILL &&
-    !g.strike
-  ) {
-    g.focusActive = true
-    g.focusCharge = 0
-    g.focus = FOCUS_MAX
-  }
-
-  // the crosshair lock only exists inside an active window; firing needs this step's aim
-  g.strikeTargetId =
-    g.focusActive && !g.strike ? findStrikeTarget(p.pos, input.lookDir, g.titans, g.arena) : null
-
-  // F with a lock fires the strike; the same press must not also swing a blade
-  if (input.slash && !g.prevInput.slash && g.strikeTargetId !== null) {
-    beginStrike(g, g.strikeTargetId)
-  }
-
-  if (g.strike) {
-    // the dash owns the soldier: no hooks, blades, spears or footwork until it lands
-    stepStrikeDash(g, dt)
+  if (g.grab) {
+    // the fist owns the soldier: nothing to do but mash (see grab.ts)
+    stepGrabHeld(g, input, dt)
   } else {
-    stepPlayerActions(g, input, dt)
+    // focus: a full charge buys one fixed slow-mo window (main loop applies FOCUS_TIME_SCALE).
+    // The tap only opens it; the window runs to the end of its 3 real seconds no matter what
+    // Q does afterwards — only the strike, a grab or an intermission cuts it short.
+    if (g.focusActive) {
+      g.focus = Math.max(0, g.focus - FOCUS_DRAIN * dt)
+      if (g.focus <= 0) g.focusActive = false
+    } else if (
+      input.focus &&
+      !g.prevInput.focus &&
+      g.focusCharge >= FOCUS_KILLS_TO_FILL &&
+      !g.strike
+    ) {
+      g.focusActive = true
+      g.focusCharge = 0
+      g.focus = FOCUS_MAX
+    }
+
+    // the crosshair lock only exists inside an active window; firing needs this step's aim
+    g.strikeTargetId =
+      g.focusActive && !g.strike ? findStrikeTarget(p.pos, input.lookDir, g.titans, g.arena) : null
+
+    // F with a lock fires the strike; the same press must not also swing a blade
+    if (input.slash && !g.prevInput.slash && g.strikeTargetId !== null) {
+      beginStrike(g, g.strikeTargetId)
+    }
+
+    if (g.strike) {
+      // the dash owns the soldier: no hooks, blades, spears or footwork until it lands
+      stepStrikeDash(g, dt)
+      updateGrabWatch(g.grabWatch, p, g.titans, dt, true)
+    } else {
+      stepPlayerActions(g, input, dt)
+      // loitering slow inside a titan's reach arms the grab; being flung around does not
+      const grabber = updateGrabWatch(g.grabWatch, p, g.titans, dt, p.invulnTimer > 0)
+      if (grabber) beginGrab(g, grabber)
+    }
   }
 
   // spears resolve before titan AI so a fresh stagger suppresses this tick's swat
@@ -320,6 +352,10 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
 
   const chasers = pickChasers(g)
   for (const titan of g.titans) {
+    if (g.grab && titan.id === g.grab.titanId) {
+      titan.vel.set(0, 0, 0) // the holder stands still and squeezes; no walking, no swats
+      continue
+    }
     for (const event of stepTitan(titan, p.pos, dt, g.rngLive, g.arena, g.nav, chasers.has(titan.id), g.relentless)) {
       if (event.type !== 'swat') continue
       if (p.invulnTimer > 0) continue
@@ -351,6 +387,9 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
     g.strikeTargetId = null
     g.focusActive = false
     g.focus = 0
+    // an intermission opens the fist; nothing holds you into the next wave
+    g.grab = null
+    g.grabWatch.linger = 0
   }
 
   copyInput(g.prevInput, input)
@@ -532,6 +571,75 @@ function stepStrikeDash(g: GameState, dt: number): void {
     grantFocusCharge(g)
   }
   if (result.done) g.strike = null
+}
+
+/** The fist closes: hooks tear free, the slow-mo window dies, the QTE starts. */
+function beginGrab(g: GameState, titan: TitanState): void {
+  const p = g.player
+  for (const [index, hook] of p.hooks.entries()) {
+    // plucked off the wall (or off the titan itself): nothing stays anchored
+    if (hook.state === 'attached') {
+      releaseHook(hook)
+      g.events.push({ type: 'unhook', index: index as 0 | 1 })
+    }
+  }
+  g.focusActive = false
+  g.focus = 0
+  g.strikeTargetId = null
+  g.grab = startGrab(titan)
+  p.pos.copy(grabHoldPoint(titan))
+  p.vel.set(0, 0, 0)
+  p.onGround = false
+  p.bankedSpeed = 0
+  g.events.push({ type: 'grabbed', titanId: titan.id })
+}
+
+/**
+ * One tick inside the fist: the soldier stays pinned to the hold point, fresh Space
+ * presses fill the escape bar, and the timer decides between a fling free and a squeeze
+ * worth GRAB_HP_COST hearts. The holder dying or being staggered loose ends it early.
+ */
+function stepGrabHeld(g: GameState, input: InputState, dt: number): void {
+  const grab = g.grab
+  if (!grab) return
+  const p = g.player
+  const titan = g.titans.find((t) => t.id === grab.titanId)
+  if (!titan || titan.hp <= 0 || titan.state === 'staggered' || titan.state === 'dead') {
+    g.grab = null
+    g.grabWatch.cooldown = GRAB_REGRAB_COOLDOWN
+    p.invulnTimer = Math.max(p.invulnTimer, 0.8)
+    g.events.push({ type: 'grabReleased', titanId: grab.titanId })
+    return
+  }
+  // the fist is the only thing allowed to hurt you: swats and blasts pass over
+  p.invulnTimer = Math.max(p.invulnTimer, 0.1)
+  p.pos.copy(grabHoldPoint(titan))
+  p.vel.set(0, 0, 0)
+  p.onGround = false
+  const result = stepGrab(grab, input.jump && !g.prevInput.jump, dt)
+  if (result === 'held') return
+  g.grab = null
+  g.grabWatch.cooldown = GRAB_REGRAB_COOLDOWN
+  const away = forwardOf(titan)
+  if (result === 'escaped') {
+    p.vel.copy(away).multiplyScalar(13)
+    p.vel.y = 10
+    p.invulnTimer = 1.2
+    titan.attackCooldown = Math.max(titan.attackCooldown, 1.5) // no swat mid-fling
+    g.events.push({ type: 'grabEscaped', titanId: titan.id })
+  } else {
+    p.hp -= GRAB_HP_COST
+    p.invulnTimer = 1.5
+    p.vel.copy(away).multiplyScalar(10)
+    p.vel.y = 8
+    g.events.push({ type: 'grabFailed', titanId: titan.id, hp: p.hp })
+    g.events.push({ type: 'playerHit', hp: p.hp })
+    if (p.hp <= 0) {
+      g.phase = 'dead'
+      saveBest(g)
+      g.events.push({ type: 'death' })
+    }
+  }
 }
 
 /**
