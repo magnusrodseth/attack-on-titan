@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Arena } from './city'
-import { emptyArena, generateCity } from './city'
+import { emptyArena } from './city'
+import { generateCity } from './citygen'
 import { buildNavGrid, findPath, isWalkable, nearestWalkable } from './nav'
 import { createRng, hashSeed } from './rng'
 
@@ -12,6 +13,7 @@ function arenaWith(buildings: Partial<Arena['buildings'][0]>[]): Arena {
       z: 0,
       w: 10,
       d: 10,
+      y0: 0,
       h: 15,
       kind: 'house',
       ridgeAxis: 'x',
@@ -32,10 +34,22 @@ describe('buildNavGrid', () => {
   })
 
   it('marks everything beyond the wall unwalkable', () => {
-    const grid = buildNavGrid(emptyArena())
+    const arena = emptyArena()
+    const grid = buildNavGrid(arena)
     expect(isWalkable(grid, 0, 0)).toBe(true)
-    expect(isWalkable(grid, 169, 0)).toBe(false)
-    expect(isWalkable(grid, 0, -180)).toBe(false)
+    expect(isWalkable(grid, arena.wallRadius - 1, 0)).toBe(false)
+    expect(isWalkable(grid, 0, -arena.wallRadius - 10)).toBe(false)
+  })
+
+  it('lets titans walk beneath high spans but not beneath low bridge decks', () => {
+    const grid = buildNavGrid(
+      arenaWith([
+        { x: 30, z: 0, w: 10, d: 12, y0: 36, h: 42, kind: 'deck' }, // the gate span
+        { x: -30, z: 0, w: 17, d: 5, y0: 3.3, h: 4.6, kind: 'deck' }, // a canal bridge
+      ]),
+    )
+    expect(isWalkable(grid, 30, 0)).toBe(true) // room for a 15m titan under 36m
+    expect(isWalkable(grid, -30, 0)).toBe(false) // a 4m deck is a wall to a titan
   })
 })
 

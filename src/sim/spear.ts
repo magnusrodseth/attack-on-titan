@@ -123,7 +123,7 @@ export function stepSpears(
 
       spear.pos.addScaledVector(dir, step)
       spear.traveled += step
-      const ground = groundHeightAt(arena, spear.pos.x, spear.pos.z)
+      const ground = groundHeightAt(arena, spear.pos.x, spear.pos.z, spear.pos.y)
       if (spear.pos.y <= ground) {
         spear.pos.y = ground
         spear.phase = 'stuck'

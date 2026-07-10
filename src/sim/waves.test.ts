@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createRng } from './rng'
-import { matchdayComposition, waveComposition } from './waves'
+import { TITAN_DENSITY, matchdayComposition, waveComposition } from './waves'
+
+// spawn ring bounds for the default 260m wall: [0.5, 0.85] of the radius
+const RING_MIN = 260 * 0.5
+const RING_MAX = 260 * 0.85
 
 describe('waveComposition', () => {
   it('is deterministic for the same seed', () => {
@@ -23,7 +27,7 @@ describe('waveComposition', () => {
     const matchday = waveComposition(3, createRng(7))
     expect(matchday.filter((s) => s.kind === 'striker')).toHaveLength(1)
     expect(matchday.filter((s) => s.kind === 'captain')).toHaveLength(1)
-    expect(matchday).toHaveLength(8 + 2) // the usual wave-3 horde, plus the duo
+    expect(matchday).toHaveLength(8 * TITAN_DENSITY + 2) // the usual wave-3 horde, plus the duo
 
     const offday = waveComposition(4, createRng(7))
     expect(offday.some((s) => s.kind === 'striker' || s.kind === 'captain')).toBe(false)
@@ -45,10 +49,18 @@ describe('waveComposition', () => {
   it('spawns on a ring outside the city core with sane heights', () => {
     for (const spawn of waveComposition(5, createRng(2))) {
       const dist = Math.hypot(spawn.x, spawn.z)
-      expect(dist).toBeGreaterThanOrEqual(90)
-      expect(dist).toBeLessThanOrEqual(150)
+      expect(dist).toBeGreaterThanOrEqual(RING_MIN)
+      expect(dist).toBeLessThanOrEqual(RING_MAX)
       expect(spawn.height).toBeGreaterThanOrEqual(8)
       expect(spawn.height).toBeLessThanOrEqual(27)
+    }
+  })
+
+  it('scales the spawn ring with the arena wall', () => {
+    for (const spawn of waveComposition(5, createRng(2), 1, 170)) {
+      const dist = Math.hypot(spawn.x, spawn.z)
+      expect(dist).toBeGreaterThanOrEqual(170 * 0.5)
+      expect(dist).toBeLessThanOrEqual(170 * 0.85)
     }
   })
 })
@@ -63,8 +75,8 @@ describe('matchdayComposition', () => {
         expect(s.height).toBeGreaterThanOrEqual(13)
         expect(s.height).toBeLessThanOrEqual(16)
         const dist = Math.hypot(s.x, s.z)
-        expect(dist).toBeGreaterThanOrEqual(90)
-        expect(dist).toBeLessThanOrEqual(150)
+        expect(dist).toBeGreaterThanOrEqual(RING_MIN)
+        expect(dist).toBeLessThanOrEqual(RING_MAX)
       }
     }
   })

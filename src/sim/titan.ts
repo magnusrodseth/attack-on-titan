@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
-import { insideBuildingXZ, resolveBuildingCollision } from './city'
+import { baseGroundY, insideBuildingXZ, resolveBuildingCollision } from './city'
 import { GRAVITY } from './constants'
 import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
@@ -201,6 +201,13 @@ export function stepTitan(
   t.attackCooldown = Math.max(0, t.attackCooldown - dt)
   t.leapCooldown = Math.max(0, t.leapCooldown - dt)
   t.avoidTimer = Math.max(0, t.avoidTimer - dt)
+
+  // grounded titans track the terrain base, so canal waders sink to the bed instead
+  // of hovering over the water (leaps own their own vertical arc)
+  if (arena && t.state !== 'leap' && t.pos.y <= 0.1) {
+    const baseY = baseGroundY(arena, t.pos.x, t.pos.z)
+    t.pos.y += (baseY - t.pos.y) * Math.min(1, dt * 4)
+  }
 
   const dx = playerPos.x - t.pos.x
   const dz = playerPos.z - t.pos.z

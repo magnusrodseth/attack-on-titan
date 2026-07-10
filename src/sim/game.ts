@@ -1,6 +1,7 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
-import { generateCity, raycastHookTarget } from './city'
+import { raycastHookTarget } from './city'
+import { generateCity } from './citygen'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
 import { stepSlashBuffer, trySlash } from './combat'

@@ -108,7 +108,7 @@ describe('stepTitan', () => {
 
   it('paths around a building between it and the player instead of grinding into it', () => {
     const arena = emptyArena()
-    arena.buildings.push({ x: 15, z: 0, w: 6, d: 14, h: 16, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
+    arena.buildings.push({ x: 15, z: 0, w: 6, d: 14, y0: 0, h: 16, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
     const nav = buildNavGrid(arena)
     const t = createTitan({ id: 1, kind: 'normal', height: 16, x: 0, z: 0 })
     t.state = 'chase'
@@ -120,7 +120,7 @@ describe('stepTitan', () => {
 
   it('a titan standing inside a building wades out of the footprint', () => {
     const arena = emptyArena()
-    arena.buildings.push({ x: 15, z: 0, w: 10, d: 14, h: 16, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
+    arena.buildings.push({ x: 15, z: 0, w: 10, d: 14, y0: 0, h: 16, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
     const nav = buildNavGrid(arena)
     const t = createTitan({ id: 1, kind: 'normal', height: 12, x: 15, z: 0 }) // embedded
     for (let i = 0; i < 120 * 5; i++) stepTitan(t, player(200, 1.7, 0), DT, rngZero, arena, nav)
@@ -151,7 +151,7 @@ describe('titan building collision', () => {
   it('cannot walk through a house; it is held at the wall', () => {
     const arena = emptyArena()
     // a long wall of building directly in the chase path
-    arena.buildings.push({ x: 10, z: 0, w: 4, d: 60, h: 20, kind: 'house', ridgeAxis: 'z', tint: 0.5 })
+    arena.buildings.push({ x: 10, z: 0, w: 4, d: 60, y0: 0, h: 20, kind: 'house', ridgeAxis: 'z', tint: 0.5 })
     const t = createTitan({ id: 1, kind: 'normal', height: 12, x: 0, z: 0 })
     t.state = 'chase'
     const target = player(30, 1.7, 0)

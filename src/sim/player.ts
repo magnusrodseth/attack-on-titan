@@ -269,7 +269,25 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   resolveBuildingCollision(arena, p.pos, p.vel, 0.5)
   clampToWall(arena, p.pos, p.vel, 1)
 
-  const ground = groundHeightAt(arena, p.pos.x, p.pos.z) + EYE_HEIGHT
+  // the canal: tethered, the rope carries you — skimming the water costs a whisper,
+  // like a tethered ground graze, and the banked swing survives. Untethered you are
+  // wading, and the water eats your run. That asymmetry IS the risk gap.
+  const canal = arena.canal
+  if (
+    canal &&
+    p.pos.y - EYE_HEIGHT < canal.waterY &&
+    Math.abs(p.pos.x - canal.x) < canal.halfWidth
+  ) {
+    const tethered = anchors.length > 0
+    const soak = Math.max(0, 1 - (tethered ? 0.3 : 2.5) * dt)
+    p.vel.x *= soak
+    p.vel.z *= soak
+    if (!tethered) p.bankedSpeed = 0
+  }
+
+  // feet-relative ground: an elevated deck is a one-way platform — pass under it
+  // freely, land on it from above (or pop onto it as your feet clear its base)
+  const ground = groundHeightAt(arena, p.pos.x, p.pos.z, p.pos.y - EYE_HEIGHT) + EYE_HEIGHT
   if (p.pos.y <= ground) {
     p.pos.y = ground
     if (p.vel.y < 0) p.vel.y = 0

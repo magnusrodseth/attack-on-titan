@@ -120,7 +120,7 @@ export function stepStrike(
   const move = Math.min(step, strike.exitRemaining)
   p.pos.addScaledVector(strike.dir, move)
   strike.exitRemaining -= move
-  const ground = groundHeightAt(arena, p.pos.x, p.pos.z) + EYE_HEIGHT
+  const ground = groundHeightAt(arena, p.pos.x, p.pos.z, p.pos.y - EYE_HEIGHT) + EYE_HEIGHT
   if (p.pos.y < ground) {
     p.pos.y = ground
     strike.exitRemaining = 0

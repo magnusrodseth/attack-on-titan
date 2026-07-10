@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateCity } from './city'
+import { generateCity } from './citygen'
 import {
   COURSE_WALL_MARGIN,
   GATE_TIERS,
@@ -34,7 +34,7 @@ describe('generateCourse', () => {
     expect(b.course.gates).not.toEqual(a.course.gates)
   })
 
-  it('lays a start plus 10-15 ordered gates', () => {
+  it('lays a start plus a bounded count of ordered gates', () => {
     for (const seed of SEEDS) {
       const { course } = setup(seed)
       expect(course.gates.length).toBeGreaterThanOrEqual(MIN_GATES)
@@ -75,14 +75,16 @@ describe('generateCourse', () => {
     }
   })
 
-  it('mixes all three height tiers, each gate inside its band with its radius', () => {
+  it('mixes all three height tiers; canyon and rooftop ride the local skyline', () => {
     for (const seed of SEEDS) {
-      const { course } = setup(seed)
+      const { arena, course } = setup(seed)
       const seen = new Set<string>()
       for (const gate of course.gates) {
         const band = GATE_TIERS[gate.tier]
         expect(gate.y).toBeGreaterThanOrEqual(band.minY)
-        expect(gate.y).toBeLessThanOrEqual(band.maxY)
+        if (gate.tier === 'street') expect(gate.y).toBeLessThanOrEqual(band.maxY)
+        // skyline-derived tiers stay well under the towers and the wall
+        expect(gate.y).toBeLessThanOrEqual(arena.wallHeight)
         expect(gate.radius).toBe(band.radius)
         seen.add(gate.tier)
       }

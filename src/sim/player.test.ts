@@ -266,3 +266,32 @@ describe('stepPlayer', () => {
     expect(p.vel.x).toBeLessThanOrEqual(p.config.runSpeed + 0.5)
   })
 })
+
+describe('canal water', () => {
+  function canalArena() {
+    const arena = emptyArena()
+    arena.canal = { x: 0, halfWidth: 6, bedY: -1.8, waterY: -0.9 }
+    return arena
+  }
+
+  it('wading untethered bleeds speed hard and wipes the banked swing', () => {
+    const arena = canalArena()
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT - 1.8, 0) // feet on the canal bed
+    p.vel.set(20, 0, 0)
+    p.bankedSpeed = 20
+    for (let i = 0; i < 60; i++) stepPlayer(p, idle(), DT, arena) // half a second in the water
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeLessThan(8)
+    expect(p.bankedSpeed).toBe(0)
+  })
+
+  it('a tethered skim across the water keeps its pace (rope does the work)', () => {
+    const arena = canalArena()
+    const p = createPlayer()
+    p.pos.set(0, EYE_HEIGHT - 1.8, 0)
+    p.vel.set(20, 0, 0)
+    attachHook(p.hooks[0], new Vector3(0, 60, 40), p.pos)
+    for (let i = 0; i < 60; i++) stepPlayer(p, idle(), DT, arena)
+    expect(Math.hypot(p.vel.x, p.vel.z)).toBeGreaterThan(15)
+  })
+})

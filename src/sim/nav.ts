@@ -17,6 +17,8 @@ export interface NavGrid {
 const CELL = 2
 const CLEARANCE = 1.6
 const SQRT2 = Math.SQRT2
+/** Spans based at or above this (the gate span) don't block titans walking beneath. */
+const TITAN_NAV_CLEARANCE = 12
 
 function toIndex(grid: NavGrid, x: number): number {
   return Math.floor((x + grid.extent) / grid.cell)
@@ -50,6 +52,7 @@ export function buildNavGrid(arena: Arena, clearance = CLEARANCE, cell = CELL): 
   }
 
   for (const b of arena.buildings) {
+    if (b.y0 >= TITAN_NAV_CLEARANCE) continue
     const x0 = Math.max(0, toIndex(grid, b.x - b.w / 2 - clearance))
     const x1 = Math.min(size - 1, toIndex(grid, b.x + b.w / 2 + clearance))
     const z0 = Math.max(0, toIndex(grid, b.z - b.d / 2 - clearance))
@@ -60,7 +63,48 @@ export function buildNavGrid(arena: Arena, clearance = CLEARANCE, cell = CELL): 
       }
     }
   }
+  pruneUnreachable(grid)
   return grid
+}
+
+/**
+ * Keeps only the walkable component reachable from the plaza. A pocket that clearance
+ * inflation seals off (a tight courtyard, a nook between stair blocks) must read as
+ * unwalkable, or snapped spawn points and course gates land somewhere unroutable.
+ */
+function pruneUnreachable(grid: NavGrid): void {
+  const size = grid.size
+  const [sx, sz] = nearestWalkable(grid, 0, 0)
+  const start = toIndex(grid, sz) * size + toIndex(grid, sx)
+  if (grid.walkable[start] !== 1) return
+  const reached = new Uint8Array(size * size)
+  const queue = new Int32Array(size * size)
+  let head = 0
+  let tail = 0
+  queue[tail++] = start
+  reached[start] = 1
+  while (head < tail) {
+    const current = queue[head++]!
+    const ix = current % size
+    const iz = (current / size) | 0
+    for (const [dx, dz] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = ix + dx
+      const nz = iz + dz
+      if (nx < 0 || nz < 0 || nx >= size || nz >= size) continue
+      const neighbor = nz * size + nx
+      if (reached[neighbor] || grid.walkable[neighbor] !== 1) continue
+      reached[neighbor] = 1
+      queue[tail++] = neighbor
+    }
+  }
+  for (let i = 0; i < grid.walkable.length; i++) {
+    if (grid.walkable[i] === 1 && reached[i] === 0) grid.walkable[i] = 0
+  }
 }
 
 /** Nearest walkable cell centre, searched in deterministic expanding rings. */
@@ -100,6 +144,41 @@ export function lineWalkable(
 const MAX_EXPANSIONS = 20000
 
 /**
+ * A* scratch buffers, reused across calls. Sixty titans repathing over the v2 grid
+ * would otherwise allocate several grid-sized arrays each — megabytes of garbage per
+ * second. Generation stamps make old entries invisible without refilling anything.
+ */
+interface PathScratch {
+  cells: number
+  g: Float64Array
+  fScore: Float64Array
+  came: Int32Array
+  touched: Uint32Array
+  closed: Uint32Array
+  generation: number
+  heap: number[]
+}
+let pathScratch: PathScratch | null = null
+
+function getPathScratch(cells: number): PathScratch {
+  if (!pathScratch || pathScratch.cells !== cells) {
+    pathScratch = {
+      cells,
+      g: new Float64Array(cells),
+      fScore: new Float64Array(cells),
+      came: new Int32Array(cells),
+      touched: new Uint32Array(cells),
+      closed: new Uint32Array(cells),
+      generation: 0,
+      heap: [],
+    }
+  }
+  pathScratch.generation++
+  pathScratch.heap.length = 0
+  return pathScratch
+}
+
+/**
  * A* over the street grid (8-connected, no corner cutting), smoothed by line of sight.
  * Returns world-space waypoints ending at the goal cell, or null when unreachable.
  */
@@ -117,9 +196,9 @@ export function findPath(
   if (start === goal) return [[gx, gz]]
 
   const size = grid.size
-  const g = new Float64Array(size * size).fill(Infinity)
-  const came = new Int32Array(size * size).fill(-1)
-  const closed = new Uint8Array(size * size)
+  const scratch = getPathScratch(size * size)
+  const { g, fScore, came, touched, closed, generation, heap } = scratch
+  const gAt = (i: number): number => (touched[i] === generation ? g[i]! : Infinity)
   const goalIx = goal % size
   const goalIz = Math.floor(goal / size)
 
@@ -130,8 +209,7 @@ export function findPath(
   }
 
   // binary min-heap on f, ties broken by larger g (closer to goal) then index
-  const heap: number[] = []
-  const fScore = new Float64Array(size * size).fill(Infinity)
+  // heap entries are always touched this generation, so raw reads are safe here
   const less = (a: number, b: number): boolean =>
     fScore[a]! !== fScore[b]! ? fScore[a]! < fScore[b]! : g[a]! !== g[b]! ? g[a]! > g[b]! : a < b
   const push = (node: number): void => {
@@ -165,15 +243,17 @@ export function findPath(
   }
 
   g[start] = 0
+  came[start] = -1
+  touched[start] = generation
   fScore[start] = octile(start % size, Math.floor(start / size))
   push(start)
   let expansions = 0
 
   while (heap.length > 0 && expansions < MAX_EXPANSIONS) {
     const current = pop()
-    if (closed[current]) continue
+    if (closed[current] === generation) continue
     if (current === goal) break
-    closed[current] = 1
+    closed[current] = generation
     expansions++
     const ix = current % size
     const iz = Math.floor(current / size)
@@ -187,11 +267,12 @@ export function findPath(
         if (dx !== 0 && dz !== 0 && (!cellWalkable(grid, ix + dx, iz) || !cellWalkable(grid, ix, iz + dz)))
           continue
         const neighbor = nz * size + nx
-        if (closed[neighbor]) continue
+        if (closed[neighbor] === generation) continue
         const cost = g[current]! + (dx !== 0 && dz !== 0 ? SQRT2 : 1) * grid.cell
-        if (cost < g[neighbor]!) {
+        if (cost < gAt(neighbor)) {
           g[neighbor] = cost
           came[neighbor] = current
+          touched[neighbor] = generation
           fScore[neighbor] = cost + octile(nx, nz)
           push(neighbor)
         }
@@ -199,7 +280,7 @@ export function findPath(
     }
   }
 
-  if (came[goal] === -1 && goal !== start) return null
+  if (touched[goal] !== generation && goal !== start) return null
 
   // reconstruct, then greedily skip waypoints with clear line of sight
   const cells: [number, number][] = []

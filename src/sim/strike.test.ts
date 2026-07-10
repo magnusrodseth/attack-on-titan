@@ -61,7 +61,7 @@ describe('findStrikeTarget', () => {
 
   it('rejects a nape hidden behind a building', () => {
     const arena = emptyArena()
-    arena.buildings.push({ x: 15, z: 0, w: 8, d: 8, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    arena.buildings.push({ x: 15, z: 0, w: 8, d: 8, y0: 0, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
     const titan = titanAt(30, 0)
     const pos = new Vector3(0, 10, 0)
     expect(findStrikeTarget(pos, aimAt(pos, napeCenter(titan)), [titan], arena)).toBe(null)
@@ -107,7 +107,7 @@ describe('stepStrike', () => {
 
   it('clips the exit run short of a building behind the titan', () => {
     const arena = emptyArena()
-    arena.buildings.push({ x: 36, z: 0, w: 6, d: 30, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    arena.buildings.push({ x: 36, z: 0, w: 6, d: 30, y0: 0, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
     const titan = titanAt(30, 0)
     const p = createPlayer()
     p.pos.set(0, napeCenter(titan).y, -0.9) // level, straight shot down +x

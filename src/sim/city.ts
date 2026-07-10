@@ -1,21 +1,93 @@
 import { Vector3 } from 'three'
-import { shuffle } from './rng'
 
 /**
- * AoT-district city (see wayfinder ticket 007): dense low row-houses with gabled roofs,
- * scattered church towers as high anchors, a central plaza with the resupply station,
- * all ringed by a 50m wall. `h` is total height including the roof ridge and is what
- * hooks and collision use; the renderer draws eaves below it.
+ * AoT-district city geometry (see wayfinder ticket 007 and the v2 rework): dense gabled
+ * row-houses in height districts, warehouses and church towers as mid/high anchors, two
+ * boulevards crossing at the plaza, a canal chord with swing-under bridges, a sealed
+ * main gate, all ringed by a 50m wall. `h` is total height including the roof ridge and
+ * is what hooks and collision use; `y0` is the base height — elevated decks (bridges,
+ * the gate span) set it above 0 so soldiers can pass underneath.
  */
+export type BuildingKind =
+  | 'house' // gabled row house (also the cathedral nave)
+  | 'warehouse' // mid-tier gable: fills the band between rooftops and towers
+  | 'tower' // church tower with a pyramid spire
+  | 'cathedral' // the district's one great spire
+  | 'gatehouse' // the two towers flanking the sealed main gate
+  | 'bastion' // wall bastion towers at the other cardinal points
+  | 'deck' // elevated flat span (bridge decks, the gate span); y0 > 0
+  | 'pier' // bridge piers and stair blocks
+  | 'chimney' // rooftop perch above a house ridge
+  | 'flagpole' // thin high anchor on towers and spans
+  | 'well'
+  | 'stall'
+  | 'cart'
+
 export interface Building {
   x: number
   z: number
   w: number
   d: number
+  /** Base height of the solid box; > 0 means you can pass (and swing) underneath. */
+  y0: number
+  /** Total height including the roof ridge or spire tip (absolute, not relative to y0). */
   h: number
-  kind: 'house' | 'tower'
+  kind: BuildingKind
   ridgeAxis: 'x' | 'z'
   tint: number
+}
+
+export type RoofShape = 'gable' | 'pyramid' | 'flat'
+
+export const ROOF_SHAPE: Record<BuildingKind, RoofShape> = {
+  house: 'gable',
+  warehouse: 'gable',
+  tower: 'pyramid',
+  cathedral: 'pyramid',
+  gatehouse: 'pyramid',
+  bastion: 'pyramid',
+  deck: 'flat',
+  pier: 'flat',
+  chimney: 'flat',
+  flagpole: 'flat',
+  well: 'flat',
+  stall: 'flat',
+  cart: 'flat',
+}
+
+/**
+ * Fraction of total height where the walls end and the roof begins. The single source
+ * of truth shared by sim raycasts/collision AND the renderer — if these drift apart,
+ * hooks anchor to air or sink into roofs.
+ */
+export const EAVE_FRACTION: Record<BuildingKind, number> = {
+  house: 0.7,
+  warehouse: 0.8,
+  tower: 0.78,
+  cathedral: 0.82,
+  gatehouse: 0.86,
+  bastion: 0.86,
+  deck: 1,
+  pier: 1,
+  chimney: 1,
+  flagpole: 1,
+  well: 1,
+  stall: 1,
+  cart: 1,
+}
+
+export function eaveHeight(b: Building): number {
+  return b.h * EAVE_FRACTION[b.kind]
+}
+
+/** The canal runs the full north-south chord at a fixed x; water sits below street level. */
+export interface CanalSpec {
+  x: number
+  halfWidth: number
+  /** Canal bed: what wading feet stand on. */
+  bedY: number
+  /** Water surface: below this, wading drag applies. */
+  waterY: number
 }
 
 export interface Arena {
@@ -24,100 +96,42 @@ export interface Arena {
   wallHeight: number
   plazaRadius: number
   station: Vector3
+  canal: CanalSpec | null
+  /** Wall angle (radians, +X = 0) of the sealed main gate; bastions hold the other cardinals. */
+  gateAngle: number
+  /** Broadphase over buildings; rebuilt lazily whenever buildings.length changes. */
+  index?: BuildingIndex
 }
-
-const BLOCK = 34
-const STREET_HALF = 3
-const CELL_HALF = BLOCK / 2 - STREET_HALF // usable half-extent of a block
 
 export function emptyArena(): Arena {
   return {
     buildings: [],
-    wallRadius: 170,
+    wallRadius: 260,
     wallHeight: 50,
     plazaRadius: 22,
     station: new Vector3(0, 0, 0),
+    canal: null,
+    gateAngle: 0,
   }
 }
 
-export function generateCity(rng: () => number): Arena {
-  const arena = emptyArena()
-  const cells: Array<{ cx: number; cz: number }> = []
-  const margin = CELL_HALF + 2
-  for (let gx = -5; gx <= 5; gx++) {
-    for (let gz = -5; gz <= 5; gz++) {
-      const cx = gx * BLOCK
-      const cz = gz * BLOCK
-      if (Math.hypot(Math.abs(cx) + margin, Math.abs(cz) + margin) >= arena.wallRadius) continue
-      const nearestX = Math.max(Math.abs(cx) - CELL_HALF, 0)
-      const nearestZ = Math.max(Math.abs(cz) - CELL_HALF, 0)
-      if (Math.hypot(nearestX, nearestZ) <= arena.plazaRadius + 1) continue
-      cells.push({ cx, cz })
-    }
-  }
-
-  const order = shuffle(rng, cells)
-  const towerCells = new Set(order.slice(0, 6 + Math.floor(rng() * 3)))
-  for (const cell of cells) {
-    if (towerCells.has(cell)) {
-      arena.buildings.push({
-        x: cell.cx,
-        z: cell.cz,
-        w: 12,
-        d: 12,
-        h: 36 + rng() * 12,
-        kind: 'tower',
-        ridgeAxis: rng() < 0.5 ? 'x' : 'z',
-        tint: rng(),
-      })
-      continue
-    }
-    if (rng() < 0.08) continue // market square
-    fillRowHouses(arena, cell.cx, cell.cz, rng)
-  }
-  return arena
+/** Terrain height ignoring buildings: 0 everywhere except the canal bed. */
+export function baseGroundY(arena: Arena, x: number, _z: number): number {
+  const canal = arena.canal
+  if (canal && Math.abs(x - canal.x) < canal.halfWidth) return canal.bedY
+  return 0
 }
 
-function fillRowHouses(arena: Arena, cx: number, cz: number, rng: () => number): void {
-  const alongX = rng() < 0.5
-  const rowDepth = 10 + rng() * 3
-  for (const side of [-1, 1]) {
-    const rowOffset = side * (CELL_HALF - rowDepth / 2)
-    let cursor = -CELL_HALF
-    while (cursor < CELL_HALF - 5) {
-      let width = 8 + rng() * 4
-      if (cursor + width > CELL_HALF - 5) width = CELL_HALF - cursor // absorb the tail
-      const center = cursor + width / 2
-      const height = 14 + rng() * 8
-      arena.buildings.push({
-        x: alongX ? cx + center : cx + rowOffset,
-        z: alongX ? cz + rowOffset : cz + center,
-        w: alongX ? width : rowDepth,
-        d: alongX ? rowDepth : width,
-        h: height,
-        kind: 'house',
-        ridgeAxis: alongX ? 'x' : 'z',
-        tint: rng(),
-      })
-      cursor += width
-    }
-  }
-}
-
-/** Fraction of total height where the walls end and the roof begins. */
-export function eaveHeight(b: Building): number {
-  return b.h * (b.kind === 'tower' ? 0.78 : 0.7)
-}
-
-/** Height of the building surface (wall top, gable slope, or spire) at a point, 0 outside. */
+/** Height of the building surface (wall top, roof slope, or spire) at a point, 0 outside. */
 export function surfaceHeightAt(b: Building, x: number, z: number): number {
   const dx = x - b.x
   const dz = z - b.z
   if (Math.abs(dx) > b.w / 2 || Math.abs(dz) > b.d / 2) return 0
+  const shape = ROOF_SHAPE[b.kind]
+  if (shape === 'flat') return b.h
   const eave = eaveHeight(b)
   const rise = b.h - eave
-  if (b.kind === 'tower') {
-    // pyramid spire
+  if (shape === 'pyramid') {
     const t = Math.max(Math.abs(dx) / (b.w / 2), Math.abs(dz) / (b.d / 2))
     return eave + rise * (1 - t)
   }
@@ -125,21 +139,50 @@ export function surfaceHeightAt(b: Building, x: number, z: number): number {
   return eave + rise * (1 - cross)
 }
 
-export function groundHeightAt(arena: Arena, x: number, z: number): number {
-  let ground = 0
-  for (const b of arena.buildings) {
-    const surface = surfaceHeightAt(b, x, z)
-    if (surface > ground) ground = surface
+/** An elevated surface only counts as ground once your feet have cleared its base. */
+const STEP_TOLERANCE = 0.3
+
+/**
+ * Highest standable surface at a point, seen from feet height `feetY`. Elevated decks
+ * behave like one-way platforms: below their base you pass under freely; at or above
+ * it they catch you. Pass Infinity to get the absolute skyline height.
+ */
+export function groundHeightAt(arena: Arena, x: number, z: number, feetY: number): number {
+  let ground = baseGroundY(arena, x, z)
+  const index = ensureIndex(arena)
+  const bucket = bucketAtPoint(index, x, z)
+  if (bucket) {
+    for (const bi of bucket) {
+      const b = arena.buildings[bi]!
+      if (b.y0 > feetY + STEP_TOLERANCE) continue
+      const surface = surfaceHeightAt(b, x, z)
+      // surfaceHeightAt returns 0 for "outside the footprint" — that must not beat
+      // a negative base like the canal bed
+      if (surface > 0 && surface > ground) ground = surface
+    }
   }
   return ground
 }
 
-/** True when the XZ point is inside a building footprint (inflate < 0 shrinks it). */
-export function insideBuildingXZ(arena: Arena, x: number, z: number, inflate = 0): boolean {
-  for (const b of arena.buildings) {
-    if (Math.abs(x - b.x) < b.w / 2 + inflate && Math.abs(z - b.z) < b.d / 2 + inflate) return true
-  }
-  return false
+/**
+ * True when the XZ point is inside a building footprint (inflate < 0 shrinks it).
+ * Buildings based above `maxBaseY` (bridge decks, the gate span) don't count — being
+ * underneath one is not being embedded in it.
+ */
+export function insideBuildingXZ(
+  arena: Arena,
+  x: number,
+  z: number,
+  inflate = 0,
+  maxBaseY = 0.5,
+): boolean {
+  const pad = Math.max(inflate, 0)
+  let hit = false
+  forEachInRect(arena, x - pad, x + pad, z - pad, z + pad, (b) => {
+    if (b.y0 > maxBaseY) return
+    if (Math.abs(x - b.x) < b.w / 2 + inflate && Math.abs(z - b.z) < b.d / 2 + inflate) hit = true
+  })
+  return hit
 }
 
 export function resolveBuildingCollision(
@@ -148,14 +191,16 @@ export function resolveBuildingCollision(
   vel: Vector3,
   radius: number,
 ): void {
-  for (const b of arena.buildings) {
-    // walls only push below the eaves; the ground clamp owns roof-slope contact
-    if (pos.y >= eaveHeight(b)) continue
+  forEachInRect(arena, pos.x - radius, pos.x + radius, pos.z - radius, pos.z + radius, (b) => {
+    // walls only push between the base and the eaves; the ground clamp owns roof-slope
+    // contact, and below an elevated deck you pass under freely. The epsilon keeps
+    // ground-walkers (titans stand at y = 0 exactly) colliding with ground buildings.
+    if (pos.y >= eaveHeight(b) || pos.y < b.y0 - 0.01) return
     const ex = b.w / 2 + radius
     const ez = b.d / 2 + radius
     const dx = pos.x - b.x
     const dz = pos.z - b.z
-    if (Math.abs(dx) >= ex || Math.abs(dz) >= ez) continue
+    if (Math.abs(dx) >= ex || Math.abs(dz) >= ez) return
     const penX = ex - Math.abs(dx)
     const penZ = ez - Math.abs(dz)
     if (penX < penZ) {
@@ -167,7 +212,7 @@ export function resolveBuildingCollision(
       pos.z = b.z + side * ez
       if (vel.z * side < 0) vel.z = 0
     }
-  }
+  })
 }
 
 export function clampToWall(arena: Arena, pos: Vector3, vel: Vector3, margin: number): void {
@@ -185,7 +230,7 @@ export function clampToWall(arena: Arena, pos: Vector3, vel: Vector3, margin: nu
   }
 }
 
-/** Analytic hook raycast against building AABBs and the wall ring. Returns the anchor point. */
+/** Analytic hook raycast against building volumes and the wall ring. Returns the anchor point. */
 export function raycastHookTarget(
   arena: Arena,
   origin: Vector3,
@@ -195,17 +240,15 @@ export function raycastHookTarget(
   let bestT = maxRange
   let found = false
 
-  for (const b of arena.buildings) {
-    const t = rayVsBuilding(origin, dir, b)
-    if (t !== null && t < bestT && t > 0.01) {
-      bestT = t
-      found = true
-    }
-  }
-
   const tWall = rayVsWall(origin, dir, arena.wallRadius, arena.wallHeight)
   if (tWall !== null && tWall < bestT && tWall > 0.01) {
     bestT = tWall
+    found = true
+  }
+
+  const t = raycastBuildings(arena, origin, dir, bestT)
+  if (t !== null) {
+    bestT = t
     found = true
   }
 
@@ -213,10 +256,11 @@ export function raycastHookTarget(
   return origin.clone().addScaledVector(dir, bestT)
 }
 
-/** Walls up to the eaves, then real gable slopes (houses) or the full box (towers). */
-function rayVsBuilding(origin: Vector3, dir: Vector3, b: Building): number | null {
-  if (b.kind === 'tower') return rayVsAabb(origin, dir, b, b.h)
-  const wallT = rayVsAabb(origin, dir, b, eaveHeight(b))
+/** Walls up to the eaves, then real gable slopes; pyramids and flats are box volumes. */
+export function rayVsBuilding(origin: Vector3, dir: Vector3, b: Building): number | null {
+  const shape = ROOF_SHAPE[b.kind]
+  if (shape !== 'gable') return rayVsAabb(origin, dir, b, b.y0, b.h)
+  const wallT = rayVsAabb(origin, dir, b, b.y0, eaveHeight(b))
   const roofT = rayVsGable(origin, dir, b)
   if (wallT === null) return roofT
   if (roofT === null) return wallT
@@ -229,8 +273,8 @@ function rayVsGable(origin: Vector3, dir: Vector3, b: Building): number | null {
   const alongX = b.ridgeAxis === 'x'
   const halfA = (alongX ? b.w : b.d) / 2
   const halfC = (alongX ? b.d : b.w) / 2
-  const oa = (alongX ? origin.x - b.x : origin.z - b.z)
-  const oc = (alongX ? origin.z - b.z : origin.x - b.x)
+  const oa = alongX ? origin.x - b.x : origin.z - b.z
+  const oc = alongX ? origin.z - b.z : origin.x - b.x
   const da = alongX ? dir.x : dir.z
   const dc = alongX ? dir.z : dir.x
   const slope = rise / halfC
@@ -267,8 +311,14 @@ function rayVsGable(origin: Vector3, dir: Vector3, b: Building): number | null {
   return best
 }
 
-function rayVsAabb(origin: Vector3, dir: Vector3, b: Building, maxY: number): number | null {
-  const min = [b.x - b.w / 2, 0, b.z - b.d / 2]
+function rayVsAabb(
+  origin: Vector3,
+  dir: Vector3,
+  b: Building,
+  minYVal: number,
+  maxY: number,
+): number | null {
+  const min = [b.x - b.w / 2, minYVal, b.z - b.d / 2]
   const max = [b.x + b.w / 2, maxY, b.z + b.d / 2]
   const o = [origin.x, origin.y, origin.z]
   const d = [dir.x, dir.y, dir.z]
@@ -310,4 +360,158 @@ function rayVsWall(origin: Vector3, dir: Vector3, radius: number, height: number
     if (y >= 0 && y <= height) return t
   }
   return null
+}
+
+// ---------------------------------------------------------------------------
+// Broadphase: a uniform grid over building footprints. The v2 city carries well
+// over a thousand solids and every geometry query above runs inside the 120 Hz
+// sim (often per titan), so linear scans are out. The index rebuilds lazily
+// whenever buildings.length changes, which keeps hand-built test arenas honest.
+// ---------------------------------------------------------------------------
+
+const INDEX_CELL = 17
+
+export interface BuildingIndex {
+  cell: number
+  extent: number
+  size: number
+  buckets: Array<number[] | undefined>
+  /** Per-building visited stamp so rect/ray queries test each building once. */
+  stamp: Uint32Array
+  stampGen: number
+  count: number
+}
+
+function buildIndex(arena: Arena): BuildingIndex {
+  const extent = arena.wallRadius + 24
+  const size = Math.ceil((extent * 2) / INDEX_CELL)
+  const index: BuildingIndex = {
+    cell: INDEX_CELL,
+    extent,
+    size,
+    buckets: new Array<number[] | undefined>(size * size),
+    stamp: new Uint32Array(arena.buildings.length),
+    stampGen: 0,
+    count: arena.buildings.length,
+  }
+  arena.buildings.forEach((b, bi) => {
+    const x0 = cellIndex(index, b.x - b.w / 2)
+    const x1 = cellIndex(index, b.x + b.w / 2)
+    const z0 = cellIndex(index, b.z - b.d / 2)
+    const z1 = cellIndex(index, b.z + b.d / 2)
+    for (let iz = z0; iz <= z1; iz++) {
+      for (let ix = x0; ix <= x1; ix++) {
+        const key = iz * index.size + ix
+        ;(index.buckets[key] ??= []).push(bi)
+      }
+    }
+  })
+  return index
+}
+
+function cellIndex(index: BuildingIndex, v: number): number {
+  const i = Math.floor((v + index.extent) / index.cell)
+  return Math.max(0, Math.min(index.size - 1, i))
+}
+
+export function ensureIndex(arena: Arena): BuildingIndex {
+  if (!arena.index || arena.index.count !== arena.buildings.length) {
+    arena.index = buildIndex(arena)
+  }
+  return arena.index
+}
+
+function bucketAtPoint(index: BuildingIndex, x: number, z: number): number[] | undefined {
+  if (Math.abs(x) > index.extent || Math.abs(z) > index.extent) return undefined
+  return index.buckets[cellIndex(index, z) * index.size + cellIndex(index, x)]
+}
+
+/** Visits every building whose footprint could touch the rect, exactly once each. */
+function forEachInRect(
+  arena: Arena,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+  visit: (b: Building) => void,
+): void {
+  const index = ensureIndex(arena)
+  index.stampGen++
+  const x0 = cellIndex(index, minX)
+  const x1 = cellIndex(index, maxX)
+  const z0 = cellIndex(index, minZ)
+  const z1 = cellIndex(index, maxZ)
+  for (let iz = z0; iz <= z1; iz++) {
+    for (let ix = x0; ix <= x1; ix++) {
+      const bucket = index.buckets[iz * index.size + ix]
+      if (!bucket) continue
+      for (const bi of bucket) {
+        if (index.stamp[bi] === index.stampGen) continue
+        index.stamp[bi] = index.stampGen
+        visit(arena.buildings[bi]!)
+      }
+    }
+  }
+}
+
+/**
+ * Nearest building hit along the ray, walking index cells in order (2D DDA) so the
+ * march can stop as soon as the next cell begins beyond the best hit so far.
+ */
+function raycastBuildings(
+  arena: Arena,
+  origin: Vector3,
+  dir: Vector3,
+  maxT: number,
+): number | null {
+  const index = ensureIndex(arena)
+  index.stampGen++
+  let bestT: number | null = null
+  let limit = maxT
+
+  const testBucket = (bucket: number[] | undefined): void => {
+    if (!bucket) return
+    for (const bi of bucket) {
+      if (index.stamp[bi] === index.stampGen) continue
+      index.stamp[bi] = index.stampGen
+      const t = rayVsBuilding(origin, dir, arena.buildings[bi]!)
+      if (t !== null && t > 0.01 && t < limit) {
+        limit = t
+        bestT = t
+      }
+    }
+  }
+
+  const horiz = Math.hypot(dir.x, dir.z)
+  if (horiz < 1e-9) {
+    // straight up or down: only the column under the origin matters
+    testBucket(bucketAtPoint(index, origin.x, origin.z))
+    return bestT
+  }
+
+  let ix = cellIndex(index, origin.x)
+  let iz = cellIndex(index, origin.z)
+  const stepX = dir.x > 0 ? 1 : -1
+  const stepZ = dir.z > 0 ? 1 : -1
+  const cellEdgeX = -index.extent + (ix + (stepX > 0 ? 1 : 0)) * index.cell
+  const cellEdgeZ = -index.extent + (iz + (stepZ > 0 ? 1 : 0)) * index.cell
+  let tMaxX = Math.abs(dir.x) < 1e-9 ? Infinity : (cellEdgeX - origin.x) / dir.x
+  let tMaxZ = Math.abs(dir.z) < 1e-9 ? Infinity : (cellEdgeZ - origin.z) / dir.z
+  const tDeltaX = Math.abs(dir.x) < 1e-9 ? Infinity : index.cell / Math.abs(dir.x)
+  const tDeltaZ = Math.abs(dir.z) < 1e-9 ? Infinity : index.cell / Math.abs(dir.z)
+
+  for (let guard = 0; guard < index.size * 2 + 4; guard++) {
+    testBucket(index.buckets[iz * index.size + ix])
+    const tNext = Math.min(tMaxX, tMaxZ)
+    if (tNext > limit) break
+    if (tMaxX < tMaxZ) {
+      ix += stepX
+      tMaxX += tDeltaX
+    } else {
+      iz += stepZ
+      tMaxZ += tDeltaZ
+    }
+    if (ix < 0 || iz < 0 || ix >= index.size || iz >= index.size) break
+  }
+  return bestT
 }

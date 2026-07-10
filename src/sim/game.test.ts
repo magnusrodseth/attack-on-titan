@@ -120,7 +120,7 @@ describe('hooks through the game loop', () => {
   it('fires a hook at a building on the press edge and releases on the release edge', () => {
     const game = playingGame()
     game.arena.buildings.length = 0
-    game.arena.buildings.push({ x: 30, z: 0, w: 10, d: 10, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    game.arena.buildings.push({ x: 30, z: 0, w: 10, d: 10, y0: 0, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
     game.player.pos.set(0, 10, 0)
     const input = neutralInput()
     input.lookDir = new Vector3(1, 0, 0)
@@ -327,7 +327,7 @@ describe('focus strike through the game loop', () => {
 
   it('releases attached hooks the moment the strike fires', () => {
     const { game, titan, input } = armedGame()
-    game.arena.buildings.push({ x: 0, z: 30, w: 10, d: 10, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    game.arena.buildings.push({ x: 0, z: 30, w: 10, d: 10, y0: 0, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
     const hookInput = neutralInput()
     hookInput.focus = true
     hookInput.lookDir = new Vector3(0, 0.5, 1).normalize()
@@ -359,7 +359,7 @@ describe('focus strike through the game loop', () => {
 
   it('never locks a nape hidden behind a building', () => {
     const { game, titan, input } = armedGame()
-    game.arena.buildings.push({ x: 20, z: 0, w: 8, d: 8, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
+    game.arena.buildings.push({ x: 20, z: 0, w: 8, d: 8, y0: 0, h: 40, kind: 'tower', ridgeAxis: 'x', tint: 0.5 })
     input.lookDir = napeCenter(titan).sub(game.player.pos).normalize()
     stepGame(game, input, DT)
     expect(game.strikeTargetId).toBe(null)

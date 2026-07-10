@@ -64,7 +64,7 @@ export class DayNightSky {
   private moonReady = false
 
   constructor(scene: Scene) {
-    this.fog = new Fog(FOG_DAY.clone(), 70, 460)
+    this.fog = new Fog(FOG_DAY.clone(), 70, 620)
     scene.fog = this.fog
     scene.background = this.background
 
@@ -124,11 +124,12 @@ export class DayNightSky {
     this.celestial.position.set(140, 200, 80)
     this.celestial.castShadow = true
     this.celestial.shadow.mapSize.set(2048, 2048)
-    this.celestial.shadow.camera.left = -220
-    this.celestial.shadow.camera.right = 220
-    this.celestial.shadow.camera.top = 220
-    this.celestial.shadow.camera.bottom = -220
-    this.celestial.shadow.camera.far = 600
+    // sized to the v2 district: the 260m wall plus its ground apron
+    this.celestial.shadow.camera.left = -330
+    this.celestial.shadow.camera.right = 330
+    this.celestial.shadow.camera.top = 330
+    this.celestial.shadow.camera.bottom = -330
+    this.celestial.shadow.camera.far = 800
     this.celestial.shadow.bias = -0.0004
     scene.add(this.celestial)
   }

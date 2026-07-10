@@ -1,86 +1,97 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import type { Arena } from './city'
+import type { Arena, Building } from './city'
 import {
+  baseGroundY,
   clampToWall,
   emptyArena,
-  generateCity,
   groundHeightAt,
+  insideBuildingXZ,
   raycastHookTarget,
+  rayVsBuilding,
   resolveBuildingCollision,
+  surfaceHeightAt,
 } from './city'
+import { generateCity } from './citygen'
 import { createRng } from './rng'
 
-function singleBuildingArena(): Arena {
-  const arena = emptyArena()
-  arena.buildings.push({ x: 0, z: 0, w: 10, d: 10, h: 20, kind: 'house', ridgeAxis: 'x', tint: 0.5 })
-  return arena
+function house(overrides: Partial<Building> = {}): Building {
+  return {
+    x: 0,
+    z: 0,
+    w: 10,
+    d: 10,
+    y0: 0,
+    h: 20,
+    kind: 'house',
+    ridgeAxis: 'x',
+    tint: 0.5,
+    ...overrides,
+  }
 }
 
-describe('generateCity', () => {
-  it('is deterministic for the same seed', () => {
-    const a = generateCity(createRng(9))
-    const b = generateCity(createRng(9))
-    expect(a.buildings.length).toBe(b.buildings.length)
-    expect(a.buildings[0]).toEqual(b.buildings[0])
-  })
-
-  it('keeps every building inside the wall ring', () => {
-    const arena = generateCity(createRng(3))
-    for (const bld of arena.buildings) {
-      const cornerDist = Math.hypot(Math.abs(bld.x) + bld.w / 2, Math.abs(bld.z) + bld.d / 2)
-      expect(cornerDist).toBeLessThan(arena.wallRadius)
-    }
-  })
-
-  it('leaves a clear plaza around the resupply station at the center', () => {
-    const arena = generateCity(createRng(3))
-    for (const bld of arena.buildings) {
-      const nearestX = Math.max(Math.abs(bld.x) - bld.w / 2, 0)
-      const nearestZ = Math.max(Math.abs(bld.z) - bld.d / 2, 0)
-      expect(Math.hypot(nearestX, nearestZ)).toBeGreaterThan(arena.plazaRadius - 1e-9)
-    }
-  })
-})
-
-describe('generateCity — AoT district look (user reference images)', () => {
-  it('is dense row-houses tall enough to build swing velocity from', () => {
-    const arena = generateCity(createRng(5))
-    const houses = arena.buildings.filter((b) => b.kind === 'house')
-    expect(houses.length).toBeGreaterThan(150) // dense district
-    const heights = houses.map((b) => b.h).sort((a, b) => a - b)
-    const median = heights[Math.floor(heights.length / 2)]!
-    expect(median).toBeGreaterThanOrEqual(14)
-    expect(median).toBeLessThanOrEqual(23)
-  })
-
-  it('scatters tall church towers as high anchor points', () => {
-    const arena = generateCity(createRng(5))
-    const towers = arena.buildings.filter((b) => b.kind === 'tower')
-    expect(towers.length).toBeGreaterThanOrEqual(5)
-    for (const t of towers) expect(t.h).toBeGreaterThanOrEqual(32)
-  })
-
-  it('has an AoT-scale 50m wall', () => {
-    const arena = generateCity(createRng(5))
-    expect(arena.wallHeight).toBe(50)
-  })
-})
+function singleBuildingArena(overrides: Partial<Building> = {}): Arena {
+  const arena = emptyArena()
+  arena.buildings.push(house(overrides))
+  return arena
+}
 
 describe('groundHeightAt', () => {
   it('returns ridge height on the ridge line and 0 outside the footprint', () => {
     const arena = singleBuildingArena()
-    expect(groundHeightAt(arena, 0, 0)).toBe(20) // ridge runs along x at z=0
-    expect(groundHeightAt(arena, 100, 100)).toBe(0)
+    expect(groundHeightAt(arena, 0, 0, Infinity)).toBe(20) // ridge runs along x at z=0
+    expect(groundHeightAt(arena, 100, 100, Infinity)).toBe(0)
   })
 
   it('follows the gable slope down toward the eaves', () => {
     const arena = singleBuildingArena() // ridgeAxis x, w=d=10, h=20, eave = 14
-    const midSlope = groundHeightAt(arena, 0, 2.5) // halfway down the south slope
+    const midSlope = groundHeightAt(arena, 0, 2.5, Infinity) // halfway down the south slope
     expect(midSlope).toBeCloseTo(17, 0)
-    const nearEave = groundHeightAt(arena, 0, 4.9)
+    const nearEave = groundHeightAt(arena, 0, 4.9, Infinity)
     expect(nearEave).toBeLessThan(14.5)
     expect(nearEave).toBeGreaterThan(13.5)
+  })
+
+  it('treats flat-topped props as standable surfaces', () => {
+    const arena = singleBuildingArena({ kind: 'cart', w: 2, d: 3, h: 1.4 })
+    expect(groundHeightAt(arena, 0.5, 1, Infinity)).toBeCloseTo(1.4)
+  })
+
+  it('ignores an elevated deck while your feet are below its base (one-way platform)', () => {
+    const arena = singleBuildingArena({ kind: 'deck', y0: 4, h: 5.5 })
+    expect(groundHeightAt(arena, 0, 0, 0)).toBe(0) // running underneath
+    expect(groundHeightAt(arena, 0, 0, 4.2)).toBe(5.5) // feet cleared the base: caught
+    expect(groundHeightAt(arena, 0, 0, 8)).toBe(5.5) // falling onto it from above
+  })
+
+  it('returns the canal bed inside the canal strip', () => {
+    const arena = emptyArena()
+    arena.canal = { x: 60, halfWidth: 6, bedY: -1.8, waterY: -0.9 }
+    expect(baseGroundY(arena, 60, 40)).toBe(-1.8)
+    expect(baseGroundY(arena, 50, 40)).toBe(0)
+    expect(groundHeightAt(arena, 61, -30, Infinity)).toBe(-1.8)
+  })
+})
+
+describe('surfaceHeightAt', () => {
+  it('peaks pyramids at the center and slopes to the eaves', () => {
+    const tower = house({ kind: 'tower', w: 12, d: 12, h: 40 }) // eave = 31.2
+    expect(surfaceHeightAt(tower, 0, 0)).toBeCloseTo(40)
+    expect(surfaceHeightAt(tower, 6, 0)).toBeCloseTo(31.2)
+  })
+})
+
+describe('insideBuildingXZ', () => {
+  it('detects footprints and honors negative inflate', () => {
+    const arena = singleBuildingArena()
+    expect(insideBuildingXZ(arena, 4, 4)).toBe(true)
+    expect(insideBuildingXZ(arena, 4.9, 0, -0.3)).toBe(false)
+    expect(insideBuildingXZ(arena, 6, 0)).toBe(false)
+  })
+
+  it('does not count elevated decks: standing under a bridge is not being embedded', () => {
+    const arena = singleBuildingArena({ kind: 'deck', y0: 4, h: 5.5 })
+    expect(insideBuildingXZ(arena, 0, 0)).toBe(false)
   })
 })
 
@@ -109,6 +120,19 @@ describe('resolveBuildingCollision', () => {
     const vel = new Vector3(-3, 0, 0)
     resolveBuildingCollision(arena, pos, vel, 0.5)
     expect(pos.x).toBe(4.5) // no horizontal shove; the ground clamp owns roof contact
+  })
+
+  it('lets you pass beneath an elevated deck but blocks you at deck level', () => {
+    const arena = singleBuildingArena({ kind: 'deck', y0: 4, h: 5.5 })
+    const under = new Vector3(4.5, 2, 0)
+    const underVel = new Vector3(-3, 0, 0)
+    resolveBuildingCollision(arena, under, underVel, 0.5)
+    expect(under.x).toBe(4.5) // free passage below the base
+
+    const at = new Vector3(4.5, 4.8, 0)
+    const atVel = new Vector3(-3, 0, 0)
+    resolveBuildingCollision(arena, at, atVel, 0.5)
+    expect(at.x).toBeCloseTo(5.5) // the deck edge is solid
   })
 })
 
@@ -166,5 +190,71 @@ describe('raycastHookTarget', () => {
     // above the eave corner (z=4.9, y=19) the roof surface is ~14.1; a ray there at y 19 misses
     const hit = raycastHookTarget(arena, new Vector3(0, 19, 4.9), new Vector3(1, 0, 0), 20)
     expect(hit).toBeNull()
+  })
+
+  it('passes under an elevated deck but hooks its edge at deck height', () => {
+    const arena = singleBuildingArena({ kind: 'deck', y0: 4, h: 5.5, w: 16, d: 6 })
+    // a level shot below the base sails clean through (nothing else in range)
+    expect(raycastHookTarget(arena, new Vector3(-20, 2, 0), new Vector3(1, 0, 0), 100)).toBeNull()
+    // a shot at deck height hits the deck side
+    const at = raycastHookTarget(arena, new Vector3(-20, 4.8, 0), new Vector3(1, 0, 0), 100)
+    expect(at!.x).toBeCloseTo(-8)
+  })
+
+  it('hits a thin flagpole when aimed straight at it', () => {
+    const arena = singleBuildingArena({ kind: 'flagpole', w: 0.35, d: 0.35, h: 45 })
+    const hit = raycastHookTarget(arena, new Vector3(-30, 40, 0), new Vector3(1, 0, 0), 100)
+    expect(hit).not.toBeNull()
+    expect(hit!.x).toBeCloseTo(-0.175)
+  })
+})
+
+describe('broadphase index', () => {
+  it('matches a brute-force linear scan on a full generated city', () => {
+    const arena = generateCity(createRng(7))
+    const rng = createRng(99)
+    for (let i = 0; i < 300; i++) {
+      const x = (rng() * 2 - 1) * arena.wallRadius
+      const z = (rng() * 2 - 1) * arena.wallRadius
+      const feetY = rng() * 30
+      let expected = baseGroundY(arena, x, z)
+      for (const b of arena.buildings) {
+        if (b.y0 > feetY + 0.3) continue
+        const s = surfaceHeightAt(b, x, z)
+        if (s > 0 && s > expected) expected = s
+      }
+      expect(groundHeightAt(arena, x, z, feetY)).toBeCloseTo(expected, 10)
+    }
+  })
+
+  it('raycasts through the index identically to scanning every building', () => {
+    const arena = generateCity(createRng(11))
+    const rng = createRng(1234)
+    for (let i = 0; i < 250; i++) {
+      // stay 110m from the wall so the 90m ray can never reach it: buildings only
+      const origin = new Vector3((rng() * 2 - 1) * 150, 2 + rng() * 40, (rng() * 2 - 1) * 150)
+      const dir = new Vector3(rng() * 2 - 1, rng() * 1.2 - 0.5, rng() * 2 - 1)
+      if (dir.lengthSq() < 1e-6) continue
+      dir.normalize()
+      const hit = raycastHookTarget(arena, origin, dir, 90)
+      let best = Infinity
+      for (const b of arena.buildings) {
+        const s = rayVsBuilding(origin, dir, b)
+        if (s !== null && s > 0.01 && s < best) best = s
+      }
+      if (best > 90) {
+        expect(hit).toBeNull()
+      } else {
+        expect(hit).not.toBeNull()
+        expect(hit!.clone().sub(origin).length()).toBeCloseTo(best, 6)
+      }
+    }
+  })
+
+  it('rebuilds automatically when a test arena gains buildings after a query', () => {
+    const arena = emptyArena()
+    expect(groundHeightAt(arena, 0, 0, Infinity)).toBe(0)
+    arena.buildings.push(house())
+    expect(groundHeightAt(arena, 0, 0, Infinity)).toBe(20)
   })
 })

@@ -27,8 +27,32 @@ export class Minimap {
     bg.beginPath()
     bg.arc(CENTER, CENTER, arena.wallRadius * this.scale, 0, Math.PI * 2)
     bg.stroke()
+    if (arena.canal) {
+      // the canal reads as a water ribbon clipped to the wall ring
+      bg.save()
+      bg.beginPath()
+      bg.arc(CENTER, CENTER, arena.wallRadius * this.scale, 0, Math.PI * 2)
+      bg.clip()
+      bg.fillStyle = 'rgba(96, 152, 175, 0.75)'
+      bg.fillRect(
+        CENTER + (arena.canal.x - arena.canal.halfWidth) * this.scale,
+        0,
+        arena.canal.halfWidth * 2 * this.scale,
+        SIZE,
+      )
+      bg.restore()
+    }
+    const landmark = new Set(['tower', 'cathedral', 'gatehouse', 'bastion'])
+    const clutter = new Set(['chimney', 'flagpole', 'well', 'stall', 'cart'])
     for (const b of arena.buildings) {
-      bg.fillStyle = b.kind === 'tower' ? 'rgba(235, 235, 240, 0.75)' : 'rgba(205, 180, 150, 0.5)'
+      if (clutter.has(b.kind)) continue // sub-pixel props would only add noise
+      bg.fillStyle = landmark.has(b.kind)
+        ? 'rgba(235, 235, 240, 0.75)'
+        : b.kind === 'deck' || b.kind === 'pier'
+          ? 'rgba(200, 205, 212, 0.8)'
+          : b.kind === 'warehouse'
+            ? 'rgba(170, 150, 125, 0.6)'
+            : 'rgba(205, 180, 150, 0.5)'
       bg.fillRect(
         CENTER + (b.x - b.w / 2) * this.scale,
         CENTER + (b.z - b.d / 2) * this.scale,

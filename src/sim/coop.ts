@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
-import { generateCity } from './city'
+import { generateCity } from './citygen'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
 import { stepSlashBuffer, trySlash } from './combat'
@@ -211,7 +211,7 @@ function spawnWave(w: CoopWorld): void {
   const rng = createRng(hashSeed(`${w.seed}:wave:${w.wave}`))
   const squad = Math.max(1, connectedCount(w))
   const scale = 1 + COOP_SCALE_PER_PLAYER * (squad - 1)
-  w.titans = waveComposition(w.wave, rng, scale).map((s) => {
+  w.titans = waveComposition(w.wave, rng, scale, w.arena.wallRadius).map((s) => {
     const [x, z] = nearestWalkable(w.nav, s.x, s.z)
     return createTitan({ id: w.nextTitanId++, kind: s.kind, height: s.height, x, z })
   })

@@ -31,11 +31,16 @@ export interface GameMode {
   chooseUpgrade?(g: GameState, id: string): void
 }
 
-type Composition = (wave: number, rng: () => number) => TitanSpawn[]
+type Composition = (
+  wave: number,
+  rng: () => number,
+  countScale?: number,
+  wallRadius?: number,
+) => TitanSpawn[]
 
 function spawnWave(g: GameState, composition: Composition): void {
   const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
-  g.titans = composition(g.wave, rng).map((s) => {
+  g.titans = composition(g.wave, rng, 1, g.arena.wallRadius).map((s) => {
     // snap spawns onto walkable streets so no titan starts its life inside a house
     const [x, z] = nearestWalkable(g.nav, s.x, s.z)
     return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
