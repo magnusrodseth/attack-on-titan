@@ -17,6 +17,17 @@ import { SPEAR_FUSE } from '../sim/spear'
 
 const UP = new Vector3(0, 1, 0)
 
+// one geometry per part, shared by every spear and rack ever built — spears come and
+// go constantly (fired, exploded, wave rebuilds), so per-instance geometry would churn
+// GPU buffers and leak on removal (three.js never auto-disposes)
+const BODY_GEO = new CylinderGeometry(0.055, 0.055, 1.5, 8)
+const WARHEAD_GEO = new ConeGeometry(0.13, 0.5, 8)
+const COLLAR_GEO = new CylinderGeometry(0.085, 0.085, 0.16, 8)
+const SKIRT_GEO = new CylinderGeometry(0.075, 0.12, 0.24, 8)
+const FRAME_GEO = new CylinderGeometry(0.75, 0.85, 0.35, 10)
+const COLUMN_GEO = new CylinderGeometry(0.9, 0.9, 7, 12, 1, true)
+const RING_GEO = new RingGeometry(1.1, 1.5, 24).rotateX(-Math.PI / 2)
+
 /**
  * Thunder spears and their street caches. Both meshes are hand-built from the
  * already-credited brushed-steel and cable-metal textures (see README credits);
@@ -26,6 +37,13 @@ const UP = new Vector3(0, 1, 0)
 export class SpearsView {
   private steelMat: MeshStandardMaterial
   private darkMat: MeshStandardMaterial
+  private ringMat = new MeshStandardMaterial({
+    color: 0xffb347,
+    emissive: 0xffb347,
+    emissiveIntensity: 0.8,
+    transparent: true,
+    opacity: 0.55,
+  })
   private spears = new Map<number, { group: Group; warhead: MeshStandardMaterial }>()
   private racks: { group: Group; glow: MeshBasicMaterial }[] = []
   private lastPickups: SpearPickup[] | null = null
@@ -55,17 +73,17 @@ export class SpearsView {
   /** Long thin tube, conical warhead, flared thruster skirt — the reference silhouette. */
   private makeSpear(): { group: Group; warhead: MeshStandardMaterial } {
     const group = new Group()
-    const body = new Mesh(new CylinderGeometry(0.055, 0.055, 1.5, 8), this.steelMat)
+    const body = new Mesh(BODY_GEO, this.steelMat)
     group.add(body)
     // the warhead gets its own material instance so the fuse can pulse it red
     const warheadMat = this.darkMat.clone()
-    const warhead = new Mesh(new ConeGeometry(0.13, 0.5, 8), warheadMat)
+    const warhead = new Mesh(WARHEAD_GEO, warheadMat)
     warhead.position.y = 0.95
     group.add(warhead)
-    const collar = new Mesh(new CylinderGeometry(0.085, 0.085, 0.16, 8), this.darkMat)
+    const collar = new Mesh(COLLAR_GEO, this.darkMat)
     collar.position.y = 0.68
     group.add(collar)
-    const skirt = new Mesh(new CylinderGeometry(0.075, 0.12, 0.24, 8), this.darkMat)
+    const skirt = new Mesh(SKIRT_GEO, this.darkMat)
     skirt.position.y = -0.82
     group.add(skirt)
     group.traverse((o) => {
@@ -78,13 +96,17 @@ export class SpearsView {
   /** A low steel frame holding three upright spears under an amber locator column. */
   private makeRack(x: number, z: number): { group: Group; glow: MeshBasicMaterial } {
     const group = new Group()
-    const frame = new Mesh(new CylinderGeometry(0.75, 0.85, 0.35, 10), this.darkMat)
+    const frame = new Mesh(FRAME_GEO, this.darkMat)
     frame.position.y = 0.18
     group.add(frame)
     for (let i = 0; i < 3; i++) {
       const angle = (i / 3) * Math.PI * 2
-      const { group: spear } = this.makeSpear()
+      const { group: spear, warhead } = this.makeSpear()
       this.scene.remove(spear) // it belongs to the rack, not the loose-spear pool
+      warhead.dispose() // racked warheads never pulse; drop the clone for the shared mat
+      spear.traverse((o) => {
+        if (o instanceof Mesh && o.material === warhead) o.material = this.darkMat
+      })
       spear.position.set(Math.cos(angle) * 0.32, 1.1, Math.sin(angle) * 0.32)
       spear.rotation.z = 0.08 * Math.cos(angle)
       group.add(spear)
@@ -95,19 +117,10 @@ export class SpearsView {
       opacity: 0.16,
       depthWrite: false,
     })
-    const column = new Mesh(new CylinderGeometry(0.9, 0.9, 7, 12, 1, true), glowMat)
+    const column = new Mesh(COLUMN_GEO, glowMat)
     column.position.y = 3.5
     group.add(column)
-    const ring = new Mesh(
-      new RingGeometry(1.1, 1.5, 24).rotateX(-Math.PI / 2),
-      new MeshStandardMaterial({
-        color: 0xffb347,
-        emissive: 0xffb347,
-        emissiveIntensity: 0.8,
-        transparent: true,
-        opacity: 0.55,
-      }),
-    )
+    const ring = new Mesh(RING_GEO, this.ringMat)
     ring.position.y = 0.06
     group.add(ring)
     group.position.set(x, 0, z)
@@ -144,12 +157,16 @@ export class SpearsView {
     for (const [id, view] of this.spears) {
       if (seen.has(id)) continue
       this.scene.remove(view.group)
+      view.warhead.dispose() // the pulse clone is per-spear; geometries are shared
       this.spears.delete(id)
     }
 
     // caches: rebuilt when the wave replaces the array, hidden as they are taken
     if (pickups !== this.lastPickups) {
-      for (const rack of this.racks) this.scene.remove(rack.group)
+      for (const rack of this.racks) {
+        this.scene.remove(rack.group)
+        rack.glow.dispose() // per-rack clone; everything else is shared
+      }
       this.racks = pickups.map((pk) => this.makeRack(pk.x, pk.z))
       this.lastPickups = pickups
     }

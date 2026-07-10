@@ -7,6 +7,7 @@ import {
   pushSnapshot,
   stepCoopClient,
   syncSoldierMirror,
+  syncSpearMirror,
   syncTitanMirror,
   type RemoteSoldier,
 } from './coopClient'
@@ -175,6 +176,43 @@ describe('snapshot interpolation', () => {
     expect(g.player.bladeHp).toBe(3)
     expect(g.score.score).toBe(777)
     expect(g.score.combo).toBe(2)
+  })
+})
+
+describe('spear and pickup mirror', () => {
+  it('keeps g.pickups referentially stable while the wave is unchanged (rack rebuild key)', () => {
+    // SpearsView rebuilds every rack when the pickups array identity changes, so a
+    // fresh array per frame means ~75 new meshes per frame and a GPU-memory leak
+    const g = createGame('coop-test', null)
+    const buf = createSnapshotBuffer()
+    const snap1 = makeSnap(1, [], [])
+    snap1.pickups = [
+      { id: 1, x: 10, z: 0, taken: false },
+      { id: 2, x: -10, z: 5, taken: false },
+    ]
+    pushSnapshot(buf, snap1, 0)
+    syncSpearMirror(g, buf, 100)
+    const firstArray = g.pickups
+    expect(firstArray).toHaveLength(2)
+
+    const snap2 = makeSnap(2, [], [])
+    snap2.pickups = [
+      { id: 1, x: 10, z: 0, taken: true }, // same wave, one cache claimed
+      { id: 2, x: -10, z: 5, taken: false },
+    ]
+    pushSnapshot(buf, snap2, 50)
+    syncSpearMirror(g, buf, 150)
+    expect(g.pickups).toBe(firstArray) // same identity: no rack rebuild
+    expect(g.pickups[0]!.taken).toBe(true) // but the flag still mirrors
+
+    const snap3 = makeSnap(3, [], [])
+    snap3.pickups = [
+      { id: 3, x: 4, z: 4, taken: false }, // new wave: new cache ids
+    ]
+    pushSnapshot(buf, snap3, 100)
+    syncSpearMirror(g, buf, 200)
+    expect(g.pickups).not.toBe(firstArray) // new identity: racks rebuild once
+    expect(g.pickups.map((pk) => pk.id)).toEqual([3])
   })
 })
 

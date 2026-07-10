@@ -268,7 +268,21 @@ export function syncSpearMirror(g: GameState, buf: SnapshotBuffer, now: number):
     next.push(spear)
   }
   g.spears = next
-  g.pickups = b.pickups.map((pk) => ({ id: pk.id, x: pk.x, z: pk.z, taken: pk.taken }))
+  // keep the pickups array referentially stable while the wave's caches are unchanged:
+  // SpearsView keys its rack rebuild on array identity, so a fresh array per frame
+  // would recreate every rack mesh every frame (and leak the old GPU buffers)
+  const sameWave =
+    g.pickups.length === b.pickups.length && g.pickups.every((pk, i) => pk.id === b.pickups[i]!.id)
+  if (sameWave) {
+    for (const [i, pk] of b.pickups.entries()) {
+      const live = g.pickups[i]!
+      live.x = pk.x
+      live.z = pk.z
+      live.taken = pk.taken
+    }
+  } else {
+    g.pickups = b.pickups.map((pk) => ({ id: pk.id, x: pk.x, z: pk.z, taken: pk.taken }))
+  }
 }
 
 /** Mirrors the server-authoritative bits of MY soldier into the local player + score. */
