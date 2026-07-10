@@ -1,0 +1,57 @@
+# Wayfinder Map: Time trials — Signal Run & The Culling
+
+Label: `wayfinder:map` · Tracker: local markdown (`wayfinder/tickets/`, `tt-` prefix) · Fresh
+effort charted 2026-07-10 via grilling.
+
+## Destination
+
+Two new solo game modes live in production at attack-on-titan.magnusrodseth.com: **Signal Run**
+(seeded point-to-point parkour time trial through flare-marked gates) and **The Culling**
+(eternal timed levels — clear each roster of relentless, map-wide-tracking titans before the
+countdown). Local PBs always; logged-in times on the global leaderboard with a featured seed.
+Built together in one worktree branch, verified in a real browser, merged to main.
+
+## Notes
+
+- **This effort carries execution in-map** (like the solo and multiplayer maps): alignment
+  happened HITL via grilling (tt-001); build proceeds autonomously ticket by ticket.
+- Workflow: one worktree branch off main; `pnpm test` + `pnpm tsc --noEmit` before commits;
+  playwriter + `window.__aot` for render/HUD verification; merge only after prod-shape E2E.
+- Skills in play: tdd (sim seams first), verify + playwriter (browser E2E), grilling for any
+  ticket that surfaces a real user decision.
+- Texture mandate: flare smoke = transient particle effect, ring gates = gameplay indicator
+  glow — both accepted exceptions. Any new *solid* visible mesh still needs a sourced CC0
+  texture first.
+- Sim changes stay pure and tested in `src/sim/`; both modes are `GAME_MODES` registry entries
+  (`src/sim/modes.ts`) — the menu picks them up automatically.
+- Glossary: `CONTEXT.md` (Time trials section). Solo map (`wayfinder/map.md`) remains the
+  authority for core movement/combat decisions; multiplayer map owns the leaderboard stack.
+
+## Decisions so far
+
+- [Time-trials alignment](tickets/tt-001-timetrials-alignment.md) — one effort ships both
+  modes, solo-only v1; Signal Run: seeded point-to-point course of flare-column + ring gates,
+  empty city, gate = full gas, first-input timer, race-strip HUD with splits; The Culling:
+  timed waves on the waveLoop skeleton, mode-wide relentless aggro, seconds-per-kill time
+  budget tightening per level, countdown HUD with urgency; local PB + global D1 board keyed by
+  (mode, seed) with a featured seed; ranked by time (race) and deepest level cleared, score
+  tiebreak (hunt).
+
+## Not yet specified
+
+- Ghost replay: racing a translucent ghost of your PB run (needs input/pose recording).
+- Titan-traffic variant of Signal Run — docile wandering titans as moving grapple anchors.
+- Medal thresholds (gold/silver/bronze target times per course) and how they're derived.
+- Featured-seed rotation (weekly cadence, automation); v1 surfaces one manually chosen seed.
+- Stage ladder: multiple course lengths per seed (sprint/marathon) with their own boards.
+- Hunt pace-bar telemetry (required kills-per-minute vs actual) — declined for v1 HUD, may
+  return after playtests.
+- Boss-hunt levels (guaranteed footballers every 3rd Culling level) — declined for the v1
+  scaling shape, revisit as spice once tuning lands.
+
+## Out of scope
+
+- Co-op play of either mode: shared-clock racing, relay checkpoints, co-op hunts (solo-only
+  decision, tt-001). A later effort with a redrawn destination owns it.
+- Racing other players' ghosts (multiplayer ghost sync).
+- Mobile/touch (gated out of the game entirely).
