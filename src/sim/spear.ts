@@ -204,9 +204,21 @@ function blastDistanceToTitan(t: TitanState, point: Vector3): number {
   return Math.hypot(Math.max(0, horiz - radius), point.y - clampedY)
 }
 
-/** The wave's spear caches, seeded from `seed:spears:wave` and snapped to walkable streets. */
-export function spawnPickups(seed: string, wave: number, nav: NavGrid, count = PICKUPS_PER_WAVE): SpearPickup[] {
-  const rng = createRng(hashSeed(`${seed}:spears:${wave}`))
+/**
+ * The wave's spear caches, seeded from `seed:spears:wave` and snapped to walkable streets.
+ * `round` > 0 keys a fresh deterministic layout for the same wave — Shifter fights restock
+ * emptied caches so a plated boss can never strand a dry soldier (round 0 keeps the
+ * original stream, so existing saves and the co-op server are untouched).
+ */
+export function spawnPickups(
+  seed: string,
+  wave: number,
+  nav: NavGrid,
+  count = PICKUPS_PER_WAVE,
+  round = 0,
+): SpearPickup[] {
+  const key = round === 0 ? `${seed}:spears:${wave}` : `${seed}:spears:${wave}:${round}`
+  const rng = createRng(hashSeed(key))
   const pickups: SpearPickup[] = []
   for (let i = 0; i < count; i++) {
     const angle = rng() * Math.PI * 2

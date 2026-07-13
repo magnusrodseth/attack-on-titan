@@ -301,3 +301,17 @@ describe('blasting a shifter', () => {
     expect(pure.hp).toBeLessThan(pure.maxHp)
   })
 })
+
+describe('cache restock rounds', () => {
+  it('a later round lands fresh deterministic spots, round 0 stays as it always was', () => {
+    const nav = buildNavGrid(emptyArena())
+    const round0a = spawnPickups('restock-seed', 5, nav)
+    const round0b = spawnPickups('restock-seed', 5, nav, PICKUPS_PER_WAVE, 0)
+    expect(round0a.map((p) => [p.x, p.z])).toEqual(round0b.map((p) => [p.x, p.z]))
+
+    const round1 = spawnPickups('restock-seed', 5, nav, PICKUPS_PER_WAVE, 1)
+    const round1again = spawnPickups('restock-seed', 5, nav, PICKUPS_PER_WAVE, 1)
+    expect(round1.map((p) => [p.x, p.z])).toEqual(round1again.map((p) => [p.x, p.z]))
+    expect(round1.map((p) => [p.x, p.z])).not.toEqual(round0a.map((p) => [p.x, p.z]))
+  })
+})

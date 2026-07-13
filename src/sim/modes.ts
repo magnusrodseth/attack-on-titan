@@ -60,6 +60,8 @@ function spawnWave(g: GameState, composition: Composition): void {
   }
   // fresh spear caches each wave; spears riding last wave's corpses go with them
   g.pickups = spawnPickups(g.seed, g.wave, g.nav)
+  g.pickupRound = 0
+  g.pickupRespawnTimer = 0
   g.spears = g.spears.filter((s) => s.titanId === null)
 }
 

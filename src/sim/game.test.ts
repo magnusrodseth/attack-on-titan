@@ -1021,3 +1021,42 @@ describe('cardinal resupply stations', () => {
     expect(game.events.some((e) => e.type === 'resupply')).toBe(true)
   })
 })
+
+describe('spear caches during a shifter fight', () => {
+  function bossWaveGame() {
+    const game = createGame('restock-loop', null, 'waves')
+    startGame(game)
+    while (game.wave < 5) {
+      for (const t of game.titans) {
+        t.hp = 0
+        t.state = 'dead'
+      }
+      stepGame(game, neutralInput(), DT)
+      chooseUpgrade(game, game.offers[0]!.id)
+    }
+    game.player.pos.set(game.boss!.titan.pos.x - 30, 2, game.boss!.titan.pos.z)
+    return game
+  }
+
+  it('restocks emptied caches after a delay, so a plated fight can never strand you dry', () => {
+    const game = bossWaveGame()
+    const before = game.pickups.map((p) => [p.x, p.z])
+    for (const p of game.pickups) p.taken = true
+    let restocked = false
+    for (let i = 0; i < Math.round(12 * 120) && !restocked; i++) {
+      stepGame(game, neutralInput(), DT)
+      if (game.events.some((e) => e.type === 'spearCachesRestocked')) restocked = true
+    }
+    expect(restocked).toBe(true)
+    expect(game.pickups.length).toBeGreaterThan(0)
+    expect(game.pickups.every((p) => !p.taken)).toBe(true)
+    expect(game.pickups.map((p) => [p.x, p.z])).not.toEqual(before) // fresh spots
+  })
+
+  it('never restocks on an ordinary wave: scarcity stays meaningful', () => {
+    const game = playingGame('restock-normal')
+    for (const p of game.pickups) p.taken = true
+    for (let i = 0; i < Math.round(12 * 120); i++) stepGame(game, neutralInput(), DT)
+    expect(game.pickups.every((p) => p.taken)).toBe(true)
+  })
+})

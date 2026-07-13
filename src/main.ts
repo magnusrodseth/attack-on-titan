@@ -1240,6 +1240,10 @@ function handleEvents(events: GameEvent[]): void {
         hud.showBanner(`Thunder Spear Racked · ${event.remaining}`, 1200)
         audio.pickupChime()
         break
+      case 'spearCachesRestocked':
+        hud.showBanner('Fresh Spear Caches Dropped', 2000)
+        audio.pickupChime()
+        break
       case 'gatePass': {
         // the flare pops in a puff of its own smoke and the column dies with it
         const gate = game.race?.course.gates[event.index]

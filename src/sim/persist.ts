@@ -90,6 +90,9 @@ export interface SavedRun {
   titans: SavedTitan[]
   spears: SavedSpear[]
   pickups: SpearPickup[]
+  /** Boss-wave cache restocking; absent in saves from before it existed (wave restart = round 0). */
+  pickupRound?: number
+  pickupRespawnTimer?: number
   /**
    * The Shifter fight on a boss wave; absent everywhere else and in pre-boss saves
    * (which cannot contain shifter titans, so absence is only invalid alongside one).
@@ -144,6 +147,8 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     titans: g.titans.map((t) => ({ ...t, pos: v3(t.pos), vel: v3(t.vel), ankles: [...t.ankles] as [boolean, boolean] })),
     spears: g.spears.map((s) => ({ ...s, pos: v3(s.pos), vel: v3(s.vel), local: v3(s.local) })),
     pickups: g.pickups.map((pk) => ({ ...pk })),
+    pickupRound: g.pickupRound,
+    pickupRespawnTimer: g.pickupRespawnTimer,
     ...(g.boss
       ? {
           boss: {
@@ -258,6 +263,8 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
     local: new Vector3(...s.local),
   }))
   g.pickups = save.pickups.map((pk) => ({ ...pk }))
+  g.pickupRound = save.pickupRound ?? 0
+  g.pickupRespawnTimer = save.pickupRespawnTimer ?? 0
 
   const savedBoss = save.boss
   const bossTitan = savedBoss ? g.titans.find((t) => t.id === savedBoss.titanId) : undefined

@@ -84,6 +84,16 @@ and the vault Blender loop note).
   `pnpm server:deploy` before co-op players can resupply at the new corners** (the stale
   server would reject the distance check).
 
+## Addendum: cache restock during boss fights (user-caught softlock, 2026-07-13)
+
+Plated fights are spear-gated, but caches spawned once per wave and resupply never
+restocks spears — a player who wasted every spear on the Armored/War Hammer/Female was
+permanently stuck. Fix: while a Shifter is alive, once every cache is taken the streets
+restock after `SPEAR_RESTOCK_DELAY` (8 s) on fresh deterministic spots
+(`seed:spears:wave:round`, round 0 keeps the original stream so saves and co-op are
+untouched). Ordinary waves keep their scarcity. `pickupRound`/`pickupRespawnTimer` ride
+the run save additively; "Fresh Spear Caches Dropped" banner on restock.
+
 ## Follow-ups (not in v1)
 
 - Texture/bake pass per model → graduate ids into `TEXTURED_GLBS`.

@@ -41,7 +41,7 @@ import {
   stepScore,
 } from './score'
 import type { SpearPickup, SpearState } from './spear'
-import { collectPickups, fireSpear, stepSpears } from './spear'
+import { collectPickups, fireSpear, PICKUPS_PER_WAVE, spawnPickups, stepSpears } from './spear'
 import type { StrikeState } from './strike'
 import { createStrike, findStrikeTarget, stepStrike } from './strike'
 import type { TitanKind, TitanState } from './titan'
@@ -80,6 +80,8 @@ export type GameEvent =
   | { type: 'spearDetonated'; pos: Vector3 }
   | { type: 'staggered'; titanId: number }
   | { type: 'spearPickup'; remaining: number }
+  /** A Shifter fight restocked its emptied caches: plated fights never strand you dry. */
+  | { type: 'spearCachesRestocked' }
   | { type: 'playerHit'; hp: number }
   // the grab QTE: fist closes, mash succeeds, timer empties, or the holder drops you
   | { type: 'grabbed'; titanId: number }
@@ -140,6 +142,10 @@ export interface GameState {
   spears: SpearState[]
   /** The current wave's spear caches; replaced wholesale when a wave spawns. */
   pickups: SpearPickup[]
+  /** Restock generation within the wave: boss fights respawn emptied caches (round > 0). */
+  pickupRound: number
+  /** Counts down while a Shifter fight sits with every cache taken; at zero, restock. */
+  pickupRespawnTimer: number
   arena: Arena
   /** Walkable street grid derived from the arena; never persisted, rebuilt from seed. */
   nav: NavGrid
@@ -220,6 +226,8 @@ export function createGame(
     titans: [],
     spears: [],
     pickups: [],
+    pickupRound: 0,
+    pickupRespawnTimer: 0,
     arena,
     nav: buildNavGrid(arena),
     score: createScore(),
@@ -256,6 +264,8 @@ export function startGame(g: GameState): void {
   g.titans = []
   g.spears = []
   g.pickups = []
+  g.pickupRound = 0
+  g.pickupRespawnTimer = 0
   g.boss = null
   g.race = null
   g.hunt = null
@@ -668,12 +678,29 @@ function hurtPlayer(g: GameState, from: Vector3, knock: number, up: number): voi
   }
 }
 
+/** Seconds an all-taken cache set sits empty during a boss fight before restocking. */
+export const SPEAR_RESTOCK_DELAY = 8
+
 /** One tick of the Shifter's own behavior: abilities, projectiles, aura, summons. */
 function stepBossFight(g: GameState, dt: number): void {
   const boss = g.boss
   if (!boss || boss.titan.hp <= 0) return
   const p = g.player
   const titanId = boss.titan.id
+
+  // plated fights are spear-gated, so a Shifter never strands you dry: once every cache
+  // is taken the streets restock after a breath, on fresh deterministic spots per round.
+  // Ordinary waves keep their scarcity — this runs only while a boss is alive.
+  if (g.pickups.length > 0 && g.pickups.every((pickup) => pickup.taken)) {
+    g.pickupRespawnTimer -= dt
+    if (g.pickupRespawnTimer <= 0) {
+      g.pickupRound += 1
+      g.pickups = spawnPickups(g.seed, g.wave, g.nav, PICKUPS_PER_WAVE, g.pickupRound)
+      g.events.push({ type: 'spearCachesRestocked' })
+    }
+  } else {
+    g.pickupRespawnTimer = SPEAR_RESTOCK_DELAY
+  }
 
   const liveSummons = boss.state.summonIds.reduce((count, id) => {
     const t = g.titans.find((titan) => titan.id === id)
