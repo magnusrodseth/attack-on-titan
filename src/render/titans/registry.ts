@@ -1,4 +1,5 @@
 import { buildCartTitan } from './cart'
+import { buildFemaleTitan } from './female'
 import { buildJawTitan } from './jaw'
 import type { BossBodyBuilder } from './lib'
 
@@ -10,5 +11,6 @@ import type { BossBodyBuilder } from './lib'
  */
 export const BOSS_BODY_BUILDERS: Record<string, BossBodyBuilder> = {
   'cart-titan': buildCartTitan,
+  'female-titan': buildFemaleTitan,
   'jaw-titan': buildJawTitan,
 }
