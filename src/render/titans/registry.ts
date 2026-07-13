@@ -1,3 +1,4 @@
+import { buildAttackTitan } from './attack'
 import { buildCartTitan } from './cart'
 import { buildFemaleTitan } from './female'
 import { buildJawTitan } from './jaw'
@@ -10,6 +11,7 @@ import type { BossBodyBuilder } from './lib'
  * When all nine are here, the glb path (and public/models/) goes away.
  */
 export const BOSS_BODY_BUILDERS: Record<string, BossBodyBuilder> = {
+  'attack-titan': buildAttackTitan,
   'cart-titan': buildCartTitan,
   'female-titan': buildFemaleTitan,
   'jaw-titan': buildJawTitan,
