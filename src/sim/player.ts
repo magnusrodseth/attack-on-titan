@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
-import { clampToWall, groundHeightAt, resolveBuildingCollision } from './city'
+import { clampToCeiling, clampToWall, groundHeightAt, resolveBuildingCollision } from './city'
 import { EYE_HEIGHT, GRAVITY } from './constants'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { Hook } from './rope'
@@ -268,6 +268,7 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   for (const hook of p.hooks) applyRopeConstraint(p.pos, p.vel, hook)
   resolveBuildingCollision(arena, p.pos, p.vel, 0.5)
   clampToWall(arena, p.pos, p.vel, 1)
+  clampToCeiling(arena, p.pos, p.vel, 0.9)
 
   // the canal: tethered, the rope carries you — skimming the water costs a whisper,
   // like a tethered ground graze, and the banked swing survives. Untethered you are

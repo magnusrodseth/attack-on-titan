@@ -59,6 +59,13 @@ export function buildNavGrid(arena: Arena, clearance = CLEARANCE, cell = CELL): 
     const z1 = Math.min(size - 1, toIndex(grid, b.z + b.d / 2 + clearance))
     for (let iz = z0; iz <= z1; iz++) {
       for (let ix = x0; ix <= x1; ix++) {
+        // round solids block their disc, not their bounding square — the walkable
+        // diagonals past a cavern pillar are real streets
+        if (
+          b.shape === 'cyl' &&
+          Math.hypot(toWorld(grid, ix) - b.x, toWorld(grid, iz) - b.z) >= b.w / 2 + clearance
+        )
+          continue
         grid.walkable[iz * size + ix] = 0
       }
     }

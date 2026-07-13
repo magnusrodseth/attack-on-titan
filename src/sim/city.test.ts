@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { Arena, Building } from './city'
 import {
   baseGroundY,
+  ceilingHeightAt,
+  clampToCeiling,
   clampToWall,
   emptyArena,
   groundHeightAt,
@@ -256,5 +258,126 @@ describe('broadphase index', () => {
     expect(groundHeightAt(arena, 0, 0, Infinity)).toBe(0)
     arena.buildings.push(house())
     expect(groundHeightAt(arena, 0, 0, Infinity)).toBe(20)
+  })
+})
+
+// --- cylinder solids (rock pillars, stalactites) ---------------------------------------
+
+function pillar(overrides: Partial<Building> = {}): Building {
+  return house({ kind: 'pillar', shape: 'cyl', w: 10, d: 10, h: 30, ...overrides })
+}
+
+describe('cylinder buildings', () => {
+  it('surface height is flat inside the radius and zero outside — corners are open air', () => {
+    const b = pillar()
+    expect(surfaceHeightAt(b, 2, 3)).toBe(30) // hypot 3.6 < r 5
+    expect(surfaceHeightAt(b, 4, 4)).toBe(0) // hypot 5.66 > 5: a box would say 30 here
+  })
+
+  it('insideBuildingXZ tests the disc, not the bounding square', () => {
+    const arena = singleBuildingArena({ kind: 'pillar', shape: 'cyl', h: 30 })
+    expect(insideBuildingXZ(arena, 3, 3)).toBe(true)
+    expect(insideBuildingXZ(arena, 4, 4)).toBe(false)
+    expect(insideBuildingXZ(arena, 4, 4, 2)).toBe(true) // inflate 2: 5.66 < 7
+  })
+
+  it('collision pushes radially out and kills only the inward velocity', () => {
+    const arena = singleBuildingArena({ kind: 'pillar', shape: 'cyl', h: 30 })
+    const pos = new Vector3(2.5, 1, 2.5)
+    const vel = new Vector3(-3, 0, 1)
+    resolveBuildingCollision(arena, pos, vel, 0.5)
+    expect(Math.hypot(pos.x, pos.z)).toBeCloseTo(5.5, 6)
+    expect(pos.x).toBeCloseTo(pos.z, 6) // pushed along the radial normal
+    const inward = vel.x * (pos.x / 5.5) + vel.z * (pos.z / 5.5)
+    expect(inward).toBeGreaterThanOrEqual(-1e-9)
+  })
+
+  it('collision above the top or below an elevated base is a pass-through', () => {
+    const arena = singleBuildingArena({ kind: 'stalactite', shape: 'cyl', y0: 20, h: 30 })
+    const pos = new Vector3(2, 5, 0)
+    const vel = new Vector3(1, 0, 0)
+    resolveBuildingCollision(arena, pos, vel, 0.5)
+    expect(pos.x).toBe(2) // flying beneath the hanging rock
+  })
+
+  it('raycasts the lateral surface and the caps', () => {
+    const b = pillar()
+    const side = rayVsBuilding(new Vector3(-20, 5, 0), new Vector3(1, 0, 0), b)
+    expect(side).toBeCloseTo(15, 6)
+    const top = rayVsBuilding(new Vector3(0, 40, 0), new Vector3(0, -1, 0), b)
+    expect(top).toBeCloseTo(10, 6)
+    const above = rayVsBuilding(new Vector3(-20, 35, 0), new Vector3(1, 0, 0), b)
+    expect(above).toBeNull()
+    // an off-center ray enters at the chord, later than the diameter would
+    const chord = rayVsBuilding(new Vector3(-20, 5, 4.4), new Vector3(1, 0, 0), b)
+    expect(chord).toBeCloseTo(20 - Math.sqrt(25 - 4.4 * 4.4), 4)
+  })
+
+  it('hooks anchor on the pillar surface through the arena raycast', () => {
+    const arena = singleBuildingArena({ kind: 'pillar', shape: 'cyl', h: 30 })
+    const hit = raycastHookTarget(arena, new Vector3(-40, 8, 0), new Vector3(1, 0, 0), 90)
+    expect(hit).not.toBeNull()
+    expect(hit!.x).toBeCloseTo(-5, 6)
+  })
+})
+
+// --- cavern ceiling (the Underground) ----------------------------------------------------
+
+function cavernArena(): Arena {
+  const arena = emptyArena()
+  arena.cavern = { centerY: 44, edgeY: 22, shafts: [] }
+  arena.wallHeight = 22
+  return arena
+}
+
+describe('cavern ceiling', () => {
+  it('is a paraboloid: centerY at the middle, edgeY at the wall', () => {
+    const arena = cavernArena()
+    expect(ceilingHeightAt(arena, 0, 0)).toBeCloseTo(44)
+    expect(ceilingHeightAt(arena, 260, 0)).toBeCloseTo(22)
+    expect(ceilingHeightAt(arena, 130, 0)).toBeCloseTo(38.5) // 22 + 22 * (1 - 0.25)
+    expect(ceilingHeightAt(emptyArena(), 0, 0)).toBe(Infinity)
+  })
+
+  it('hooks anchor on the ceiling straight overhead and at an angle', () => {
+    const arena = cavernArena()
+    const up = raycastHookTarget(arena, new Vector3(0, 10, 0), new Vector3(0, 1, 0), 90)
+    expect(up).not.toBeNull()
+    expect(up!.y).toBeCloseTo(44, 4)
+
+    const angled = raycastHookTarget(
+      arena,
+      new Vector3(130, 10, 0),
+      new Vector3(0.4, 0.8, 0).normalize(),
+      90,
+    )
+    expect(angled).not.toBeNull()
+    // the anchor sits exactly on the dome surface
+    expect(angled!.y).toBeCloseTo(ceilingHeightAt(arena, angled!.x, angled!.z), 4)
+  })
+
+  it('buildings still win over the ceiling when they are closer', () => {
+    const arena = cavernArena()
+    arena.buildings.push(house({ h: 20 }))
+    const hit = raycastHookTarget(arena, new Vector3(0, 25, 0), new Vector3(0, 1, 0), 90)
+    expect(hit!.y).toBeCloseTo(44, 4) // straight up from above the roof: ceiling
+    const roof = raycastHookTarget(arena, new Vector3(0, 5, 0.1), new Vector3(0, 1, 0), 90)
+    expect(roof!.y).toBeLessThan(21) // under the roof: the gable catches it first
+  })
+
+  it('clampToCeiling keeps the soldier under the rock and kills upward velocity', () => {
+    const arena = cavernArena()
+    const pos = new Vector3(0, 43.5, 0)
+    const vel = new Vector3(0, 5, 0)
+    clampToCeiling(arena, pos, vel, 1)
+    expect(pos.y).toBeCloseTo(43, 6)
+    expect(vel.y).toBe(0)
+
+    // no cavern: a no-op
+    const openPos = new Vector3(0, 500, 0)
+    const openVel = new Vector3(0, 5, 0)
+    clampToCeiling(emptyArena(), openPos, openVel, 1)
+    expect(openPos.y).toBe(500)
+    expect(openVel.y).toBe(5)
   })
 })

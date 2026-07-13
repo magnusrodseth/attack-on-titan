@@ -21,13 +21,13 @@ import { BossFxView } from './render/bosses'
 import { bossForMilestone, bossPartCenter } from './sim/boss'
 import { nearestStationDist, raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
-import { clockFraction } from './sim/daynight'
 import { LAMP_BATTERY_SECONDS, lampGlow, lampOn } from './sim/flashlight'
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
 import type { GameEvent } from './sim/game'
-import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, saveBest, startGame, stepGame } from './sim/game'
+import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, gameClock, saveBest, startGame, stepGame } from './sim/game'
+import { DEFAULT_MAP_ID, GAME_MAPS, getMap, mapScopedSeed, mapsForMode } from './sim/maps'
 import {
   commendationInfo,
   commendationRows,
@@ -65,6 +65,15 @@ function storedModeId(): string | null {
   }
 }
 
+const MAP_KEY = 'aot-odm-map'
+function storedMapId(): string | null {
+  try {
+    return localStorage.getItem(MAP_KEY)
+  } catch {
+    return null
+  }
+}
+
 // refresh-proof persistence: a saved run pins its own seed and mode, so a plain reload
 // (no explicit URL overrides) drops back into exactly the run that was interrupted
 const RUN_KEY = 'aot-odm-run'
@@ -88,8 +97,14 @@ const coopMode = lobbyCode !== null
 const playgroundMode = import.meta.env.DEV && !coopMode && urlParams.get('playground') === '1'
 const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
+// the arena archetype resolves like the mode (URL → saved run → sticky choice), then
+// falls back to the district anywhere the chosen map cannot host the chosen mode
+const requestedMapId = coopMode
+  ? DEFAULT_MAP_ID
+  : (urlParams.get('map') ?? runSave?.mapId ?? storedMapId() ?? DEFAULT_MAP_ID)
+const mapId = getMap(requestedMapId).modes.includes(modeId) ? getMap(requestedMapId).id : DEFAULT_MAP_ID
 initAnalytics()
-const game = createGame(seed, undefined, modeId)
+const game = createGame(seed, undefined, modeId, mapId)
 // the soldier's record: lifetime commendations riding the solo event bus (ticket 010)
 const commendations = createCommendations(loadCommendations(game.storage))
 const { scene, updateScenery, dayNight } = buildScene(game.arena)
@@ -406,7 +421,7 @@ hud.onOpenModes = () => {
   // each card carries your record on it: what winning means, and where you stand
   const bests: Record<string, string> = {}
   if (game.best.bestScore > 0) bests.waves = `Best ${game.best.bestScore} · Wave ${game.best.bestWave}`
-  const raceBest = loadRaceBest(game.storage, seed)
+  const raceBest = loadRaceBest(game.storage, mapScopedSeed(game.map.id, seed))
   if (raceBest) bests.race = `Best ${formatRaceTime(raceBest.time)} on this course`
   const huntBest = loadHuntBest(game.storage, seed)
   if (huntBest) bests.hunt = `Best Level ${huntBest.level} on this district`
@@ -421,6 +436,43 @@ hud.onCloseCommendations = () => {
   hud.hideCommendations()
   hud.showStart(game.phase === 'playing', game)
 }
+// the map picker: Signal Run offers the registry's arenas; other modes stay district
+hud.initMapsButton(game.map.name, mapsForMode(game.mode.id).length > 1)
+hud.onOpenMaps = () => {
+  const maps = mapsForMode(game.mode.id)
+  const bests: Record<string, string> = {}
+  for (const map of maps) {
+    const best = loadRaceBest(game.storage, mapScopedSeed(map.id, seed))
+    if (best) bests[map.id] = `Best ${formatRaceTime(best.time)} on this course`
+  }
+  hud.showMaps(maps, game.map.id, bests)
+}
+hud.onCloseMaps = () => {
+  hud.hideMaps()
+  hud.showStart(game.phase === 'playing', game)
+}
+hud.onPickMap = (id) => {
+  if (id === game.map.id) {
+    hud.onCloseMaps()
+    return
+  }
+  confirmIfMidRun(
+    `Deploying to ${GAME_MAPS.find((m) => m.id === id)?.name ?? id} ends your current run.`,
+    'Switch Map',
+    () =>
+      dropRunAndGo(() => {
+        try {
+          localStorage.setItem(MAP_KEY, id)
+        } catch {
+          // private mode: the URL param below still carries the choice
+        }
+        const params = new URLSearchParams(location.search)
+        params.set('map', id)
+        location.search = params.toString()
+      }),
+  )
+}
+
 hud.onPickMode = (id) => {
   if (id === game.mode.id) {
     hud.onCloseModes()
@@ -933,9 +985,10 @@ hud.onOpenLeaderboard = () => {
   const you = loadAccount()?.username ?? null
   hud.setLeaderboardIdentity(you) // signed-out visitors learn how names get on the board
   hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading', you)
-  hud.showTrialBoards(seed, null, 'loading')
-  void fetchTrials(seed).then((boards) => {
-    if (hud.leaderboardOpen) hud.showTrialBoards(seed, boards, boards ? 'ready' : 'error', you)
+  const trialScope = mapScopedSeed(game.map.id, seed)
+  hud.showTrialBoards(trialScope, null, 'loading')
+  void fetchTrials(trialScope).then((boards) => {
+    if (hud.leaderboardOpen) hud.showTrialBoards(trialScope, boards, boards ? 'ready' : 'error', you)
   })
   void fetchLeaderboard().then((data) => {
     if (data) {
@@ -1270,8 +1323,8 @@ function handleEvents(events: GameEvent[]): void {
       case 'raceFinished':
         audio.chime()
         effects.addShake(0.25)
-        submitTrial({ mode: 'race', seed, timeS: event.time, splits: event.splits })
-        track('trial_finished', { mode: game.mode.id, seed, time_s: event.time, pb: event.pb })
+        submitTrial({ mode: 'race', seed: mapScopedSeed(game.map.id, seed), timeS: event.time, splits: event.splits })
+        track('trial_finished', { mode: game.mode.id, seed, map: game.map.id, time_s: event.time, pb: event.pb })
         break
       case 'raceArmed':
       case 'raceRestart':
@@ -1555,7 +1608,7 @@ renderer.setAnimationLoop(() => {
   gatesView.sync(game, now * 0.001)
   updateSpearBeeps(dt)
   updateScenery(dt, camera)
-  const clock = debug.clockOverride ?? clockFraction(seed, game.time)
+  const clock = debug.clockOverride ?? gameClock(game)
   dayNight.update(clock, camera)
   flashlight.update(camera, game.phase === 'menu' ? 0 : lampGlow(clock, game.player.lamp), now)
   blade.update(dt)
@@ -1708,7 +1761,7 @@ function snapshot() {
       : null,
     hooks: game.player.hooks.map((h) => h.state),
     buildings: game.arena.buildings.length,
-    clock: Math.round((debug.clockOverride ?? clockFraction(seed, game.time)) * 1000) / 1000,
+    clock: Math.round((debug.clockOverride ?? gameClock(game)) * 1000) / 1000,
     lamp: Math.round(game.player.lamp),
   }
 }

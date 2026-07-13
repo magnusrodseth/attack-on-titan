@@ -68,6 +68,7 @@ export class GatesView {
       opacity: 0.9,
       blending: AdditiveBlending,
       depthWrite: false,
+      fog: false, // signal flares outshine any fog, above ground or under it
     })
     this.ring = new Mesh(new TorusGeometry(1, 0.22, 10, 44), this.ringMat)
     this.ring.visible = false
@@ -82,6 +83,7 @@ export class GatesView {
       opacity: 0.14,
       blending: AdditiveBlending,
       depthWrite: false,
+      fog: false,
     })
     // open-ended cone of light, wider at the top like a smoke plume catching sun
     const beam = new Mesh(new CylinderGeometry(2.6, 0.9, COLUMN_HEIGHT, 10, 1, true), beamMat)
@@ -106,6 +108,7 @@ export class GatesView {
       opacity: 0.55,
       blending: AdditiveBlending,
       depthWrite: false,
+      fog: false,
     })
     const smoke = new Points(geometry, smokeMat)
     smoke.visible = false

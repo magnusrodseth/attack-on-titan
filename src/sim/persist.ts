@@ -4,6 +4,7 @@ import { BOSS_LADDER } from './boss'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { GamePhase, GameState } from './game'
 import { loadHuntBest } from './hunt'
+import { DEFAULT_MAP_ID } from './maps'
 import type { PlayerConfig } from './player'
 import { neutralInput } from './player'
 import { resumeRng } from './rng'
@@ -77,6 +78,8 @@ export interface SavedRun {
   v: number
   seed: string
   modeId: string
+  /** Arena archetype; absent in saves from before maps existed (those are the district). */
+  mapId?: string
   phase: GamePhase
   wave: number
   time: number
@@ -116,6 +119,7 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     v: SAVE_VERSION,
     seed: g.seed,
     modeId: g.mode.id,
+    mapId: g.map.id,
     phase: g.phase,
     wave: g.wave,
     time: g.time,
@@ -192,6 +196,8 @@ function serializeHook(hook: GameState['player']['hooks'][0]): SavedHook {
 export function restoreRun(save: SavedRun | null | undefined, g: GameState): boolean {
   if (!save || save.v !== SAVE_VERSION) return false
   if (save.seed !== g.seed || save.modeId !== g.mode.id) return false
+  // the arena re-derives from seed + map: restoring into another map's geometry is never valid
+  if ((save.mapId ?? DEFAULT_MAP_ID) !== g.map.id) return false
   // a shifter on the roster demands its fight state; a dangling boss payload is fine to drop
   if (save.titans.some((t) => t.kind === 'shifter')) {
     if (!save.boss) return false

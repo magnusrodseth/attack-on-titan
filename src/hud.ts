@@ -5,6 +5,7 @@ import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
 import { GRAB_ESCAPE_PRESSES } from './sim/grab'
 import { loadHuntBest, HUNT_URGENCY_FRACTION } from './sim/hunt'
+import { DEFAULT_MAP_ID, mapScopedSeed } from './sim/maps'
 import { loadRaceBest } from './sim/race'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
@@ -111,6 +112,8 @@ export class Hud {
   private settingsPanel = el('settings')
   private modesPanel = el('modes')
   private modeCards = el('mode-cards')
+  private mapsPanel = el('maps')
+  private mapCards = el('map-cards')
   private bannerTimer: number | undefined
 
   private raceStrip = el('race-strip')
@@ -173,6 +176,9 @@ export class Hud {
   onOpenModes: () => void = () => {}
   onCloseModes: () => void = () => {}
   onPickMode: (id: string) => void = () => {}
+  onOpenMaps: () => void = () => {}
+  onCloseMaps: () => void = () => {}
+  onPickMap: (id: string) => void = () => {}
   onOpenCoop: () => void = () => {}
   onCloseCoop: () => void = () => {}
   onAuth: (mode: 'register' | 'login', username: string, password: string) => void = () => {}
@@ -211,6 +217,8 @@ export class Hud {
     el<HTMLButtonElement>('settings-back').addEventListener('click', () => this.onCloseSettings())
     el<HTMLButtonElement>('modes-btn').addEventListener('click', () => this.onOpenModes())
     el<HTMLButtonElement>('modes-back').addEventListener('click', () => this.onCloseModes())
+    el<HTMLButtonElement>('maps-btn').addEventListener('click', () => this.onOpenMaps())
+    el<HTMLButtonElement>('maps-back').addEventListener('click', () => this.onCloseMaps())
     el<HTMLButtonElement>('coop-btn').addEventListener('click', () => this.onOpenCoop())
     el<HTMLButtonElement>('coop-back').addEventListener('click', () => this.onCloseCoop())
     el<HTMLButtonElement>('coop-register').addEventListener('click', () => this.submitAuth('register'))
@@ -353,6 +361,50 @@ export class Hud {
 
   get modesOpen(): boolean {
     return !this.modesPanel.classList.contains('hidden')
+  }
+
+  /** The Map button on the start plate; hidden when the mode offers only one arena. */
+  initMapsButton(mapName: string, visible: boolean): void {
+    const button = el<HTMLButtonElement>('maps-btn')
+    button.textContent = `Map · ${mapName}`
+    button.classList.toggle('hidden', !visible)
+  }
+
+  showMaps(
+    maps: { id: string; name: string; desc: string }[],
+    currentId: string,
+    bests: Record<string, string> = {},
+  ): void {
+    this.mapCards.innerHTML = ''
+    for (const map of maps) {
+      const selected = map.id === currentId
+      const best = bests[map.id]
+      const card = document.createElement('div')
+      card.className = selected ? 'card mode-card selected' : 'card mode-card'
+      card.tabIndex = 0
+      card.setAttribute('role', 'button')
+      card.innerHTML =
+        `<div class="card-name">${map.name}</div><div class="card-desc">${map.desc}</div>` +
+        (selected ? '<div class="card-tag">Active</div>' : '') +
+        (best ? `<div class="card-pb">${best}</div>` : '')
+      card.addEventListener('click', () => this.onPickMap(map.id))
+      card.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        this.onPickMap(map.id)
+      })
+      this.mapCards.appendChild(card)
+    }
+    this.start.classList.add('hidden')
+    this.mapsPanel.classList.remove('hidden')
+  }
+
+  hideMaps(): void {
+    this.mapsPanel.classList.add('hidden')
+  }
+
+  get mapsOpen(): boolean {
+    return !this.mapsPanel.classList.contains('hidden')
   }
 
   showCommendations(rows: CommendationRow[]): void {
@@ -770,8 +822,9 @@ export class Hud {
   /** What deploys when you press the button: active mode, course, and your record on it. */
   private menuContext(g: GameState): string {
     const parts = [g.mode.name, `seed ${g.seed}`]
+    if (g.map.id !== DEFAULT_MAP_ID) parts.splice(1, 0, g.map.name)
     if (g.mode.id === 'race') {
-      const best = g.race?.best ?? loadRaceBest(g.storage, g.seed)
+      const best = g.race?.best ?? loadRaceBest(g.storage, mapScopedSeed(g.map.id, g.seed))
       if (best) parts.push(`best ${formatRaceTime(best.time)}`)
     } else if (g.mode.id === 'hunt') {
       const best = g.hunt?.best ?? loadHuntBest(g.storage, g.seed)
@@ -790,6 +843,7 @@ export class Hud {
   showConfirm(text: string, yesLabel: string, onYes: () => void): void {
     this.start.classList.add('hidden')
     this.modesPanel.classList.add('hidden')
+    this.mapsPanel.classList.add('hidden')
     el('confirm-text').textContent = text
     el<HTMLButtonElement>('confirm-yes').textContent = yesLabel
     this.confirmAction = onYes

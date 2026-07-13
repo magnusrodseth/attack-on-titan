@@ -141,6 +141,9 @@ describe('serializeRun / restoreRun', () => {
     expect(restoreRun(save, createGame('seed-b', null))).toBe(false)
     expect(restoreRun({ ...save, v: SAVE_VERSION + 1 }, createGame('seed-a', null))).toBe(false)
     expect(restoreRun({ ...save, modeId: 'time-trial' }, createGame('seed-a', null))).toBe(false)
+    // the arena re-derives from seed + map: a district save must not restore into the cavern
+    expect(restoreRun(save, createGame('seed-a', null, 'waves', 'underground'))).toBe(false)
+    expect(restoreRun({ ...save, mapId: 'underground' }, createGame('seed-a', null))).toBe(false)
     expect(restoreRun(null, createGame('seed-a', null))).toBe(false)
     const untouched = createGame('seed-b', null)
     const before = untouched.player.pos.clone()

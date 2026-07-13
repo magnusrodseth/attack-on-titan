@@ -60,6 +60,7 @@ function fakeGame(over: FakeOverrides = {}): GameState {
     arena: { canal: over.canal ?? null },
     hunt: over.hunt ?? null,
     mode: { id: over.modeId ?? 'waves' },
+    map: { id: 'district', clockFraction: null },
   } as unknown as GameState
 }
 

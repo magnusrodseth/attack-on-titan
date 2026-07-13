@@ -33,6 +33,7 @@ import type { Arena, Building } from '../sim/city'
 import { baseGroundY, eaveHeight, groundHeightAt } from '../sim/city'
 import { BLOCK } from '../sim/citygen'
 import { createRng } from '../sim/rng'
+import { CavernAmbience, addCavern, addCavernGround } from './cavern'
 import { DayNightSky } from './daynight'
 
 const loader = new TextureLoader()
@@ -53,10 +54,16 @@ function tex(path: string, repeatX = 1, repeatY = 1, srgb = true): Texture {
   return texture
 }
 
+/** What main.ts drives per frame: DayNightSky over the district, CavernAmbience below. */
+export interface SkyDriver {
+  onNight(callback: (night: number) => void): void
+  update(fraction: number, camera: Object3D): void
+}
+
 export interface BuiltScene {
   scene: Scene
   updateScenery: (dt: number, camera?: Object3D) => void
-  dayNight: DayNightSky
+  dayNight: SkyDriver
 }
 
 /** Gable roof prism with planar UVs: unit footprint, ridge along local X at y=1. */
@@ -81,6 +88,21 @@ function gablePrismGeometry(): BufferGeometry {
 
 export function buildScene(arena: Arena): BuiltScene {
   const scene = new Scene()
+
+  if (arena.cavern) {
+    // the Underground: same housing/props/station set under a rock dome — no sky, no
+    // canal, no scenery beyond the wall (the black fog owns everything distant)
+    const ambience = new CavernAmbience(scene)
+    addCavernGround(scene, arena)
+    ambience.onNight(addHousing(scene, arena))
+    addLandmarks(scene, arena)
+    addProps(scene, arena)
+    addBanners(scene, arena)
+    addCavern(scene, arena)
+    addStation(scene, arena)
+    return { scene, updateScenery: () => {}, dayNight: ambience }
+  }
+
   const dayNight = new DayNightSky(scene)
 
   addGround(scene, arena)
@@ -372,10 +394,11 @@ function addHousing(scene: Scene, arena: Arena): (night: number) => void {
   slateRoofs.count = slateCount
   scene.add(plasterBodies, brickBodies, stoneBodies, terraRoofs, slateRoofs)
 
-  // photo window texture: neutral tint reads as dark glass, overbright warm tint as lamplight
+  // photo window texture: neutral tint reads as dark glass, overbright warm tint as
+  // lamplight. Under the cavern the lit windows ARE the vista — they pierce the fog.
   const windows = new InstancedMesh(
     new PlaneGeometry(1.2, 1.6),
-    new MeshBasicMaterial({ map: tex('/textures/window.png'), side: DoubleSide }),
+    new MeshBasicMaterial({ map: tex('/textures/window.png'), side: DoubleSide, fog: !arena.cavern }),
     windowSlots.length,
   )
   const slotQuat = new Quaternion()
@@ -474,6 +497,9 @@ function addLandmarks(scene: Scene, arena: Arena): void {
     body.receiveShadow = true
     scene.add(body, spire)
   }
+
+  // no sealed gate down here: the Underground's gateAngle marks the surface stairway
+  if (arena.cavern) return
 
   // the sealed main gate: a stone gate block set into the wall between the towers,
   // framing a pair of recessed plank door leaves under a stone lintel

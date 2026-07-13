@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { ceilingHeightAt } from './city'
 import { generateCity } from './citygen'
+import { generateUnderground } from './undergroundgen'
 import {
   COURSE_WALL_MARGIN,
   GATE_TIERS,
@@ -95,6 +97,40 @@ describe('generateCourse', () => {
   it('spans the city point-to-point, not a local loop', () => {
     for (const seed of SEEDS) {
       const { arena, course } = setup(seed)
+      const finish = course.gates[course.gates.length - 1]!
+      const span = Math.hypot(finish.x - course.start.x, finish.z - course.start.z)
+      expect(span).toBeGreaterThanOrEqual(arena.wallRadius)
+    }
+  })
+})
+
+describe('generateCourse under the cavern (the Underground)', () => {
+  it('holds every course invariant with no ring hanging in the rock', () => {
+    for (const seed of SEEDS.slice(0, 4)) {
+      const arena = generateUnderground(seed)
+      const nav = buildNavGrid(arena)
+      const course = generateCourse(seed, arena, nav)
+
+      expect(course.gates.length).toBeGreaterThanOrEqual(MIN_GATES)
+      expect(course.gates.length).toBeLessThanOrEqual(MAX_GATES)
+      expect(isWalkable(nav, course.start.x, course.start.z)).toBe(true)
+
+      let prev = { x: course.start.x, z: course.start.z }
+      const seen = new Set<string>()
+      for (const gate of course.gates) {
+        const d = Math.hypot(gate.x - prev.x, gate.z - prev.z)
+        expect(d).toBeGreaterThanOrEqual(MIN_GATE_SPACING)
+        expect(d).toBeLessThanOrEqual(MAX_GATE_SPACING)
+        expect(isWalkable(nav, gate.x, gate.z)).toBe(true)
+        expect(Math.hypot(gate.x, gate.z)).toBeLessThanOrEqual(arena.wallRadius - COURSE_WALL_MARGIN)
+        // the whole ring clears the dome, not just its center
+        expect(gate.y + gate.radius).toBeLessThanOrEqual(ceilingHeightAt(arena, gate.x, gate.z) - 1)
+        expect(gate.y).toBeGreaterThanOrEqual(GATE_TIERS[gate.tier].minY)
+        seen.add(gate.tier)
+        prev = gate
+      }
+      expect(seen.size).toBe(3)
+
       const finish = course.gates[course.gates.length - 1]!
       const span = Math.hypot(finish.x - course.start.x, finish.z - course.start.z)
       expect(span).toBeGreaterThanOrEqual(arena.wallRadius)

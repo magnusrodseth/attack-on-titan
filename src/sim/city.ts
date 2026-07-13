@@ -22,6 +22,8 @@ export type BuildingKind =
   | 'well'
   | 'stall'
   | 'cart'
+  | 'pillar' // cavern rock column, floor to ceiling (cylinder)
+  | 'stalactite' // hanging cavern rock, y0 well above the streets (cylinder)
 
 export interface Building {
   x: number
@@ -35,6 +37,12 @@ export interface Building {
   kind: BuildingKind
   ridgeAxis: 'x' | 'z'
   tint: number
+  /** Round solids (cavern pillars, stalactites): w is the diameter and d must equal w. */
+  shape?: 'box' | 'cyl'
+}
+
+function cylRadius(b: Building): number {
+  return b.w / 2
 }
 
 export type RoofShape = 'gable' | 'pyramid' | 'flat'
@@ -53,6 +61,8 @@ export const ROOF_SHAPE: Record<BuildingKind, RoofShape> = {
   well: 'flat',
   stall: 'flat',
   cart: 'flat',
+  pillar: 'flat',
+  stalactite: 'flat',
 }
 
 /**
@@ -74,6 +84,8 @@ export const EAVE_FRACTION: Record<BuildingKind, number> = {
   well: 1,
   stall: 1,
   cart: 1,
+  pillar: 1,
+  stalactite: 1,
 }
 
 export function eaveHeight(b: Building): number {
@@ -90,6 +102,19 @@ export interface CanalSpec {
   waterY: number
 }
 
+/**
+ * A cavern roof over the whole arena (the Underground). The ceiling is a paraboloid:
+ * `centerY` above the plaza easing to `edgeY` where it meets the perimeter rock wall
+ * (wallHeight should equal edgeY so the wall rises to meet the dome). One analytic
+ * surface shared by hook raycasts, the flight clamp and the renderer — they can't drift.
+ */
+export interface CavernSpec {
+  centerY: number
+  edgeY: number
+  /** Surface openings pouring light shafts: landmarks for the renderer and course. */
+  shafts: { x: number; z: number; radius: number }[]
+}
+
 export interface Arena {
   buildings: Building[]
   wallRadius: number
@@ -98,6 +123,7 @@ export interface Arena {
   /** Resupply stations: the plaza one first, then one per cardinal on open ground. */
   stations: Vector3[]
   canal: CanalSpec | null
+  cavern: CavernSpec | null
   /** Wall angle (radians, +X = 0) of the sealed main gate; bastions hold the other cardinals. */
   gateAngle: number
   /** Broadphase over buildings; rebuilt lazily whenever buildings.length changes. */
@@ -112,8 +138,57 @@ export function emptyArena(): Arena {
     plazaRadius: 22,
     stations: [new Vector3(0, 0, 0)],
     canal: null,
+    cavern: null,
     gateAngle: 0,
   }
+}
+
+/** Ceiling height at a point; Infinity under an open sky. */
+export function ceilingHeightAt(arena: Arena, x: number, z: number): number {
+  const cavern = arena.cavern
+  if (!cavern) return Infinity
+  const r2 = (x * x + z * z) / (arena.wallRadius * arena.wallRadius)
+  return cavern.edgeY + (cavern.centerY - cavern.edgeY) * Math.max(0, 1 - r2)
+}
+
+/** Keeps airborne soldiers out of the cavern rock; a no-op under an open sky. */
+export function clampToCeiling(arena: Arena, pos: Vector3, vel: Vector3, margin: number): void {
+  if (!arena.cavern) return
+  const limit = ceilingHeightAt(arena, pos.x, pos.z) - margin
+  if (pos.y <= limit) return
+  pos.y = limit
+  if (vel.y > 0) vel.y = 0
+}
+
+/**
+ * Ray vs the ceiling paraboloid y(r) = centerY - K * (r/R)^2. Substituting the ray gives
+ * a quadratic in t; the smallest positive root inside the wall radius is the anchor.
+ */
+function rayVsCeiling(arena: Arena, origin: Vector3, dir: Vector3): number | null {
+  const cavern = arena.cavern
+  if (!cavern) return null
+  const R = arena.wallRadius
+  const A = (cavern.centerY - cavern.edgeY) / (R * R)
+  const a = A * (dir.x * dir.x + dir.z * dir.z)
+  const b = 2 * A * (origin.x * dir.x + origin.z * dir.z) + dir.y
+  const c = A * (origin.x * origin.x + origin.z * origin.z) + origin.y - cavern.centerY
+  let roots: number[]
+  if (Math.abs(a) < 1e-12) {
+    if (Math.abs(b) < 1e-12) return null
+    roots = [-c / b]
+  } else {
+    const disc = b * b - 4 * a * c
+    if (disc < 0) return null
+    const sq = Math.sqrt(disc)
+    roots = [(-b - sq) / (2 * a), (-b + sq) / (2 * a)].sort((p, q) => p - q)
+  }
+  for (const t of roots) {
+    if (t <= 0.01) continue
+    const x = origin.x + dir.x * t
+    const z = origin.z + dir.z * t
+    if (Math.hypot(x, z) <= R + 1e-6) return t
+  }
+  return null
 }
 
 /** Horizontal distance to the closest resupply station; every consumer resupplies there. */
@@ -137,6 +212,7 @@ export function baseGroundY(arena: Arena, x: number, _z: number): number {
 export function surfaceHeightAt(b: Building, x: number, z: number): number {
   const dx = x - b.x
   const dz = z - b.z
+  if (b.shape === 'cyl') return Math.hypot(dx, dz) < cylRadius(b) ? b.h : 0
   if (Math.abs(dx) > b.w / 2 || Math.abs(dz) > b.d / 2) return 0
   const shape = ROOF_SHAPE[b.kind]
   if (shape === 'flat') return b.h
@@ -191,6 +267,10 @@ export function insideBuildingXZ(
   let hit = false
   forEachInRect(arena, x - pad, x + pad, z - pad, z + pad, (b) => {
     if (b.y0 > maxBaseY) return
+    if (b.shape === 'cyl') {
+      if (Math.hypot(x - b.x, z - b.z) < cylRadius(b) + inflate) hit = true
+      return
+    }
     if (Math.abs(x - b.x) < b.w / 2 + inflate && Math.abs(z - b.z) < b.d / 2 + inflate) hit = true
   })
   return hit
@@ -207,6 +287,23 @@ export function resolveBuildingCollision(
     // contact, and below an elevated deck you pass under freely. The epsilon keeps
     // ground-walkers (titans stand at y = 0 exactly) colliding with ground buildings.
     if (pos.y >= eaveHeight(b) || pos.y < b.y0 - 0.01) return
+    if (b.shape === 'cyl') {
+      const dx = pos.x - b.x
+      const dz = pos.z - b.z
+      const dist = Math.hypot(dx, dz)
+      const ex = cylRadius(b) + radius
+      if (dist >= ex) return
+      const nx = dist > 1e-6 ? dx / dist : 1
+      const nz = dist > 1e-6 ? dz / dist : 0
+      pos.x = b.x + nx * ex
+      pos.z = b.z + nz * ex
+      const inward = vel.x * nx + vel.z * nz
+      if (inward < 0) {
+        vel.x -= nx * inward
+        vel.z -= nz * inward
+      }
+      return
+    }
     const ex = b.w / 2 + radius
     const ez = b.d / 2 + radius
     const dx = pos.x - b.x
@@ -257,6 +354,12 @@ export function raycastHookTarget(
     found = true
   }
 
+  const tCeiling = rayVsCeiling(arena, origin, dir)
+  if (tCeiling !== null && tCeiling < bestT) {
+    bestT = tCeiling
+    found = true
+  }
+
   const t = raycastBuildings(arena, origin, dir, bestT)
   if (t !== null) {
     bestT = t
@@ -269,6 +372,7 @@ export function raycastHookTarget(
 
 /** Walls up to the eaves, then real gable slopes; pyramids and flats are box volumes. */
 export function rayVsBuilding(origin: Vector3, dir: Vector3, b: Building): number | null {
+  if (b.shape === 'cyl') return rayVsCylinder(origin, dir, b)
   const shape = ROOF_SHAPE[b.kind]
   if (shape !== 'gable') return rayVsAabb(origin, dir, b, b.y0, b.h)
   const wallT = rayVsAabb(origin, dir, b, b.y0, eaveHeight(b))
@@ -276,6 +380,43 @@ export function rayVsBuilding(origin: Vector3, dir: Vector3, b: Building): numbe
   if (wallT === null) return roofT
   if (roofT === null) return wallT
   return Math.min(wallT, roofT)
+}
+
+/** Finite vertical cylinder between y0 and h: lateral surface plus the two cap discs. */
+function rayVsCylinder(origin: Vector3, dir: Vector3, b: Building): number | null {
+  const r = cylRadius(b)
+  const ox = origin.x - b.x
+  const oz = origin.z - b.z
+  let best: number | null = null
+  const consider = (t: number): void => {
+    if (t > 0.01 && (best === null || t < best)) best = t
+  }
+
+  // lateral surface
+  const a = dir.x * dir.x + dir.z * dir.z
+  if (a > 1e-12) {
+    const bq = 2 * (ox * dir.x + oz * dir.z)
+    const cq = ox * ox + oz * oz - r * r
+    const disc = bq * bq - 4 * a * cq
+    if (disc >= 0) {
+      const sq = Math.sqrt(disc)
+      for (const t of [(-bq - sq) / (2 * a), (-bq + sq) / (2 * a)]) {
+        const y = origin.y + dir.y * t
+        if (y >= b.y0 && y <= b.h) consider(t)
+      }
+    }
+  }
+
+  // cap discs at y0 and h
+  if (Math.abs(dir.y) > 1e-12) {
+    for (const capY of [b.y0, b.h]) {
+      const t = (capY - origin.y) / dir.y
+      const x = ox + dir.x * t
+      const z = oz + dir.z * t
+      if (x * x + z * z <= r * r) consider(t)
+    }
+  }
+  return best
 }
 
 function rayVsGable(origin: Vector3, dir: Vector3, b: Building): number | null {

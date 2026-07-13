@@ -741,6 +741,7 @@
           <button id="giveup-btn" class="hidden solo-only">Abandon Run</button>
           <button id="coop-btn" class="solo-only">Multiplayer</button>
           <button id="modes-btn" class="solo-only">Game Mode</button>
+          <button id="maps-btn" class="solo-only hidden"></button>
           <button id="featured-btn" class="solo-only"></button>
           <div class="menu-note solo-only" id="featured-note">One fixed district shared by every soldier: its trial times fill the global boards.</div>
           <div class="menu-row" id="menu-row">
@@ -836,6 +837,13 @@
         <div class="sub">Choose how you take the field. Switching modes restarts the run.</div>
         <div id="mode-cards"></div>
         <button id="modes-back">Back</button>
+      </div>
+
+      <div id="maps" class="overlay hidden">
+        <h2 class="aot-title">Map</h2>
+        <div class="sub">Choose where the line is laid. Every map keeps its own courses and boards.</div>
+        <div id="map-cards"></div>
+        <button id="maps-back">Back</button>
       </div>
 
       <div id="settings" class="overlay hidden">

@@ -1,7 +1,8 @@
 import { BOSS_LADDER } from './boss'
 import { EYE_HEIGHT } from './constants'
-import { clockFraction, nightFactor } from './daynight'
+import { nightFactor } from './daynight'
 import type { GameState, StorageLike } from './game'
+import { gameClock } from './game'
 
 /**
  * Commendations: permanent marks on the soldier's record, awarded once ever the first time
@@ -291,7 +292,7 @@ export function stepCommendations(
 
   // ambient checks, only while the soldier is alive in the world
   if (g.phase === 'playing') {
-    const night = nightFactor(clockFraction(g.seed, g.time)) >= 0.5
+    const night = nightFactor(gameClock(g)) >= 0.5
     if (night && !cs.scratch.night) cs.scratch.sawDusk = true
     if (!night && cs.scratch.night && cs.scratch.sawDusk) award('night-watch')
     cs.scratch.night = night

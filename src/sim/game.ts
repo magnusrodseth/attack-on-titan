@@ -3,12 +3,13 @@ import type { BossFight } from './boss'
 import { steamRadius, stepBoss } from './boss'
 import type { Arena } from './city'
 import { baseGroundY, nearestStationDist, raycastHookTarget } from './city'
-import { generateCity } from './citygen'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
 import { stepSlashBuffer, trySlash } from './combat'
 import { clockFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
+import type { GameMap } from './maps'
+import { DEFAULT_MAP_ID, getMap } from './maps'
 import type { HuntState } from './hunt'
 import type { GrabState, GrabWatch } from './grab'
 import {
@@ -171,6 +172,8 @@ export interface GameState {
   /** Loiter clock that arms a grab, plus the post-grab grace before it counts again. */
   grabWatch: GrabWatch
   mode: GameMode
+  /** The arena archetype this run generated from; joins the replay identity with the seed. */
+  map: GameMap
   /** The live Shifter fight on a boss wave; null everywhere else (boss.ts, ADR 0002). */
   boss: BossFight | null
   /** Signal Run's course and clock; null in every other mode. */
@@ -215,8 +218,10 @@ export function createGame(
   seed: string,
   storage: StorageLike | null = defaultStorage(),
   modeId: string = DEFAULT_MODE_ID,
+  mapId: string = DEFAULT_MAP_ID,
 ): GameState {
-  const arena = generateCity(createRng(hashSeed(`${seed}:city`)))
+  const map = getMap(mapId)
+  const arena = map.generate(seed)
   return {
     seed,
     phase: 'menu',
@@ -247,6 +252,7 @@ export function createGame(
     grab: null,
     grabWatch: createGrabWatch(),
     mode: getMode(modeId),
+    map,
     boss: null,
     race: null,
     hunt: null,
@@ -919,10 +925,15 @@ function stepGrabHeld(g: GameState, input: InputState, dt: number): void {
  * Shared by the solo loop and the co-op client — the battery is a personal resource the
  * server never needs to see.
  */
+/** The run's day/night clock; maps may pin it (the Underground never sees the sun). */
+export function gameClock(g: GameState): number {
+  return g.map.clockFraction ?? clockFraction(g.seed, g.time)
+}
+
 export function stepLamp(g: GameState, dt: number): void {
   const p = g.player
   const before = p.lamp
-  p.lamp = drainLamp(p.lamp, clockFraction(g.seed, g.time), dt)
+  p.lamp = drainLamp(p.lamp, gameClock(g), dt)
   if (before > LAMP_LOW_SECONDS && p.lamp <= LAMP_LOW_SECONDS && p.lamp > 0) {
     g.events.push({ type: 'lampLow' })
   }

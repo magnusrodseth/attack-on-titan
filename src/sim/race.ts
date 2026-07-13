@@ -2,6 +2,7 @@ import { EYE_HEIGHT } from './constants'
 import type { Course } from './course'
 import { generateCourse } from './course'
 import type { GameState, StorageLike } from './game'
+import { mapScopedSeed } from './maps'
 import type { GameMode } from './modes'
 import type { InputState } from './player'
 import { createPlayer } from './player'
@@ -10,7 +11,7 @@ import { createScore } from './score'
 /**
  * Signal Run (wayfinder tt-003): the parkour time trial. An empty city, a seeded course
  * of gates, and a clock that starts on your first control input. Every ring refills gas;
- * R relights the same line instantly. Times are only comparable per seed.
+ * R relights the same line instantly. Times are only comparable per seed and map.
  */
 export interface RaceBest {
   time: number
@@ -82,7 +83,7 @@ export const raceMode: GameMode = {
       armed: false,
       time: 0,
       splits: [],
-      best: loadRaceBest(g.storage, g.seed),
+      best: loadRaceBest(g.storage, mapScopedSeed(g.map.id, g.seed)),
     }
     g.player.pos.set(course.start.x, EYE_HEIGHT, course.start.z)
   },
@@ -136,7 +137,7 @@ function finishRace(g: GameState, race: RaceState): void {
   const delta = race.best === null ? null : race.time - race.best.time
   if (pb) {
     race.best = { time: race.time, splits: [...race.splits] }
-    saveRaceBest(g.storage, g.seed, race.best)
+    saveRaceBest(g.storage, mapScopedSeed(g.map.id, g.seed), race.best)
   }
   g.phase = 'finished'
   g.events.push({ type: 'raceFinished', time: race.time, splits: [...race.splits], pb, delta })

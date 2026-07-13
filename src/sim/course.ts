@@ -1,12 +1,12 @@
 import type { Arena } from './city'
-import { groundHeightAt } from './city'
+import { ceilingHeightAt, groundHeightAt } from './city'
 import type { NavGrid } from './nav'
 import { nearestWalkable } from './nav'
 import { createRng, hashSeed, shuffle } from './rng'
 
 /**
  * Signal Run course generator (wayfinder tt-002): a seeded point-to-point line of gates
- * laid across the city. Same seed, same course — times are only comparable per seed.
+ * laid across the city. Same seed + same map, same course; times only compare within both.
  */
 export type GateTier = 'street' | 'canyon' | 'rooftop'
 
@@ -203,7 +203,11 @@ function generateCourseRound(streamSeed: string, arena: Arena, nav: NavGrid): Co
     }
     const tier = tiers[i]!
     const band = GATE_TIERS[tier]
-    gates.push({ x, y: gateHeight(arena, tier, x, z, vertical()), z, radius: band.radius, tier })
+    let y = gateHeight(arena, tier, x, z, vertical())
+    // under a cavern the vertical bands bow with the dome: rings never hang in the rock
+    const ceiling = ceilingHeightAt(arena, x, z)
+    if (ceiling !== Infinity) y = Math.min(y, ceiling - band.radius - 1.5)
+    gates.push({ x, y, z, radius: band.radius, tier })
     prevX = x
     prevZ = z
   }

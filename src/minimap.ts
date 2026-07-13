@@ -44,9 +44,17 @@ export class Minimap {
       bg.restore()
     }
     const landmark = new Set(['tower', 'cathedral', 'gatehouse', 'bastion'])
-    const clutter = new Set(['chimney', 'flagpole', 'well', 'stall', 'cart'])
+    const clutter = new Set(['chimney', 'flagpole', 'well', 'stall', 'cart', 'stalactite'])
     for (const b of arena.buildings) {
-      if (clutter.has(b.kind)) continue // sub-pixel props would only add noise
+      if (clutter.has(b.kind)) continue // sub-pixel props (and overhead rock) only add noise
+      if (b.kind === 'pillar') {
+        // cavern rock columns are round: a filled disc, not a block
+        bg.fillStyle = 'rgba(140, 130, 118, 0.85)'
+        bg.beginPath()
+        bg.arc(CENTER + b.x * this.scale, CENTER + b.z * this.scale, Math.max(1.4, (b.w / 2) * this.scale), 0, Math.PI * 2)
+        bg.fill()
+        continue
+      }
       bg.fillStyle = landmark.has(b.kind)
         ? 'rgba(235, 235, 240, 0.75)'
         : b.kind === 'deck' || b.kind === 'pier'
