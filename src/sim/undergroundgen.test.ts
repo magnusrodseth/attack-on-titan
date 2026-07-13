@@ -44,7 +44,7 @@ describe('generateUnderground', () => {
 
   it('lines the streets with torches, all on open ground', () => {
     const torches = arena.cavern!.torches
-    expect(torches.length).toBeGreaterThan(60)
+    expect(torches.length).toBeGreaterThan(30)
     for (const t of torches) {
       expect(insideBuildingXZ(arena, t.x, t.z, 1)).toBe(false)
       expect(Math.hypot(t.x, t.z)).toBeLessThan(UG_WALL_RADIUS)

@@ -94,7 +94,10 @@ export class DayNightSky {
     uniforms.mieCoefficient!.value = 0.005
     uniforms.mieDirectionalG!.value = 0.8
     uniforms.cloudCoverage!.value = 0 // the sourced billboard clouds are the clouds
-    scene.add(this.sky)
+    // Underground you never see the weather — a hole in the rock reads as raw white light,
+    // not as a window onto clouds and stars. So the sky, the star dome and the moon are
+    // simply never built down there; the shaft caps in cavern.ts are the light.
+    if (!this.underground) scene.add(this.sky)
 
     const loader = new TextureLoader()
     const starTex = loader.load('/textures/stars.jpg', () => {
@@ -112,6 +115,7 @@ export class DayNightSky {
     })
     // radius must stay inside camera.far (900); the dome tracks the camera
     this.stars = new Mesh(new SphereGeometry(850, 32, 16), this.starsMat)
+    this.stars.visible = !this.underground
     this.stars.frustumCulled = false
     // the dome is camera-centered, so the distance sort would draw it over every
     // other transparent object (moon, clouds); force it to the very back instead
@@ -132,6 +136,7 @@ export class DayNightSky {
       fog: false,
     })
     this.moon = new Mesh(new SphereGeometry(26, 24, 16), this.moonMat)
+    this.moon.visible = !this.underground
     this.moon.frustumCulled = false
     this.moon.renderOrder = -1 // over the stars, under everything nearer
     scene.add(this.moon)

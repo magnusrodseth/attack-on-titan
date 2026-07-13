@@ -21,7 +21,7 @@ import { BossFxView } from './render/bosses'
 import { bossForMilestone, bossPartCenter } from './sim/boss'
 import { nearestStationDist, raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
-import { LAMP_BATTERY_SECONDS, lampGlow, lampOn } from './sim/flashlight'
+import { LAMP_BATTERY_SECONDS, lampGlow, lampOn, lightAround } from './sim/flashlight'
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
@@ -1609,8 +1609,10 @@ renderer.setAnimationLoop(() => {
   updateSpearBeeps(dt)
   updateScenery(dt, camera)
   const clock = debug.clockOverride ?? gameClock(game)
+  // the beam is on a light meter, not a clock: torchlight and shafts keep it off
+  const light = lightAround(game.arena, game.player.pos.x, game.player.pos.y, game.player.pos.z, clock)
   dayNight.update(clock, camera)
-  flashlight.update(camera, game.phase === 'menu' ? 0 : lampGlow(clock, game.player.lamp), now)
+  flashlight.update(camera, game.phase === 'menu' ? 0 : lampGlow(light, game.player.lamp), now)
   blade.update(dt)
   effects.syncRopes(game.player, camera, dt)
   effects.update(dt, camera, game.player.vel)
@@ -1656,7 +1658,7 @@ renderer.setAnimationLoop(() => {
     raycastHookTarget(game.arena, game.player.pos, lookDir, game.player.config.hookRange) !== null
   const nearStation = nearestStationDist(game.arena, game.player.pos.x, game.player.pos.z) <= 10
   const lamp =
-    lampOn(clock) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
+    lampOn(light) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
   hud.update(game, { speed, nearStation, hookInRange, lamp })
 
   if (game.mode.id === 'hunt') {

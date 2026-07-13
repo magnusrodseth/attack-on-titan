@@ -7,7 +7,7 @@ import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
 import { stepSlashBuffer, trySlash } from './combat'
 import { clockFraction } from './daynight'
-import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp } from './flashlight'
+import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS, drainLamp, lightAround } from './flashlight'
 import type { GameMap } from './maps'
 import { DEFAULT_MAP_ID, getMap } from './maps'
 import type { HuntState } from './hunt'
@@ -925,15 +925,25 @@ function stepGrabHeld(g: GameState, input: InputState, dt: number): void {
  * Shared by the solo loop and the co-op client — the battery is a personal resource the
  * server never needs to see.
  */
-/** The run's day/night clock; maps may pin it (the Underground never sees the sun). */
+/** The run's day/night clock; a map may pin it (`GameMap.clockFraction`). */
 export function gameClock(g: GameState): number {
   return g.map.clockFraction ?? clockFraction(g.seed, g.time)
+}
+
+/**
+ * How lit the soldier's own patch of world is (0 black, 1 full day). The flashlight and
+ * the HUD both read the beam off this, so the lamp trips on darkness itself rather than
+ * on the hour: under the open sky that is the daylight, underground it is the torches and
+ * the holes in the rock.
+ */
+export function playerLight(g: GameState): number {
+  return lightAround(g.arena, g.player.pos.x, g.player.pos.y, g.player.pos.z, gameClock(g))
 }
 
 export function stepLamp(g: GameState, dt: number): void {
   const p = g.player
   const before = p.lamp
-  p.lamp = drainLamp(p.lamp, gameClock(g), dt)
+  p.lamp = drainLamp(p.lamp, playerLight(g), dt)
   if (before > LAMP_LOW_SECONDS && p.lamp <= LAMP_LOW_SECONDS && p.lamp > 0) {
     g.events.push({ type: 'lampLow' })
   }

@@ -141,6 +141,7 @@ Music (two tracks alternating in-game):
 - Canal water surface (dark color + ripple normal) from [TextureCan](https://www.texturecan.com/details/531/) (Rain Ripples on Puddle, CC0)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
 - Cloud billboards from "Clouds with Transparency" by WickedInsignia on [OpenGameArt](https://opengameart.org)
+- Torch flame sprite from the [Particle Pack](https://kenney.nl/assets/particle-pack) by Kenney (CC0)
 - Mountains from [KayKit Hexagons](https://github.com/KenneyNL/KayKit-Hexagons) by Kay Lousberg
 - Teammate recruit model (rigged + animated Rogue_Hooded) from [KayKit Character Pack: Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) by Kay Lousberg (CC0)
 - Night-sky star map from [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) — NASA/Goddard Space Flight Center Scientific Visualization Studio (public domain; Gaia DR2 data)

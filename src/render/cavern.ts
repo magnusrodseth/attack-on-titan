@@ -65,6 +65,9 @@ const RUFFLE = 0.75
 /** Real lights alive at once; every other fire is emissive geometry. */
 const LIGHT_POOL = 10
 const TORCH_HEIGHT = 3.1
+/** Billboard puffs per flame, and how fast one lives its life (slow: fire, not a strobe). */
+const FLAME_PUFFS = 3
+const FLAME_SPEED = 0.42
 const TORCH_INTENSITY = 90
 const SHAFT_INTENSITY = 950
 
@@ -205,6 +208,9 @@ class CavernLights {
   private readonly torchCount: number
   private readonly beams: { mat: MeshBasicMaterial; base: number }[] = []
   private readonly pools: { mat: MeshBasicMaterial; base: number }[] = []
+  private readonly caps: MeshBasicMaterial[] = []
+  private readonly capDay = new Color(0xffffff)
+  private readonly capNight = new Color(0x6d80a8)
   private readonly glowMat: PointsMaterial
   private readonly matrix = new Matrix4()
   private readonly quat = new Quaternion()
@@ -236,14 +242,22 @@ class CavernLights {
     const posts = new InstancedMesh(postGeo, woodMat, count)
     const cups = new InstancedMesh(cupGeo, ironMat, count)
 
-    // the flame: a small unlit teardrop that gutters (the FX/indicator exception). The
-    // halo below does the real work — the geometry is just the bright core inside it.
-    const flameGeo = new ConeGeometry(0.16, 0.62, 6)
-    flameGeo.translate(0, TORCH_HEIGHT + 0.62, 0)
+    // the flame: billboard puffs of fire, built the way the Colossus's steam aura is —
+    // sourced sprite, drifting slowly, no hard geometry. Three puffs rise, swell and fade
+    // through each torch on staggered phases, so the fire breathes instead of buzzing.
     this.fire = new InstancedMesh(
-      flameGeo,
-      new MeshBasicMaterial({ color: 0xffd07a, fog: false }),
-      count,
+      new PlaneGeometry(1, 1),
+      new MeshBasicMaterial({
+        // Kenney's particle sprites are white masks made to be tinted: this is the fire
+        map: tex('/textures/fire.png', 1, 1),
+        color: 0xff8324,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        blending: AdditiveBlending,
+        fog: false,
+      }),
+      count * FLAME_PUFFS,
     )
     this.fire.frustumCulled = false
 
@@ -272,7 +286,7 @@ class CavernLights {
     glowGeo.setAttribute('position', new BufferAttribute(glowPos, 3))
     this.glowMat = new PointsMaterial({
       map: glowTexture(),
-      size: 2.9,
+      size: 2.4,
       transparent: true,
       opacity: 0.85,
       blending: AdditiveBlending,
@@ -303,6 +317,40 @@ class CavernLights {
       beam.position.set(shaft.x, ceilY / 2, shaft.z)
       scene.add(beam)
       this.beams.push({ mat: beamMat, base: 0.05 })
+
+      // the surface, seen from below: a plate of blown-out white light capping the hole.
+      // Deliberately NOT the sky — no clouds, no stars, no weather; just the glare of a
+      // world you cannot reach. It dims to a cold sliver when the sun is down.
+      const capMat = new MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        fog: false,
+        side: DoubleSide,
+      })
+      // The plate hangs OVER the rock, not under it, and is far wider than the hole.
+      // Sight-lines through an opening leave it at every angle — a small plate tucked just
+      // inside the rim ducks out of view at a shallow angle and the hole reads as a black
+      // pit with a white lip. Wide and above, the opening is full of light from anywhere in
+      // the cavern, and the rock hides the plate's edges from everywhere else.
+      let highestRim = ceilY
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2
+        highestRim = Math.max(
+          highestRim,
+          ceilingHeightAt(
+            arena,
+            shaft.x + Math.cos(a) * shaft.radius,
+            shaft.z + Math.sin(a) * shaft.radius,
+          ),
+        )
+      }
+      const cap = new Mesh(new CircleGeometry(shaft.radius * 3, 32), capMat)
+      cap.rotation.x = Math.PI / 2 // faces down into the cavern
+      cap.position.set(shaft.x, highestRim + 1.2, shaft.z)
+      scene.add(cap)
+      this.caps.push(capMat)
 
       const poolMat = new MeshBasicMaterial({
         map: hazeTex,
@@ -339,6 +387,11 @@ class CavernLights {
     // the shafts blaze at noon and all but shut at midnight (a little moonlight stays)
     for (const beam of this.beams) beam.mat.opacity = beam.base * (0.12 + 0.88 * day)
     for (const p of this.pools) p.mat.opacity = p.base * (0.06 + 0.94 * day)
+    // white glare by day, a cold dim plate by night — never a picture of the sky
+    for (const cap of this.caps) {
+      cap.color.copy(this.capNight).lerp(this.capDay, day)
+      cap.opacity = 0.35 + 0.65 * day
+    }
     // fires read as fires against the dark; at noon they stop blowing out the frame
     this.glowMat.opacity = 0.42 + 0.48 * night
   }
@@ -347,16 +400,23 @@ class CavernLights {
     this.time += dt
     const day = 1 - this.night
 
-    // every flame gutters on its own rhythm
+    // the puffs face the camera, exactly as a Sprite would, but in one instanced draw
+    if (camera) this.quat.copy(camera.quaternion)
+
     for (let i = 0; i < this.torchCount; i++) {
       const src = this.sources[i]!
-      const flicker =
-        0.78 + 0.22 * Math.sin(this.time * 11 + src.phase) * Math.sin(this.time * 7.3 + src.phase * 2)
-      this.at.set(src.x, 0, src.z)
-      // the flame breathes taller than it does wide, the way fire does
-      this.scale.set(0.82 + flicker * 0.22, 0.75 + flicker * 0.6, 0.82 + flicker * 0.22)
-      this.matrix.compose(this.at, this.quat, this.scale)
-      this.fire.setMatrixAt(i, this.matrix)
+      for (let p = 0; p < FLAME_PUFFS; p++) {
+        // each puff walks its own slow 0..1 life: born in the cup, rising, swelling, gone
+        const life = (this.time * FLAME_SPEED + src.phase + p / FLAME_PUFFS) % 1
+        const rise = life * 0.62
+        const swell = 0.55 + life * 0.85
+        // it thins out as it climbs, so the flame tapers instead of ending in a wall
+        const fade = 1 - life * life
+        this.at.set(src.x, TORCH_HEIGHT + 0.3 + rise, src.z)
+        this.scale.set(swell * fade * 1.15, swell * (0.8 + fade * 0.7), 1)
+        this.matrix.compose(this.at, this.quat, this.scale)
+        this.fire.setMatrixAt(i * FLAME_PUFFS + p, this.matrix)
+      }
     }
     this.fire.instanceMatrix.needsUpdate = true
 

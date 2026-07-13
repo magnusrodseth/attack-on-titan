@@ -348,13 +348,13 @@ function placeTorches(arena: Arena, rng: () => number): void {
     torches.push({ x, z })
   }
 
+  // every OTHER crossroads, checkerboarded. A torch every few metres reads as a forest of
+  // poles rather than a lit street, and the unlit gaps between these are the point: that
+  // is where the dark lives, and where the lamp earns its keep.
   for (let i = -lines; i <= lines; i++) {
-    const line = i * BLOCK + nudge
     for (let j = -lines; j <= lines; j++) {
-      const cross = j * BLOCK + nudge
-      drop(line + kerb, cross + kerb) // the crossroads
-      drop(line + kerb, cross + BLOCK / 2) // mid-street, north-south
-      drop(line + BLOCK / 2, cross + kerb) // mid-street, east-west
+      if ((i + j) % 2 !== 0) continue
+      drop(i * BLOCK + nudge + kerb, j * BLOCK + nudge + kerb)
     }
   }
 
