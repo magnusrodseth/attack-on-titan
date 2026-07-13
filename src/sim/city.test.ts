@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import type { Arena, Building } from './city'
 import {
+  SHAFT_LIP,
   baseGroundY,
   ceilingHeightAt,
   clampToCeiling,
@@ -325,7 +326,7 @@ describe('cylinder buildings', () => {
 
 function cavernArena(): Arena {
   const arena = emptyArena()
-  arena.cavern = { centerY: 44, edgeY: 22, shafts: [] }
+  arena.cavern = { centerY: 44, edgeY: 22, shafts: [], torches: [] }
   arena.wallHeight = 22
   return arena
 }
@@ -363,6 +364,25 @@ describe('cavern ceiling', () => {
     expect(hit!.y).toBeCloseTo(44, 4) // straight up from above the roof: ceiling
     const roof = raycastHookTarget(arena, new Vector3(0, 5, 0.1), new Vector3(0, 1, 0), 90)
     expect(roof!.y).toBeLessThan(21) // under the roof: the gable catches it first
+  })
+
+  it('a shaft is a hole: no hook anchor in it, and a soldier may climb into the opening', () => {
+    const arena = cavernArena()
+    arena.cavern!.shafts.push({ x: 0, z: 0, radius: 12 })
+
+    // straight up through the middle of the opening: nothing to grab, only sky
+    expect(raycastHookTarget(arena, new Vector3(0, 10, 0), new Vector3(0, 1, 0), 90)).toBeNull()
+    // the rim is real stone and still catches
+    const rim = raycastHookTarget(arena, new Vector3(30, 10, 0), new Vector3(0, 1, 0), 90)
+    expect(rim).not.toBeNull()
+    expect(rim!.y).toBeCloseTo(ceilingHeightAt(arena, 30, 0), 4)
+
+    // and the climb: under the opening you may rise a body's length past the rock line
+    const pos = new Vector3(0, 60, 0)
+    const vel = new Vector3(0, 5, 0)
+    clampToCeiling(arena, pos, vel, 1)
+    expect(pos.y).toBeCloseTo(ceilingHeightAt(arena, 0, 0) + SHAFT_LIP - 1, 6)
+    expect(vel.y).toBe(0)
   })
 
   it('clampToCeiling keeps the soldier under the rock and kills upward velocity', () => {

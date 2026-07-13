@@ -33,6 +33,23 @@ const HEMI_SKY_NIGHT = new Color(0x45557c)
 const HEMI_GROUND_DAY = new Color(0x8a7a63)
 const HEMI_GROUND_NIGHT = new Color(0x3c3a45)
 
+// Underground: the same sky, sun, moon and stars overhead — but seen from inside a cavern,
+// through holes worn in the rock. So the sky machinery is untouched and only what the ROCK
+// does to the light changes: the air below is dim and close, ambient is a fraction of the
+// surface's, and the sun is a rumour rather than a lamp. Daylight still swells the cave, so
+// the hour reads down here and the flashlight stays a night tool.
+const CAVE_FOG_DAY = new Color(0x1c1a18)
+const CAVE_FOG_NIGHT = new Color(0x05060a)
+const CAVE_HEMI_SKY_DAY = new Color(0x8d9bb4)
+const CAVE_HEMI_SKY_NIGHT = new Color(0x2b3346)
+const CAVE_HEMI_GROUND_DAY = new Color(0x6b5a44)
+const CAVE_HEMI_GROUND_NIGHT = new Color(0x2a2620)
+
+export interface SkyOptions {
+  /** Grade for a roofed world: dark close fog, weak ambient, a sun that cannot get in. */
+  underground?: boolean
+}
+
 const smooth = (x: number): number => {
   const t = Math.min(1, Math.max(0, x))
   return t * t * (3 - 2 * t)
@@ -62,8 +79,10 @@ export class DayNightSky {
   // an unloaded texture renders solid black, which would blot out the twilight sky
   private starsReady = false
   private moonReady = false
+  private readonly underground: boolean
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, options: SkyOptions = {}) {
+    this.underground = options.underground ?? false
     this.fog = new Fog(FOG_DAY.clone(), 70, 620)
     scene.fog = this.fog
     scene.background = this.background
@@ -166,14 +185,27 @@ export class DayNightSky {
       this.celestial.intensity = Math.max(0.02, 0.95 * moonStrength)
     }
 
-    this.hemi.color.copy(HEMI_SKY_DAY).lerp(HEMI_SKY_NIGHT, night)
-    this.hemi.groundColor.copy(HEMI_GROUND_DAY).lerp(HEMI_GROUND_NIGHT, night)
-    this.hemi.intensity = 1.1 - 0.42 * night
+    if (this.underground) {
+      // rock over your head: the sun never lands on you, it only leaks in. Ambient swells
+      // with the day so noon in the cavern is dim-but-readable and midnight is black.
+      this.hemi.color.copy(CAVE_HEMI_SKY_DAY).lerp(CAVE_HEMI_SKY_NIGHT, night)
+      this.hemi.groundColor.copy(CAVE_HEMI_GROUND_DAY).lerp(CAVE_HEMI_GROUND_NIGHT, night)
+      this.hemi.intensity = 0.95 - 0.55 * night
+      this.celestial.intensity *= 0.12
+      this.fog.color.copy(CAVE_FOG_DAY).lerp(CAVE_FOG_NIGHT, night)
+      this.fog.near = 24
+      this.fog.far = 330 - 60 * night
+      this.background.copy(CAVE_FOG_NIGHT) // the void beyond the rock, at every hour
+    } else {
+      this.hemi.color.copy(HEMI_SKY_DAY).lerp(HEMI_SKY_NIGHT, night)
+      this.hemi.groundColor.copy(HEMI_GROUND_DAY).lerp(HEMI_GROUND_NIGHT, night)
+      this.hemi.intensity = 1.1 - 0.42 * night
 
-    this.fog.color.copy(FOG_DAY).lerp(FOG_NIGHT, night).lerp(FOG_DUSK, dusk * 0.65)
-    this.fog.near = 70 - 15 * night
-    this.fog.far = 460 - 50 * night
-    this.background.copy(this.fog.color)
+      this.fog.color.copy(FOG_DAY).lerp(FOG_NIGHT, night).lerp(FOG_DUSK, dusk * 0.65)
+      this.fog.near = 70 - 15 * night
+      this.fog.far = 460 - 50 * night
+      this.background.copy(this.fog.color)
+    }
 
     // stars and moon ride with the camera so the domes never clip the far plane
     this.stars.position.copy(camera.position)

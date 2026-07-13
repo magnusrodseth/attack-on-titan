@@ -33,7 +33,7 @@ import type { Arena, Building } from '../sim/city'
 import { baseGroundY, eaveHeight, groundHeightAt } from '../sim/city'
 import { BLOCK } from '../sim/citygen'
 import { createRng } from '../sim/rng'
-import { CavernAmbience, addCavern, addCavernGround } from './cavern'
+import { addCavern, addCavernGround } from './cavern'
 import { DayNightSky } from './daynight'
 
 const loader = new TextureLoader()
@@ -90,17 +90,21 @@ export function buildScene(arena: Arena): BuiltScene {
   const scene = new Scene()
 
   if (arena.cavern) {
-    // the Underground: same housing/props/station set under a rock dome — no sky, no
-    // canal, no scenery beyond the wall (the black fog owns everything distant)
-    const ambience = new CavernAmbience(scene)
+    // the Underground: the same housing/props/station set under a rock dome, and the same
+    // sky above it — the dome is cut open at every shaft, so the sun, moon and stars all
+    // show through the holes and the hour reads down here. Only the rock's grade differs:
+    // dim close air, weak ambient, no direct sun. No canal, no scenery beyond the wall.
+    const dayNight = new DayNightSky(scene, { underground: true })
     addCavernGround(scene, arena)
-    ambience.onNight(addHousing(scene, arena))
+    dayNight.onNight(addHousing(scene, arena))
     addLandmarks(scene, arena)
     addProps(scene, arena)
     addBanners(scene, arena)
-    addCavern(scene, arena)
     addStation(scene, arena)
-    return { scene, updateScenery: () => {}, dayNight: ambience }
+
+    const cavern = addCavern(scene, arena)
+    dayNight.onNight(cavern.setNight)
+    return { scene, updateScenery: cavern.update, dayNight }
   }
 
   const dayNight = new DayNightSky(scene)

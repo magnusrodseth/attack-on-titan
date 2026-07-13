@@ -26,7 +26,31 @@ describe('generateUnderground', () => {
     expect(arena.cavern!.centerY).toBe(UG_CEILING_CENTER_Y)
     expect(arena.wallHeight).toBe(UG_CEILING_EDGE_Y)
     expect(arena.wallRadius).toBe(UG_WALL_RADIUS)
-    expect(arena.cavern!.shafts.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('opens many holes to the sky, none of them plugged by a pillar', () => {
+    const shafts = arena.cavern!.shafts
+    expect(shafts.length).toBeGreaterThanOrEqual(6)
+    const pillars = arena.buildings.filter((b) => b.kind === 'pillar')
+    for (const s of shafts) {
+      expect(s.radius).toBeGreaterThan(3)
+      expect(Math.hypot(s.x, s.z)).toBeLessThan(UG_WALL_RADIUS)
+      // a pillar rises floor-to-ceiling: one standing in an opening would cork it
+      for (const p of pillars) {
+        expect(Math.hypot(p.x - s.x, p.z - s.z)).toBeGreaterThan(p.w / 2 + s.radius)
+      }
+    }
+  })
+
+  it('lines the streets with torches, all on open ground', () => {
+    const torches = arena.cavern!.torches
+    expect(torches.length).toBeGreaterThan(60)
+    for (const t of torches) {
+      expect(insideBuildingXZ(arena, t.x, t.z, 1)).toBe(false)
+      expect(Math.hypot(t.x, t.z)).toBeLessThan(UG_WALL_RADIUS)
+    }
+    // they reach the far bowl, not just the plaza: light the whole run, not the spawn
+    expect(torches.some((t) => Math.hypot(t.x, t.z) > UG_WALL_RADIUS * 0.7)).toBe(true)
   })
 
   it('keeps every roof under the rock and pillars exactly on it', () => {
@@ -96,8 +120,8 @@ describe('map registry', () => {
     expect(mapScopedSeed('underground', 'wall-2026-7-13')).toBe('underground:wall-2026-7-13')
   })
 
-  it('pins the underground clock to permanent night', () => {
-    expect(getMap('underground').clockFraction).toBe(0)
+  it('leaves both maps on the seeded day/night cycle (the shafts let the sky in)', () => {
+    expect(getMap('underground').clockFraction).toBeNull()
     expect(getMap('district').clockFraction).toBeNull()
   })
 })

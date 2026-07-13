@@ -36,9 +36,11 @@ export const GAME_MAPS: GameMap[] = [
   {
     id: 'underground',
     name: 'The Underground',
-    desc: 'The cavern city beneath the capital — lamplit streets, rock pillars, and a ceiling to swing from.',
+    desc: 'The cavern city beneath the capital — torchlit streets, rock pillars, and a ceiling to swing from. Daylight falls through holes worn in the rock.',
     modes: ['race'],
-    clockFraction: 0, // midnight forever: the cavern never sees the sun
+    // the shafts are open to the surface, so the cavern keeps the seeded day/night cycle:
+    // sun through the holes by day, stars by night, torches burning through both
+    clockFraction: null,
     generate: generateUnderground,
   },
 ]

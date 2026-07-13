@@ -111,8 +111,13 @@ export interface CanalSpec {
 export interface CavernSpec {
   centerY: number
   edgeY: number
-  /** Surface openings pouring light shafts: landmarks for the renderer and course. */
+  /**
+   * Holes in the rock, open to the surface: real sky is visible through them, so the
+   * cavern keeps the day/night cycle. Landmarks for the renderer and the course.
+   */
   shafts: { x: number; z: number; radius: number }[]
+  /** Street torches: the light the Underground lives by. Render/light data only. */
+  torches: { x: number; z: number }[]
 }
 
 export interface Arena {
@@ -151,10 +156,25 @@ export function ceilingHeightAt(arena: Arena, x: number, z: number): number {
   return cavern.edgeY + (cavern.centerY - cavern.edgeY) * Math.max(0, 1 - r2)
 }
 
-/** Keeps airborne soldiers out of the cavern rock; a no-op under an open sky. */
+/** True inside one of the holes worn through to the surface — where there is no rock. */
+export function inShaft(arena: Arena, x: number, z: number): boolean {
+  const cavern = arena.cavern
+  if (!cavern) return false
+  return cavern.shafts.some((s) => Math.hypot(s.x - x, s.z - z) < s.radius)
+}
+
+/** How far up into an opening a soldier may climb before the surface stops them. */
+export const SHAFT_LIP = 8
+
+/**
+ * Keeps airborne soldiers out of the cavern rock; a no-op under an open sky. There is no
+ * rock in a shaft, so the rule follows the geometry: rise into the opening and you may go
+ * on up, far enough to put your head out and see the sky, and no further.
+ */
 export function clampToCeiling(arena: Arena, pos: Vector3, vel: Vector3, margin: number): void {
   if (!arena.cavern) return
-  const limit = ceilingHeightAt(arena, pos.x, pos.z) - margin
+  const rock = ceilingHeightAt(arena, pos.x, pos.z)
+  const limit = (inShaft(arena, pos.x, pos.z) ? rock + SHAFT_LIP : rock) - margin
   if (pos.y <= limit) return
   pos.y = limit
   if (vel.y > 0) vel.y = 0
@@ -186,7 +206,11 @@ function rayVsCeiling(arena: Arena, origin: Vector3, dir: Vector3): number | nul
     if (t <= 0.01) continue
     const x = origin.x + dir.x * t
     const z = origin.z + dir.z * t
-    if (Math.hypot(x, z) <= R + 1e-6) return t
+    if (Math.hypot(x, z) > R + 1e-6) continue
+    // a hook fired at an opening finds no rock: it flies out at the sky and comes back
+    // empty. The rim around the hole is real stone and still catches.
+    if (inShaft(arena, x, z)) continue
+    return t
   }
   return null
 }

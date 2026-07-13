@@ -29,6 +29,10 @@ const CEILING_CLEARANCE = 5
 const PILLAR_COUNT = 14
 const STALACTITE_COUNT = 10
 const TOWER_COUNT = 9
+/** Holes in the rock, open to the sky (the stairway's great opening is the first). */
+const SHAFT_COUNT = 9
+/** Metres between street torches: close enough that their pools very nearly touch. */
+const TORCH_SPACING = 26
 
 /** Deterministic lattice hash in [0, 1) (same construction as citygen's). */
 function hash2(ix: number, iz: number, seed: number): number {
@@ -62,7 +66,7 @@ export function generateUnderground(seed: string): Arena {
     plazaRadius: UG_PLAZA_RADIUS,
     stations: [new Vector3(0, 0, 0)],
     canal: null,
-    cavern: { centerY: UG_CEILING_CENTER_Y, edgeY: UG_CEILING_EDGE_Y, shafts: [] },
+    cavern: { centerY: UG_CEILING_CENTER_Y, edgeY: UG_CEILING_EDGE_Y, shafts: [], torches: [] },
     gateAngle: 0,
   }
 
@@ -93,6 +97,8 @@ export function generateUnderground(seed: string): Arena {
   placePillars(arena, createRng(hashSeed(`${seed}:ug:pillars`)))
   placeStalactites(arena, createRng(hashSeed(`${seed}:ug:stalactites`)))
   placeStairway(arena, createRng(hashSeed(`${seed}:ug:stairway`)))
+  placeShafts(arena, createRng(hashSeed(`${seed}:ug:shafts`)))
+  placeTorches(arena, createRng(hashSeed(`${seed}:ug:torches`)))
   placeStations(arena, createRng(hashSeed(`${seed}:ug:stations`)))
   return arena
 }
@@ -294,13 +300,69 @@ function placeStairway(arena: Arena, rng: () => number): void {
       tint: 0.5,
     })
   }
-  arena.cavern!.shafts.push({ x, z, radius: 13 })
-  // a second, smaller opening over the plaza edge: the birds-over-the-sewer-grate beam
-  arena.cavern!.shafts.push({
-    x: Math.cos(angle + 2.5) * 34,
-    z: Math.sin(angle + 2.5) * 34,
-    radius: 8,
-  })
+  // the great opening: the widest hole in the rock, straight over the stair head
+  arena.cavern!.shafts.push({ x, z, radius: 14 })
+}
+
+/**
+ * Holes worn through the rock to the surface. Real sky shows through them (the renderer
+ * cuts the dome open), so the Underground keeps the day/night cycle: sun by day, stars by
+ * night, and enough spill that the soldier is not permanently reliant on the lamp. They
+ * keep clear of the pillars, which run floor-to-ceiling and would plug an opening.
+ */
+function placeShafts(arena: Arena, rng: () => number): void {
+  const pillars = arena.buildings.filter((b) => b.kind === 'pillar')
+  const shafts = arena.cavern!.shafts
+  let guard = 0
+  while (shafts.length < SHAFT_COUNT && guard++ < 400) {
+    const angle = rng() * Math.PI * 2
+    const r = Math.sqrt(rng()) * (UG_WALL_RADIUS - 55)
+    const x = Math.cos(angle) * r
+    const z = Math.sin(angle) * r
+    const radius = 6 + rng() * 7
+    // openings never crowd each other, and never land on a pillar's head
+    if (shafts.some((s) => Math.hypot(s.x - x, s.z - z) < s.radius + radius + 55)) continue
+    if (pillars.some((p) => Math.hypot(p.x - x, p.z - z) < p.w / 2 + radius + 6)) continue
+    shafts.push({ x, z, radius })
+  }
+}
+
+/**
+ * Flaming street torches on posts: the light the Underground actually lives by, and the
+ * reason a soldier can run these streets without the lamp. They follow the ROAD net — the
+ * block grid's street lines, which run at multiples of BLOCK — dropping a torch at each
+ * crossing and again mid-street, always shouldered against the kerb rather than planted in
+ * the middle of the road. Anything that lands in a wall is skipped.
+ */
+function placeTorches(arena: Arena, rng: () => number): void {
+  const torches = arena.cavern!.torches
+  const kerb = 2.3 // stand them at the roadside, out of the running line
+  const reach = UG_WALL_RADIUS - 16
+  const lines = Math.floor(reach / BLOCK)
+  const nudge = rng() * 0.6 - 0.3 // one seeded shove so the grid never looks stamped
+
+  const drop = (x: number, z: number): void => {
+    if (Math.hypot(x, z) > reach) return
+    if (insideBuildingXZ(arena, x, z, 1.3)) return
+    if (torches.some((t) => Math.hypot(t.x - x, t.z - z) < TORCH_SPACING * 0.55)) return
+    torches.push({ x, z })
+  }
+
+  for (let i = -lines; i <= lines; i++) {
+    const line = i * BLOCK + nudge
+    for (let j = -lines; j <= lines; j++) {
+      const cross = j * BLOCK + nudge
+      drop(line + kerb, cross + kerb) // the crossroads
+      drop(line + kerb, cross + BLOCK / 2) // mid-street, north-south
+      drop(line + BLOCK / 2, cross + kerb) // mid-street, east-west
+    }
+  }
+
+  // braziers ringing the plaza: the one fire the whole bowl can see
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2
+    drop(Math.cos(angle) * (UG_PLAZA_RADIUS - 4), Math.sin(angle) * (UG_PLAZA_RADIUS - 4))
+  }
 }
 
 /** The plaza station plus two out in the bowl, each snapped onto open ground. */
