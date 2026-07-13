@@ -99,8 +99,8 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   let recruitN = 0
   const dummies = new Map<string, RemoteSoldier>()
   const figures: FootballerFigure[] = []
-  const beasts: Object3D[] = []
-  let beastGltf: Promise<GLTF> | null = null
+  const glbStatues: Object3D[] = []
+  const glbCache = new Map<string, Promise<GLTF>>()
   const styles: Record<FigureKind, Record<string, string>> = {
     striker: { ...KIT_DEFAULTS.striker },
     captain: { ...KIT_DEFAULTS.captain },
@@ -153,18 +153,22 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     figures.push(figure)
   }
 
-  /** The Blender-loop Beast Titan statue (blender/build.py → public/models/beast-titan.glb). */
-  function spawnBeast(x: number, z: number, facing: number): void {
-    beastGltf ??= new GLTFLoader().loadAsync('/models/beast-titan.glb')
-    void beastGltf.then((gltf) => {
-      const beast = gltf.scene.clone(true)
-      beast.traverse((obj) => {
+  /** Blender-loop titan statues (blender/titans/<slug>/build.py → public/models/<slug>-titan.glb). */
+  function spawnTitanGlb(slug: string, x: number, z: number, facing: number): void {
+    let gltf = glbCache.get(slug)
+    if (!gltf) {
+      gltf = new GLTFLoader().loadAsync(`/models/${slug}-titan.glb`)
+      glbCache.set(slug, gltf)
+    }
+    void gltf.then((loaded) => {
+      const statue = loaded.scene.clone(true)
+      statue.traverse((obj) => {
         if ((obj as Mesh).isMesh) obj.castShadow = obj.receiveShadow = true
       })
-      beast.position.set(x, 0, z)
-      beast.rotation.y = facing
-      scene.add(beast)
-      beasts.push(beast)
+      statue.position.set(x, 0, z)
+      statue.rotation.y = facing
+      scene.add(statue)
+      glbStatues.push(statue)
     })
   }
 
@@ -174,8 +178,8 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     recruitN = 0
     for (const figure of figures) figure.dispose(scene)
     figures.length = 0
-    for (const beast of beasts) scene.remove(beast)
-    beasts.length = 0
+    for (const statue of glbStatues) scene.remove(statue)
+    glbStatues.length = 0
   }
 
   /** One of everything on the plaza, facing the muster point; player teleported to it. */
@@ -189,7 +193,15 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     spawnDummy(3, -12, face(3, -12))
     spawnFigure('striker', 9, -18, face(9, -18))
     spawnFigure('captain', 17, -16, face(17, -16))
-    spawnBeast(-26, -30, face(-26, -30))
+    spawnTitanGlb('beast', -26, -30, face(-26, -30))
+    spawnTitanGlb('founding', -34, -38, face(-34, -38))
+    spawnTitanGlb('attack', -14, -34, face(-14, -34))
+    spawnTitanGlb('cart', -6, -24, face(-6, -24))
+    spawnTitanGlb('jaw', 6, -24, face(6, -24))
+    spawnTitanGlb('armored', 14, -34, face(14, -34))
+    spawnTitanGlb('female', 24, -30, face(24, -30))
+    spawnTitanGlb('warhammer', 32, -38, face(32, -38))
+    spawnTitanGlb('colossus', 0, -110, face(0, -110)) // looms behind the lineup
     game.player.pos.set(viewer.x, EYE_HEIGHT + 1, viewer.z)
     game.player.vel.set(0, 0, 0)
     ctx.setView(0, 0.14)
@@ -214,7 +226,18 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
         <button data-spawn="soldier">Soldier</button>
         <button data-spawn="striker">Striker</button>
         <button data-spawn="captain">Captain</button>
-        <button data-spawn="beast">Beast</button>
+      </div>
+      <div class="dv-label">Blender titan statues</div>
+      <div class="dv-row">
+        <button data-glb="beast">Beast</button>
+        <button data-glb="attack">Attack</button>
+        <button data-glb="armored">Armored</button>
+        <button data-glb="female">Female</button>
+        <button data-glb="colossus">Colossus</button>
+        <button data-glb="jaw">Jaw</button>
+        <button data-glb="cart">Cart</button>
+        <button data-glb="warhammer">War Hammer</button>
+        <button data-glb="founding">Founding</button>
       </div>
       <div class="dv-row">
         <button id="dv-lineup">Muster the Lineup</button>
@@ -293,13 +316,17 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       } else if (what === 'soldier') {
         const { x, z, faceBack } = spotAhead(9)
         spawnDummy(x, z, faceBack)
-      } else if (what === 'beast') {
-        const { x, z, faceBack } = spotAhead(34)
-        spawnBeast(x, z, faceBack)
       } else {
         const { x, z, faceBack } = spotAhead(26)
         spawnFigure(what as FigureKind, x, z, faceBack)
       }
+    })
+  }
+  for (const btn of drawer.querySelectorAll<HTMLButtonElement>('[data-glb]')) {
+    btn.addEventListener('click', () => {
+      const slug = btn.dataset.glb!
+      const { x, z, faceBack } = spotAhead(slug === 'colossus' ? 100 : 34)
+      spawnTitanGlb(slug, x, z, faceBack)
     })
   }
   q<HTMLButtonElement>('#dv-lineup').addEventListener('click', musterLineup)
@@ -472,7 +499,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       for (const titan of game.titans) titan.facing += dt * 0.4
       for (const figure of figures) figure.group.rotation.y += dt * 0.4
       for (const dummy of dummies.values()) dummy.yaw += dt * 0.4
-      for (const beast of beasts) beast.rotation.y += dt * 0.4
+      for (const statue of glbStatues) statue.rotation.y += dt * 0.4
     }
     // after the turntable spin so the nape/ankle volumes track facing without a frame of lag
     hitboxes.sync(

@@ -27,3 +27,5 @@ server/.wrangler/
 # blender demo: copyrighted reference images + save backups stay local
 blender/ref/
 blender/*.blend1
+__pycache__/
+*.blend1
