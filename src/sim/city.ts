@@ -24,6 +24,10 @@ export type BuildingKind =
   | 'cart'
   | 'pillar' // cavern rock column, floor to ceiling (cylinder)
   | 'stalactite' // hanging cavern rock, y0 well above the streets (cylinder)
+  | 'trunk' // giant tree, 80m of cliff-face bark (cylinder)
+  | 'branch' // thick limb off a giant: a standable platform high in the air (y0 > 0)
+  | 'sapling' // ordinary tree between the giants — the underbrush that sells the scale
+  | 'cabin' // abandoned tourist-era hut at the forest edge
 
 export interface Building {
   x: number
@@ -63,6 +67,10 @@ export const ROOF_SHAPE: Record<BuildingKind, RoofShape> = {
   cart: 'flat',
   pillar: 'flat',
   stalactite: 'flat',
+  trunk: 'flat',
+  branch: 'flat',
+  sapling: 'flat',
+  cabin: 'gable',
 }
 
 /**
@@ -86,6 +94,10 @@ export const EAVE_FRACTION: Record<BuildingKind, number> = {
   cart: 1,
   pillar: 1,
   stalactite: 1,
+  trunk: 1,
+  branch: 1,
+  sapling: 1,
+  cabin: 0.68,
 }
 
 export function eaveHeight(b: Building): number {
@@ -120,6 +132,19 @@ export interface CavernSpec {
   torches: { x: number; z: number }[]
 }
 
+/**
+ * The Forest of Giant Trees. The giants are `trunk` buildings and their limbs are
+ * `branch` platforms; this only carries what the whole arena needs to know about itself —
+ * chiefly the canopy height, which is what re-bands the course's gate tiers from
+ * street/canyon/rooftop into floor/trunk/canopy.
+ */
+export interface ForestSpec {
+  /** Nominal height of the crowns: the ceiling of the playable envelope. */
+  canopyY: number
+  /** The clearing the run starts in, and the light shafts that fall through the crowns. */
+  rays: { x: number; z: number; radius: number }[]
+}
+
 export interface Arena {
   buildings: Building[]
   wallRadius: number
@@ -129,6 +154,7 @@ export interface Arena {
   stations: Vector3[]
   canal: CanalSpec | null
   cavern: CavernSpec | null
+  forest: ForestSpec | null
   /** Wall angle (radians, +X = 0) of the sealed main gate; bastions hold the other cardinals. */
   gateAngle: number
   /** Broadphase over buildings; rebuilt lazily whenever buildings.length changes. */
@@ -144,6 +170,7 @@ export function emptyArena(): Arena {
     stations: [new Vector3(0, 0, 0)],
     canal: null,
     cavern: null,
+    forest: null,
     gateAngle: 0,
   }
 }

@@ -46,6 +46,22 @@ export const GATE_TIERS: Record<GateTier, { minY: number; maxY: number; radius: 
   rooftop: { minY: 18, maxY: 26, radius: 6 },
 }
 
+/**
+ * Under the giants the same three tiers re-band entirely: floor, trunk, canopy. The forest's
+ * vertical envelope is triple the city's (the crowns sit around 72 m against the district's
+ * 26 m rooftops), and a course that ignored that would be a city course laid on grass. The
+ * rings are wider up top, where you arrive fast and off a long swing.
+ */
+export const FOREST_TIERS: Record<GateTier, { minY: number; maxY: number; radius: number }> = {
+  street: { minY: 4, maxY: 8, radius: 4.5 }, // the fern floor
+  canyon: { minY: 20, maxY: 38, radius: 6 }, // mid-trunk, in among the limbs
+  rooftop: { minY: 50, maxY: 66, radius: 7.5 }, // the crown
+}
+
+export function tiersFor(arena: Arena): Record<GateTier, { minY: number; maxY: number; radius: number }> {
+  return arena.forest ? FOREST_TIERS : GATE_TIERS
+}
+
 /** Tallest roof sampled around a point; 0 over open squares and the canal. */
 function localSkyline(arena: Arena, x: number, z: number): number {
   let top = 0
@@ -69,7 +85,10 @@ function gateHeight(
   z: number,
   roll: number,
 ): number {
-  const band = GATE_TIERS[tier]
+  const band = tiersFor(arena)[tier]
+  // in the forest the bands are absolute heights, not skyline-derived: the "local skyline"
+  // beside a giant IS the giant, and reading it would hang every ring inside the bark
+  if (arena.forest) return band.minY + roll * (band.maxY - band.minY)
   if (tier === 'street') return band.minY + roll * (band.maxY - band.minY)
   // clamp to the house/warehouse band: gates hug rooftops, never tower spires
   const roof = Math.min(localSkyline(arena, x, z), 32)
@@ -202,7 +221,7 @@ function generateCourseRound(streamSeed: string, arena: Arena, nav: NavGrid): Co
       if (penalty === 0) break
     }
     const tier = tiers[i]!
-    const band = GATE_TIERS[tier]
+    const band = tiersFor(arena)[tier]
     let y = gateHeight(arena, tier, x, z, vertical())
     // under a cavern the vertical bands bow with the dome: rings never hang in the rock
     const ceiling = ceilingHeightAt(arena, x, z)

@@ -67,6 +67,7 @@ export function generateUnderground(seed: string): Arena {
     stations: [new Vector3(0, 0, 0)],
     canal: null,
     cavern: { centerY: UG_CEILING_CENTER_Y, edgeY: UG_CEILING_EDGE_Y, shafts: [], torches: [] },
+    forest: null,
     gateAngle: 0,
   }
 

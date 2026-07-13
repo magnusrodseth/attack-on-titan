@@ -34,6 +34,7 @@ import { baseGroundY, eaveHeight, groundHeightAt } from '../sim/city'
 import { BLOCK } from '../sim/citygen'
 import { createRng } from '../sim/rng'
 import { addCavern, addCavernGround } from './cavern'
+import { addForest, addTreeline } from './forest'
 import { DayNightSky } from './daynight'
 
 const loader = new TextureLoader()
@@ -105,6 +106,17 @@ export function buildScene(arena: Arena): BuiltScene {
     const cavern = addCavern(scene, arena)
     dayNight.onNight(cavern.setNight)
     return { scene, updateScenery: cavern.update, dayNight }
+  }
+
+  if (arena.forest) {
+    // the Forest of Giant Trees: an open sky over a closed world. No city set at all —
+    // the trunks, their limbs and the mid-story ARE the level, and the treeline is the wall.
+    const dayNight = new DayNightSky(scene, { forest: true })
+    const forest = addForest(scene, arena)
+    dayNight.onNight(forest.setNight)
+    addTreeline(scene, arena)
+    addStation(scene, arena)
+    return { scene, updateScenery: () => {}, dayNight }
   }
 
   const dayNight = new DayNightSky(scene)

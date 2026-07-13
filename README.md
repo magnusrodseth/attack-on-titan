@@ -135,6 +135,7 @@ Music (two tracks alternating in-game):
 
 - Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)
 - Underground cavern rock ([Rock 08](https://polyhaven.com/a/rock_08)) and cave floor dirt ([Gravel Ground 01](https://polyhaven.com/a/gravel_ground_01)) from [Poly Haven](https://polyhaven.com/textures) (both CC0)
+- Forest of Giant Trees: giant-tree bark ([Japanese Cedar Bark](https://polyhaven.com/a/japanese_cedar_bark) — the sugi the anime's groves are drawn from), mid-story bark ([Bark Brown 02](https://polyhaven.com/a/bark_brown_02)), forest floor ([Forest Ground 06](https://polyhaven.com/a/forest_ground_06)) and clearing grass ([Leafy Grass](https://polyhaven.com/a/leafy_grass)) from [Poly Haven](https://polyhaven.com/textures) (all CC0)
 - Brushed-steel blade texture from [ambientCG](https://ambientcg.com/view?id=Metal012) (Metal012, CC0)
 - Galvanized steel wire rope (ODM cables) and brushed grapple-hook steel from [ambientCG](https://ambientcg.com): [Rope002](https://ambientcg.com/view?id=Rope002), [Metal011](https://ambientcg.com/view?id=Metal011) (both CC0)
 - Weathered wood planks (market stalls, carts, bridge walkways, doors, the sealed gate) from [Poly Haven](https://polyhaven.com/a/weathered_planks) (Weathered Planks, CC0)

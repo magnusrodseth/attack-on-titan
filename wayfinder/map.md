@@ -75,6 +75,24 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
   seam, giving the flashlight and Lights Out a home arena. Menu gets a registry-driven Map picker
   beside Game Mode, shown only where a mode offers a choice. Look spec + references graduated from
   IDEAS.md; the Forest of Giant Trees stays there as the next archetype (it reuses all of this).
+- The Forest of Giant Trees (user request, 2026-07-13, shipped): the third arena, and the one
+  that proved the map registry was the right seam — it needed no change to the selector, the
+  `?map=` param, the run-save guard or the trial scoping. `src/sim/forestgen.ts` grows ~95 giants
+  (62-88 m, canon 80) as cylinder solids with buttress flares, ~270 `branch` limbs, ~520 mid-story
+  trees and the abandoned tourist cabins at the clearing. The read is SCALE: the ordinary trees
+  between the giants are the bushes that prove the 80 m. New sim geometry: `branch` is a standable
+  one-way platform (it needed nothing new — `deck` semantics via `y0` already gave it, and nav
+  already skips anything above 12 m), and `Arena.forest` re-bands the course's gate tiers from
+  street/canyon/rooftop into **floor/trunk/canopy** (`FOREST_TIERS`, 4-8 / 20-38 / 50-66 m), because
+  a "local skyline" beside an 80 m trunk IS the trunk and would hang every ring inside the bark.
+  Trunks stand 30 m apart against the 90 m hook range: the Tarzan-chain between giants is the
+  movement identity. Render (`src/render/forest.ts`) is instanced throughout — trunks, buttresses,
+  crown blob-clusters, umbrella pads, limbs, saplings, ferns — with a green fog grade on
+  `DayNightSky({ forest: true })`. Lesson worth keeping: foliage and limbs are seen from BELOW with
+  the sun behind them, so every leaf and bark material needs an emissive floor or the canopy renders
+  as black boulders. Textures: Japanese Cedar (sugi) bark for the giants — the tree the anime's
+  groves are actually drawn from — plus Bark Brown 02, Forest Ground 06 and Leafy Grass, all CC0
+  Poly Haven, credited. Race-only for now, like the Underground.
 
 ## Not yet specified
 

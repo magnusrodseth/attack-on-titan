@@ -45,9 +45,21 @@ const CAVE_HEMI_SKY_NIGHT = new Color(0x2b3346)
 const CAVE_HEMI_GROUND_DAY = new Color(0x6b5a44)
 const CAVE_HEMI_GROUND_NIGHT = new Color(0x2a2620)
 
+// Forest: an open sky, but you are under 80 m of canopy. The air is green and close, the
+// distance closes fast (which is also what keeps the trunk count affordable), and the sun
+// is filtered rather than blocked.
+const WOOD_FOG_DAY = new Color(0x7f9270)
+const WOOD_FOG_NIGHT = new Color(0x18201f)
+const WOOD_HEMI_SKY_DAY = new Color(0xcfe0b4)
+const WOOD_HEMI_SKY_NIGHT = new Color(0x44536b)
+const WOOD_HEMI_GROUND_DAY = new Color(0x6d6f4a)
+const WOOD_HEMI_GROUND_NIGHT = new Color(0x2b2f30)
+
 export interface SkyOptions {
   /** Grade for a roofed world: dark close fog, weak ambient, a sun that cannot get in. */
   underground?: boolean
+  /** Grade for the Forest: green close air, filtered sun, a horizon that dies at 300 m. */
+  forest?: boolean
 }
 
 const smooth = (x: number): number => {
@@ -80,9 +92,11 @@ export class DayNightSky {
   private starsReady = false
   private moonReady = false
   private readonly underground: boolean
+  private readonly forest: boolean
 
   constructor(scene: Scene, options: SkyOptions = {}) {
     this.underground = options.underground ?? false
+    this.forest = options.forest ?? false
     this.fog = new Fog(FOG_DAY.clone(), 70, 620)
     scene.fog = this.fog
     scene.background = this.background
@@ -201,6 +215,17 @@ export class DayNightSky {
       this.fog.near = 24
       this.fog.far = 330 - 60 * night
       this.background.copy(CAVE_FOG_NIGHT) // the void beyond the rock, at every hour
+    } else if (this.forest) {
+      // under the crowns: green air, a filtered sun, and a mid-story that closes at 300 m
+      this.hemi.color.copy(WOOD_HEMI_SKY_DAY).lerp(WOOD_HEMI_SKY_NIGHT, night)
+      this.hemi.groundColor.copy(WOOD_HEMI_GROUND_DAY).lerp(WOOD_HEMI_GROUND_NIGHT, night)
+      // the understory is dim, never black: light bounces off a hundred metres of leaf
+      this.hemi.intensity = 1.45 - 0.75 * night
+      this.celestial.intensity *= 0.7 // the canopy takes its cut
+      this.fog.color.copy(WOOD_FOG_DAY).lerp(WOOD_FOG_NIGHT, night)
+      this.fog.near = 55
+      this.fog.far = 420 - 90 * night
+      this.background.copy(this.fog.color)
     } else {
       this.hemi.color.copy(HEMI_SKY_DAY).lerp(HEMI_SKY_NIGHT, night)
       this.hemi.groundColor.copy(HEMI_GROUND_DAY).lerp(HEMI_GROUND_NIGHT, night)

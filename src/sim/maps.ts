@@ -1,6 +1,7 @@
 import type { Arena } from './city'
 import { generateCity } from './citygen'
 import { createRng, hashSeed } from './rng'
+import { generateForest } from './forestgen'
 import { generateUnderground } from './undergroundgen'
 
 /**
@@ -42,6 +43,14 @@ export const GAME_MAPS: GameMap[] = [
     // sun through the holes by day, stars by night, torches burning through both
     clockFraction: null,
     generate: generateUnderground,
+  },
+  {
+    id: 'forest',
+    name: 'The Forest of Giant Trees',
+    desc: 'Eighty metres of bark in every direction — swing the giants, rest on their limbs, and run the crown line. The definitive ODM playground.',
+    modes: ['race'],
+    clockFraction: null,
+    generate: generateForest,
   },
 ]
 

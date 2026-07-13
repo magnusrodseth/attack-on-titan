@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { ceilingHeightAt } from './city'
 import { generateCity } from './citygen'
+import { generateForest } from './forestgen'
 import { generateUnderground } from './undergroundgen'
 import {
   COURSE_WALL_MARGIN,
+  FOREST_TIERS,
   GATE_TIERS,
   MAX_GATES,
   MAX_GATE_SPACING,
@@ -134,6 +136,44 @@ describe('generateCourse under the cavern (the Underground)', () => {
       const finish = course.gates[course.gates.length - 1]!
       const span = Math.hypot(finish.x - course.start.x, finish.z - course.start.z)
       expect(span).toBeGreaterThanOrEqual(arena.wallRadius)
+    }
+  })
+})
+
+describe('generateCourse in the forest (the giants)', () => {
+  it('re-bands the tiers onto floor, trunk and canopy, and hangs no ring in a trunk', () => {
+    for (const seed of SEEDS.slice(0, 4)) {
+      const arena = generateForest(seed)
+      const nav = buildNavGrid(arena)
+      const course = generateCourse(seed, arena, nav)
+
+      expect(course.gates.length).toBeGreaterThanOrEqual(MIN_GATES)
+      expect(isWalkable(nav, course.start.x, course.start.z)).toBe(true)
+
+      let prev = { x: course.start.x, z: course.start.z }
+      const seen = new Set<string>()
+      for (const gate of course.gates) {
+        const d = Math.hypot(gate.x - prev.x, gate.z - prev.z)
+        expect(d).toBeGreaterThanOrEqual(MIN_GATE_SPACING)
+        expect(d).toBeLessThanOrEqual(MAX_GATE_SPACING)
+        // the ring hangs in the forest's own bands, not the city's rooftops
+        const band = FOREST_TIERS[gate.tier]
+        expect(gate.y).toBeGreaterThanOrEqual(band.minY)
+        expect(gate.y).toBeLessThanOrEqual(band.maxY)
+        expect(gate.radius).toBe(band.radius)
+        // gates land on walkable floor, so no ring is buried inside a giant's bark
+        expect(isWalkable(nav, gate.x, gate.z)).toBe(true)
+        seen.add(gate.tier)
+        prev = gate
+      }
+      expect(seen.size).toBe(3) // floor, trunk and canopy all get run
+      // and the crown line really is up there: the city's rooftops top out at 26
+      expect(course.gates.some((g) => g.y > 45)).toBe(true)
+
+      const finish = course.gates[course.gates.length - 1]!
+      expect(Math.hypot(finish.x - course.start.x, finish.z - course.start.z)).toBeGreaterThanOrEqual(
+        arena.wallRadius,
+      )
     }
   })
 })

@@ -111,7 +111,7 @@ describe('map registry', () => {
     expect(getMap('underground').id).toBe('underground')
     expect(getMap('nope').id).toBe('district')
     expect(getMap(null).id).toBe('district')
-    expect(mapsForMode('race').map((m) => m.id)).toEqual(['district', 'underground'])
+    expect(mapsForMode('race').map((m) => m.id)).toEqual(['district', 'underground', 'forest'])
     expect(mapsForMode('waves').map((m) => m.id)).toEqual(['district'])
   })
 
