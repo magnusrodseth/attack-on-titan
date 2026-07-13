@@ -248,9 +248,11 @@ class CavernLights {
     this.fire = new InstancedMesh(
       new PlaneGeometry(1, 1),
       new MeshBasicMaterial({
-        // Kenney's particle sprites are white masks made to be tinted: this is the fire
+        // Kenney's particle sprites are white luminance masks made to be tinted — which is
+        // exactly what an additive billboard wants: a pre-coloured flame fights the blend
+        // and leaves no control over the ramp. The colour of the fire is ours.
         map: tex('/textures/fire.png', 1, 1),
-        color: 0xff8324,
+        color: 0xff8f2e,
         transparent: true,
         opacity: 0.95,
         depthWrite: false,
