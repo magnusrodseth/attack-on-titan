@@ -59,6 +59,22 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
   excluded. ~33-entry roster incl. per-Shifter "Felled" set with All Nine Silenced capstone.
 - Matchday game mode (user request, 2026-07-09): second entry in GAME_MODES, solo, "every titan on the pitch is a footballer". modes.ts extracted the wave-clear/upgrade loop into a waveLoop(composition) skeleton both modes spread; matchdayComposition in waves.ts rolls a 50/50 striker/captain roster at signature heights with the usual escalation curve. announceWave brands every wave "Matchday · Wave N" in this mode. Menu card picked up from the registry automatically; mode persists via localStorage and ?mode=matchday.
 - Footballers REMOVED (user decision, 2026-07-13, Norway–England having been played): the Matchday mode, the striker/captain TitanKinds, the 3x jackpot tier, the every-3rd-wave event, strikers.ts, and the two non-CC0 face photos are all gone — the art credits are 100% CC0/public-domain again. SAVE_VERSION bumped 2→3 (old runs discarded); unknown mode ids fall back to Wave Survival; historical leaderboard scores stand. The waveLoop(composition) skeleton the mode drove remains the mode-registry pattern. Git history at this entry's date holds the full event-titan pattern if a seasonal guest is ever wanted.
+- The Underground + map archetypes (user request, 2026-07-13, shipped): arenas became first-class
+  next to modes. `src/sim/maps.ts` is the GameMap registry (id/name/desc/modes[]/clockFraction/
+  generate(seed)); The District keeps its exact pre-maps rng stream so old `?seed=` URLs replay
+  unchanged, and The Underground (`src/sim/undergroundgen.ts`) is the cavern city beneath the
+  capital — lamplit blocks, rock pillars floor-to-dome, stalactites, a stairway to the surface
+  under a god-ray shaft, all under a paraboloid ceiling. Signal Run only for now (titan AI under
+  a ceiling is untested, so `modes: ['race']` gates it). New sim geometry: cylinder solids
+  (`Building.shape: 'cyl'`) with radial collision/raycast/nav/minimap, and `Arena.cavern` with an
+  analytic hook raycast + flight clamp — the ceiling swing is the mechanic the surface never
+  offers, and the renderer's dome samples the same paraboloid so hooks anchor on visible rock.
+  The map joins the replay identity: `?map=` param, `SavedRun.mapId` restore guard, and trial
+  scoping via `mapScopedSeed` (district keeps the bare seed, so existing PBs and D1 rows stand;
+  no server changes). `GameMap.clockFraction` pins permanent night through the one `gameClock(g)`
+  seam, giving the flashlight and Lights Out a home arena. Menu gets a registry-driven Map picker
+  beside Game Mode, shown only where a mode offers a choice. Look spec + references graduated from
+  IDEAS.md; the Forest of Giant Trees stays there as the next archetype (it reuses all of this).
 
 ## Not yet specified
 

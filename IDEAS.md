@@ -318,43 +318,6 @@ products at three price points, and they stack.
   determinism carries them to every tier here, and a featured weekly line with the
   world-record ghost is the endgame of this whole section.
 
-## Time-trial arena: the Underground City (look spec, user-picked 2026-07-13)
-
-Canon: the subterranean district beneath Mitras, built as a shelter colony, abandoned into
-a slum ([wiki](https://attackontitan.fandom.com/wiki/Underground_(Anime))). The anime
-frames it as a bowl of warm lamplight under a black void, and that is the whole visual
-thesis: **no sky, no horizon; the map reads entirely by its own lights.**
-
-- **The read** (from the references): a basin of dense tan brick/plaster buildings with
-  red clay tile roofs, thousands of warm windows and street lanterns against pure black.
-  Slender square towers glow like candles across the skyline. Giant natural rock pillars,
-  thick as the boss titans are tall, rise out of the city fabric to an unseen ceiling.
-  Street level is vertical even on foot: external stone staircases, arched underpasses,
-  balconies, multi-level alleys, grime and water stains everywhere.
-- **Gameplay geometry**: the cavern ceiling (25-45 m, undulating) is a universal hook
-  anchor, the mechanic the surface city never offers; ceiling-swing chains are this map's
-  identity. Rock pillars are round trunks for orbit-swings. One or two god-ray light
-  shafts from surface openings are canonical (the No Regrets stairwell beam) and become
-  the landmarks: start line at the great stairway to the surface, finish gate standing in
-  the light shaft. Gate tiers remap to street / rooftop / ceiling-vault.
-- **Systems synergy**: permanent night without the day-night cycle; the lamp/flashlight
-  battery and Lights Out commendation get a home arena. Lit windows (existing overbright
-  exception) carry the navigation read. Green/blue-tinted window districts from the
-  references are exactly the per-instance tint layering the texture rule encourages.
-- **Assets**: the big win is reuse. Buildings, roofs, plaster, stairs and lantern glow
-  are the existing credited city set. New surfaces needing sourced CC0 textures: cavern
-  rock (walls, ceiling, pillars, stalactites) and a rubble/dirt ground; Poly Haven and
-  ambientCG rock/cave sets are the candidates, verified by the usual research-subagent
-  pass at build time per the texture rule.
-- **Render/perf**: fog to black is free level-of-detail (the void hides everything
-  distant); the ceiling is one coarse displaced dome; god rays as a few transparent
-  volumetric cones (transient-effect exception). The lit-window and night pipelines
-  already exist.
-- User-provided references:
-  - https://static.wikia.nocookie.net/shingekinokyojin/images/0/06/Underground_City_%28Anime%29.png/revision/latest?cb=20170617171724 (the vista: lamplit bowl, rock pillars through the city, towers)
-  - https://i.pinimg.com/736x/b3/ca/74/b3ca7431ce17150cf423215010bdb466.jpg (balcony view: roofscape read by window light, pillar silhouettes)
-  - https://i.pinimg.com/736x/22/ba/1a/22ba1ad517033255689714b1e04e261a.jpg (street level: external stairs, arches, grime, tile roofs)
-
 ## Time-trial arena: the Forest of Giant Trees (look spec, user-picked 2026-07-13)
 
 Canon: trees around 80 m tall, a maintained tourist attraction before the fall, now
