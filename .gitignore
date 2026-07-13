@@ -20,3 +20,10 @@ server/.wrangler/
 
 # Claude Code session worktrees (parallel-session runtime state)
 .claude/worktrees/
+
+# local agent config
+.pi/
+
+# blender demo: copyrighted reference images + save backups stay local
+blender/ref/
+blender/*.blend1

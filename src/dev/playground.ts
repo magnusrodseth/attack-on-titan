@@ -1,5 +1,7 @@
-import type { PerspectiveCamera, Scene } from 'three'
+import type { Mesh, Object3D, PerspectiveCamera, Scene } from 'three'
 import { Vector3 } from 'three'
+import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { Hud } from '../hud'
 import type { SoldierPool } from '../render/soldiers'
 import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
@@ -97,6 +99,8 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   let recruitN = 0
   const dummies = new Map<string, RemoteSoldier>()
   const figures: FootballerFigure[] = []
+  const beasts: Object3D[] = []
+  let beastGltf: Promise<GLTF> | null = null
   const styles: Record<FigureKind, Record<string, string>> = {
     striker: { ...KIT_DEFAULTS.striker },
     captain: { ...KIT_DEFAULTS.captain },
@@ -149,12 +153,29 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     figures.push(figure)
   }
 
+  /** The Blender-loop Beast Titan statue (blender/build.py → public/models/beast-titan.glb). */
+  function spawnBeast(x: number, z: number, facing: number): void {
+    beastGltf ??= new GLTFLoader().loadAsync('/models/beast-titan.glb')
+    void beastGltf.then((gltf) => {
+      const beast = gltf.scene.clone(true)
+      beast.traverse((obj) => {
+        if ((obj as Mesh).isMesh) obj.castShadow = obj.receiveShadow = true
+      })
+      beast.position.set(x, 0, z)
+      beast.rotation.y = facing
+      scene.add(beast)
+      beasts.push(beast)
+    })
+  }
+
   function clearAll(): void {
     game.titans = []
     dummies.clear()
     recruitN = 0
     for (const figure of figures) figure.dispose(scene)
     figures.length = 0
+    for (const beast of beasts) scene.remove(beast)
+    beasts.length = 0
   }
 
   /** One of everything on the plaza, facing the muster point; player teleported to it. */
@@ -168,6 +189,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     spawnDummy(3, -12, face(3, -12))
     spawnFigure('striker', 9, -18, face(9, -18))
     spawnFigure('captain', 17, -16, face(17, -16))
+    spawnBeast(-26, -30, face(-26, -30))
     game.player.pos.set(viewer.x, EYE_HEIGHT + 1, viewer.z)
     game.player.vel.set(0, 0, 0)
     ctx.setView(0, 0.14)
@@ -192,6 +214,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
         <button data-spawn="soldier">Soldier</button>
         <button data-spawn="striker">Striker</button>
         <button data-spawn="captain">Captain</button>
+        <button data-spawn="beast">Beast</button>
       </div>
       <div class="dv-row">
         <button id="dv-lineup">Muster the Lineup</button>
@@ -270,6 +293,9 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       } else if (what === 'soldier') {
         const { x, z, faceBack } = spotAhead(9)
         spawnDummy(x, z, faceBack)
+      } else if (what === 'beast') {
+        const { x, z, faceBack } = spotAhead(34)
+        spawnBeast(x, z, faceBack)
       } else {
         const { x, z, faceBack } = spotAhead(26)
         spawnFigure(what as FigureKind, x, z, faceBack)
@@ -446,6 +472,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       for (const titan of game.titans) titan.facing += dt * 0.4
       for (const figure of figures) figure.group.rotation.y += dt * 0.4
       for (const dummy of dummies.values()) dummy.yaw += dt * 0.4
+      for (const beast of beasts) beast.rotation.y += dt * 0.4
     }
     // after the turntable spin so the nape/ankle volumes track facing without a frame of lag
     hitboxes.sync(
