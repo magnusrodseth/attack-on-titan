@@ -101,9 +101,8 @@ export function buildFemaleTitan(t: TitanState): BossBodyVisual {
     head.ball(link, s * 0.27, eyeFront + 0.14, 12.83, 0.1, { scale: [0.85, 0.15, 1.25] })
   }
   head.box(dark, 0, -0.6, 12.65, [0.5, 0.08, 0.08])
-  // a ghost grin under the skin: 1910 dental X-ray (public domain, README credits)
-  // additive-blended so only the double row of teeth glows through the pale face
-  head.plane(mats.decal('/textures/teeth-xray.jpg', { additive: true, tint: 0x9aa0ab }), 0, -0.66, 12.6, 0.85, 0.85)
+  // the calm face splits into the bone grin (1844 dental lithograph, PD, README)
+  head.plane(mats.decal('/textures/teeth-bone.jpg', { feather: true }), 0, -0.68, 12.62, 0.62, 0.38)
   head.ball(pale, 0, -0.63, 12.85, 0.06, { scale: [0.55, 0.5, 0.8] })
   // blonde bob: crown, back, side curtains over the ears, side-swept fringe
   head.ball(hair, 0, 0.15, 13.4, 0.58, { scale: [1.1, 1.15, 0.7] })

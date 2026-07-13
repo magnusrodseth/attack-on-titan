@@ -92,13 +92,13 @@ export function buildBeastTitan(t: TitanState): BossBodyVisual {
     head.ball(skin, s * 0.72, -0.2, 15.95, 0.22)
     head.ball(fur, s * 0.45, -0.8, 14.95, 0.38)
     // deep-set clouded eyes and dark nostrils against the raw sphere fronts
-    head.ball(dark, s * 0.27, -1.32, 15.8, 0.13)
-    head.plane(eye, s * 0.27, -1.44, 15.8, 0.3, 0.25)
+    head.ball(dark, s * 0.27, -1.32, 15.8, 0.2)
+    head.plane(eye, s * 0.27, -1.46, 15.8, 0.55, 0.45)
     head.ball(dark, s * 0.1, -1.44, 15.5, 0.04)
   }
   // the beard parts over a bared bone grin (1844 dental lithograph, PD, README);
   // sits proud of the beard mass, which bulges to y -1.46 at this height
-  head.plane(mats.decal('/textures/teeth-bone.jpg', { feather: true }), 0, -1.52, 15.12, 0.7, 0.42)
+  head.plane(mats.decal('/textures/teeth-bone.jpg', { feather: true }), 0, -1.54, 15.1, 1.1, 0.66)
   // beard tufts trailing off the chin
   for (let i = 0; i < 6; i++) {
     const s = i % 2 ? 1 : -1

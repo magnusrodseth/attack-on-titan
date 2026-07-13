@@ -76,11 +76,10 @@ export function buildFoundingTitan(t: TitanState): BossBodyVisual {
     head.ball(dark, s * 0.2, -0.52, 12.3, 0.16, { scale: [1.1, 0.4, 1.25] })
     head.plane(eye, s * 0.2, -0.58, 12.3, 0.5, 0.44)
   }
-  // the gaping mouth is a lamprey maw: concentric horn-tooth rings around a dark
-  // throat (U.S. EPA photo, public domain — see README credits), feathered into
-  // the jaw over a recessed dark hollow
+  // the gaping mouth bares the bone grin (1844 dental lithograph, PD — README
+  // credits), oversized and feathered into the jaw over a recessed dark hollow
   head.ball(dark, 0, -0.3, 11.78, 0.3, { scale: [1.0, 0.4, 0.8] })
-  head.plane(mats.decal('/textures/maw-lamprey.jpg', { feather: true, tint: 0xcfc2b2 }), 0, -0.5, 11.76, 1.2, 0.85)
+  head.plane(mats.decal('/textures/teeth-bone.jpg', { feather: true }), 0, -0.5, 11.78, 1.15, 0.7)
   // long hair swept back from a high hairline, falling to mid-back
   head.ball(hair, 0, 0.22, 12.7, 0.56, { scale: [1.05, 1.2, 0.6] })
   head.ball(hair, 0, 0.6, 11.3, 0.4, { scale: [0.9, 0.5, 3.0] })

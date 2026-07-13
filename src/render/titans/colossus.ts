@@ -65,8 +65,8 @@ export function buildColossusTitan(t: TitanState): BossBodyVisual {
   for (const s of [1, -1]) {
     head.ball(muscle, s * 1.35, 0.2, 57.0, 1.8)
     head.ball(muscle, s * 1.4, -0.3, 55.8, 0.75)
-    head.ball(dark, s * 1.05, -2.5, 56.6, 0.68, { scale: [1.2, 0.3, 0.9] })
-    head.plane(eye, s * 1.05, -2.72, 56.6, 1.1, 0.88)
+    head.ball(dark, s * 1.05, -2.5, 56.6, 0.95, { scale: [1.2, 0.3, 0.9] })
+    head.plane(eye, s * 1.05, -2.78, 56.6, 1.9, 1.5)
     head.ball(muscle, s * 2.55, 0.3, 56.4, 0.55, { scale: [0.3, 0.6, 1.0], rot: [0.3, s * 0.4, 0] })
   }
   head.ball(muscle, 0, -2.0, 57.4, 1.3, { scale: [1.6, 0.45, 0.35] })

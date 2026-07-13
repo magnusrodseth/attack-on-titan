@@ -1,5 +1,5 @@
 import type { PerspectiveCamera, Scene } from 'three'
-import { Vector3 } from 'three'
+import { CanvasTexture, Sprite, SpriteMaterial, SRGBColorSpace, Vector3 } from 'three'
 import type { Hud } from '../hud'
 import type { SoldierPool } from '../render/soldiers'
 import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
@@ -102,7 +102,33 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   let recruitN = 0
   const dummies = new Map<string, RemoteSoldier>()
   const figures: FootballerFigure[] = []
-  const bodies: { fight: BossFight; visual: BossBodyVisual }[] = []
+  const bodies: { fight: BossFight; visual: BossBodyVisual; tag: Sprite }[] = []
+
+  /**
+   * A floating name plate over a gallery statue, styled like the recruits' RECRUIT
+   * label (same font, glow-shadow, slim proportions). Playground-only chrome: this
+   * module never ships in production builds.
+   */
+  function nameTag(text: string, height: number): Sprite {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 128
+    const ctx = canvas.getContext('2d')!
+    ctx.font = '600 64px Cinzel, Georgia, serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'
+    ctx.shadowBlur = 12
+    ctx.fillStyle = '#e9dcc0'
+    ctx.fillText(text.toUpperCase(), 256, 64)
+    const texture = new CanvasTexture(canvas)
+    texture.colorSpace = SRGBColorSpace
+    const sprite = new Sprite(new SpriteMaterial({ map: texture, depthTest: false, transparent: true }))
+    sprite.renderOrder = 5
+    const w = Math.max(3.4, height * 0.32)
+    sprite.scale.set(w, w / 4, 1)
+    return sprite
+  }
   const styles: Record<FigureKind, Record<string, string>> = {
     striker: { ...KIT_DEFAULTS.striker },
     captain: { ...KIT_DEFAULTS.captain },
@@ -164,7 +190,10 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     fight.titan.facing = facing
     const visual = builder(fight.titan)
     visual.addTo(scene)
-    bodies.push({ fight, visual })
+    const tag = nameTag(spec.name, spec.height)
+    tag.position.set(x, spec.height + Math.max(1.5, spec.height * 0.08), z)
+    scene.add(tag)
+    bodies.push({ fight, visual, tag })
   }
 
   function clearAll(): void {
@@ -173,7 +202,10 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     recruitN = 0
     for (const figure of figures) figure.dispose(scene)
     figures.length = 0
-    for (const body of bodies) body.visual.removeFrom(scene)
+    for (const body of bodies) {
+      body.visual.removeFrom(scene)
+      scene.remove(body.tag)
+    }
     bodies.length = 0
   }
 

@@ -71,8 +71,12 @@ export function buildWarhammerTitan(t: TitanState): BossBodyVisual {
   head.ball(dome, 0, -0.15, 13.5, 0.42)
   head.ball(dome, 0, -0.05, 13.3, 0.4)
   const eyeFront = -0.68 // proud of the raw dome sphere (blender probed the fatter blend)
+  // pinpoint-pupil green eyes (CC0 photo, README credits) staring out of the
+  // blank marble: the slits become sockets behind them
+  const eye = mats.decal('/textures/eye-pinpoint.jpg', { feather: true })
   for (const s of [1, -1]) {
-    head.ball(dark, s * 0.24, eyeFront + 0.05, 14.1, 0.17, { scale: [1.2, 0.35, 0.45] })
+    head.ball(dark, s * 0.24, eyeFront + 0.05, 14.1, 0.19, { scale: [1.2, 0.35, 0.45] })
+    head.plane(eye, s * 0.24, eyeFront - 0.04, 14.1, 0.42, 0.35)
   }
   const mouthFront = -0.62
   head.ball(white, 0, mouthFront + 0.14, 13.5, 0.44, { scale: [0.85, 0.35, 0.8] })

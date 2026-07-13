@@ -70,8 +70,8 @@ export function buildAttackTitan(t: TitanState): BossBodyVisual {
   // surface; here the sphere front at each z is computed from the ball itself)
   for (const s of [1, -1]) {
     head.ball(muscle, s * 0.38, -0.08, 13.65, 0.16)
-    head.ball(dark, s * 0.24, -0.6, 14.0, 0.15, { scale: [1.1, 0.4, 0.9] })
-    head.plane(eye, s * 0.24, -0.7, 14.0, 0.5, 0.4)
+    head.ball(dark, s * 0.24, -0.6, 14.0, 0.24, { scale: [1.1, 0.4, 0.9] })
+    head.plane(eye, s * 0.24, -0.72, 14.0, 0.85, 0.68)
     head.ball(muscle, s * 0.62, -0.05, 13.85, 0.16, { scale: [0.3, 0.5, 1.0], rot: [0.35, s * 0.5, 0] })
   }
   head.ball(muscle, 0, -0.5, 14.23, 0.3, { scale: [1.5, 0.5, 0.35] })

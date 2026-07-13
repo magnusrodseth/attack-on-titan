@@ -78,9 +78,9 @@ export function buildJawTitan(t: TitanState): BossBodyVisual {
   }
   const eyeFront = -0.25
   for (const s of [1, -1]) {
-    head.ball(red, s * 0.11, eyeFront + 0.045, 4.66, 0.07, { scale: [1.1, 0.35, 1.0] })
-    head.ball(dark, s * 0.11, eyeFront + 0.03, 4.66, 0.055, { scale: [1.1, 0.4, 0.95] })
-    head.plane(eye, s * 0.11, eyeFront - 0.02, 4.66, 0.2, 0.17)
+    head.ball(red, s * 0.12, eyeFront + 0.045, 4.66, 0.085, { scale: [1.1, 0.35, 1.0] })
+    head.ball(dark, s * 0.12, eyeFront + 0.03, 4.66, 0.07, { scale: [1.1, 0.4, 0.95] })
+    head.plane(eye, s * 0.12, eyeFront - 0.03, 4.66, 0.28, 0.24)
   }
   // huge blonde mane: crown, top, the long back mass to the chest, side falls;
   // the particle halo becomes an enlarged shell plus seeded spikes radiating out
