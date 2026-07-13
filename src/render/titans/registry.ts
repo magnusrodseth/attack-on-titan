@@ -2,6 +2,7 @@ import { buildArmoredTitan } from './armored'
 import { buildAttackTitan } from './attack'
 import { buildCartTitan } from './cart'
 import { buildFemaleTitan } from './female'
+import { buildFoundingTitan } from './founding'
 import { buildJawTitan } from './jaw'
 import type { BossBodyBuilder } from './lib'
 import { buildWarhammerTitan } from './warhammer'
@@ -17,6 +18,7 @@ export const BOSS_BODY_BUILDERS: Record<string, BossBodyBuilder> = {
   'attack-titan': buildAttackTitan,
   'cart-titan': buildCartTitan,
   'female-titan': buildFemaleTitan,
+  'founding-titan': buildFoundingTitan,
   'jaw-titan': buildJawTitan,
   'warhammer-titan': buildWarhammerTitan,
 }
