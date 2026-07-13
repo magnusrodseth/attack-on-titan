@@ -111,9 +111,10 @@ export function buildScene(arena: Arena): BuiltScene {
   if (arena.forest) {
     // the Forest of Giant Trees: an open sky over a closed world. No city set at all —
     // the trunks, their limbs and the mid-story ARE the level, and the treeline is the wall.
-    const dayNight = new DayNightSky(scene, { forest: true })
-    const forest = addForest(scene, arena)
-    dayNight.onNight(forest.setNight)
+    // the same sky the district gets: a real day/night cycle overhead, sun, moon and stars
+    // (user, 2026-07-13). The canopy does the darkening down here; the sky needs no help.
+    const dayNight = new DayNightSky(scene)
+    addForest(scene, arena)
     addTreeline(scene, arena)
     addStation(scene, arena)
     return { scene, updateScenery: () => {}, dayNight }
