@@ -201,6 +201,16 @@
         border-left: 11px solid transparent; border-right: 11px solid transparent;
         border-bottom: 17px solid #37e06be0; filter: drop-shadow(0 0 7px #37e06b);
       }
+
+      /* threat radar: nearby off-screen titans ping the screen edge in red */
+      #threats { position: absolute; inset: 0; pointer-events: none; }
+      #threats .threat-caret {
+        position: absolute; width: 0; height: 0;
+        border-left: 9px solid transparent; border-right: 9px solid transparent;
+        border-bottom: 14px solid #e8402f; filter: drop-shadow(0 0 6px #e8402fcc);
+      }
+      #threats .threat-caret.hot { border-bottom-color: #ff5544; animation: threat-pulse 0.7s infinite; }
+      @keyframes threat-pulse { 50% { filter: drop-shadow(0 0 13px #ff5544); } }
       #race-splits { font-family: var(--body-font); font-size: 15px; line-height: 1.55; margin: 10px 0 18px; max-height: 38vh; overflow-y: auto; }
       #race-splits .rs-row { display: flex; gap: 18px; justify-content: center; }
       #race-splits .rs-ahead { color: #7fe08f; }
@@ -295,7 +305,7 @@
       .overlay > :last-child { margin-bottom: auto; }
       .overlay.hidden { display: none; }
       /* an open menu hides the combat chrome behind it; the dark plate reads clean */
-      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #boss-strip, #race-dist, #race-caret) { visibility: hidden; }
+      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #boss-strip, #race-dist, #race-caret, #threats) { visibility: hidden; }
       .overlay h1 { font-size: 84px; }
       .overlay h2 { font-size: 58px; }
       #mobile-gate { z-index: 10; background: radial-gradient(ellipse at 50% 30%, #16111afb, #07060aff 78%); }
@@ -615,6 +625,7 @@
       </div>
       <div id="race-dist" class="hidden"></div>
       <div id="race-caret" class="hidden"></div>
+      <div id="threats"></div>
       <canvas id="minimap" width="170" height="170"></canvas>
       <div id="squad"></div>
       <div id="feed"></div>

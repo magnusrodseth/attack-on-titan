@@ -32,6 +32,18 @@ export interface RaceCaret {
   angle: number
 }
 
+/** A nearby off-screen titan pinging the screen edge, computed by main from the camera. */
+export interface ThreatPing {
+  /** Viewport position for the edge triangle (px) and its pointing angle (rad, 0 = up). */
+  x: number
+  y: number
+  angle: number
+  /** 0..1 — closer titans burn brighter. */
+  alpha: number
+  /** A titan mid-chase or mid-leap pulses instead of idling. */
+  hot: boolean
+}
+
 /** m:ss.cc — the race strip's one number. */
 export function formatRaceTime(t: number): string {
   const minutes = Math.floor(t / 60)
@@ -108,6 +120,8 @@ export class Hud {
   private raceCaret = el('race-caret')
   private raceResults = el('race-results')
   private raceSplitTimer: number | undefined
+  private threats = el('threats')
+  private threatPool: HTMLElement[] = []
   private huntStrip = el('hunt-strip')
   private huntTimer = el('hunt-timer')
   private huntLeft = el('hunt-left')
@@ -479,6 +493,29 @@ export class Hud {
       this.raceCaret.style.left = `${caret.x.toFixed(0)}px`
       this.raceCaret.style.top = `${caret.y.toFixed(0)}px`
       this.raceCaret.style.transform = `translate(-50%, -50%) rotate(${caret.angle.toFixed(3)}rad)`
+    }
+  }
+
+  /** Per-frame threat radar: one red edge triangle per nearby off-screen titan. */
+  updateThreats(pings: ThreatPing[]): void {
+    while (this.threatPool.length < pings.length) {
+      const div = document.createElement('div')
+      div.className = 'threat-caret'
+      this.threats.appendChild(div)
+      this.threatPool.push(div)
+    }
+    for (const [i, div] of this.threatPool.entries()) {
+      const ping = pings[i]
+      if (!ping) {
+        div.style.display = 'none'
+        continue
+      }
+      div.style.display = ''
+      div.style.left = `${ping.x.toFixed(0)}px`
+      div.style.top = `${ping.y.toFixed(0)}px`
+      div.style.transform = `translate(-50%, -50%) rotate(${ping.angle.toFixed(3)}rad)`
+      div.style.opacity = ping.alpha.toFixed(2)
+      div.classList.toggle('hot', ping.hot)
     }
   }
 

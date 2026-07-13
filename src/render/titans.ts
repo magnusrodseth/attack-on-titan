@@ -170,20 +170,34 @@ export interface TitanPuppet {
   legR: Limb
   armL: Limb
   armR: Limb
-  weakMats: WeakPointMats
-  napeGlow: Group
+  /** Head pivot, when the body has one worth animating (lunges, throws). */
+  head?: Group
+  /** Self-advertised weak points; boss bodies omit them (only the lit part sells). */
+  weakMats?: WeakPointMats
+  napeGlow?: Group
   /** Heel glows matching sim ankle targets; index 0 = left, 1 = right (like t.ankles). */
-  ankleGlows: [Group, Group]
+  ankleGlows?: [Group, Group]
   /** Death dissolve: apply 0..1 opacity to every body material. */
   setFade(fade: number): void
+}
+
+export interface TitanPoserOpts {
+  /** Four-beat gait for the Cart: arms are forelegs, legs are hind legs, torso is level. */
+  quadruped?: boolean
 }
 
 /** Drives a TitanPuppet from TitanState: one animation state machine for every titan kind. */
 export class TitanPoser {
   private walkPhase = 0
   private lastPos = { x: 0, z: 0 }
+  private readonly quadruped: boolean
 
-  constructor(private readonly p: TitanPuppet) {}
+  constructor(
+    private readonly p: TitanPuppet,
+    opts: TitanPoserOpts = {},
+  ) {
+    this.quadruped = opts.quadruped ?? false
+  }
 
   syncPose(t: TitanState, dt: number): void {
     const p = this.p
@@ -191,18 +205,27 @@ export class TitanPoser {
     p.group.rotation.y = t.facing
 
     // a cut tendon stops advertising itself; a crippled or dead titan has none to sell
-    const showAnkles = t.state !== 'dead' && t.state !== 'crippled'
-    p.ankleGlows[0].visible = showAnkles && !t.ankles[0]
-    p.ankleGlows[1].visible = showAnkles && !t.ankles[1]
+    if (p.ankleGlows) {
+      const showAnkles = t.state !== 'dead' && t.state !== 'crippled'
+      p.ankleGlows[0].visible = showAnkles && !t.ankles[0]
+      p.ankleGlows[1].visible = showAnkles && !t.ankles[1]
+    }
 
     if (t.state === 'dead') {
-      // fall forward around the feet, then dissolve
+      // fall over (forward for bipeds, onto the flank for quadrupeds), then dissolve
       const fall = Math.min(1, t.stateTime / 0.9)
-      p.group.rotation.x = (Math.PI / 2) * easeOut(fall)
+      if (this.quadruped) p.group.rotation.z = (Math.PI / 2) * easeOut(fall)
+      else p.group.rotation.x = (Math.PI / 2) * easeOut(fall)
       const fade = Math.max(0, 1 - Math.max(0, t.stateTime - 1) / 2)
-      p.napeGlow.visible = false // a dead titan has nothing left to sell
+      if (p.napeGlow) p.napeGlow.visible = false // a dead titan has nothing left to sell
       p.setFade(fade)
       p.group.visible = fade > 0.01
+      return
+    }
+    p.group.rotation.z = 0
+
+    if (this.quadruped) {
+      this.syncQuadruped(t, dt)
       return
     }
 
@@ -218,8 +241,10 @@ export class TitanPoser {
       p.armL.lower.rotation.x = p.armR.lower.rotation.x = -0.4 * eased
       p.torso.rotation.x = 0.28 * eased
       // scream "cut here"
-      p.weakMats.glow.opacity = 0.75 + Math.sin(performance.now() * 0.009) * 0.25
-      p.weakMats.stain.opacity = 0.65 + Math.sin(performance.now() * 0.009) * 0.2
+      if (p.weakMats) {
+        p.weakMats.glow.opacity = 0.75 + Math.sin(performance.now() * 0.009) * 0.25
+        p.weakMats.stain.opacity = 0.65 + Math.sin(performance.now() * 0.009) * 0.2
+      }
       return
     }
     if (t.state === 'staggered') {
@@ -229,8 +254,10 @@ export class TitanPoser {
       p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = 0.55
       p.armL.lower.rotation.x = p.armR.lower.rotation.x = -0.2
       p.torso.rotation.x = -0.12
-      p.weakMats.glow.opacity = 0.7 // steady, no pulse: the titan is out cold
-      p.weakMats.stain.opacity = 0.5
+      if (p.weakMats) {
+        p.weakMats.glow.opacity = 0.7 // steady, no pulse: the titan is out cold
+        p.weakMats.stain.opacity = 0.5
+      }
       return
     }
     p.group.rotation.x = 0
@@ -263,8 +290,72 @@ export class TitanPoser {
     }
 
     const pulse = Math.sin(performance.now() * 0.004 + t.id)
-    p.weakMats.glow.opacity = 0.8 + pulse * 0.2
-    p.weakMats.stain.opacity = 0.55 + pulse * 0.15
+    if (p.weakMats) {
+      p.weakMats.glow.opacity = 0.8 + pulse * 0.2
+      p.weakMats.stain.opacity = 0.55 + pulse * 0.15
+    }
+  }
+
+  /**
+   * The Cart's verbs: diagonal four-beat gait, a head-first lunge for the attack,
+   * a nose-down collapse when crippled. The dead topple (onto the flank) is handled
+   * in the shared path above so both body plans dissolve on the same clock.
+   */
+  private syncQuadruped(t: TitanState, dt: number): void {
+    const p = this.p
+
+    if (t.state === 'crippled') {
+      // forelegs give out: the front end drops onto folded arms, muzzle to the dirt
+      const kneel = Math.min(1, t.stateTime / 0.6)
+      const eased = 1 - (1 - kneel) * (1 - kneel)
+      p.group.position.y = t.pos.y - 0.06 * t.height * eased
+      p.group.rotation.x = 0.16 * eased
+      p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = -0.9 * eased
+      p.legL.pivot.rotation.x = p.legR.pivot.rotation.x = 0.15 * eased
+      if (p.head) p.head.rotation.x = 0.35 * eased
+      if (p.weakMats) {
+        p.weakMats.glow.opacity = 0.75 + Math.sin(performance.now() * 0.009) * 0.25
+        p.weakMats.stain.opacity = 0.65 + Math.sin(performance.now() * 0.009) * 0.2
+      }
+      return
+    }
+    if (t.state === 'staggered') {
+      // rocked back onto the haunches, forelegs pawing, reeling in place
+      p.group.rotation.x = -0.06 + Math.sin(performance.now() * 0.03) * 0.012
+      p.armL.pivot.rotation.x = 0.4
+      p.armR.pivot.rotation.x = 0.25
+      if (p.head) p.head.rotation.x = -0.2
+      return
+    }
+    p.group.rotation.x = 0
+
+    const moved = Math.hypot(t.pos.x - this.lastPos.x, t.pos.z - this.lastPos.z)
+    this.lastPos = { x: t.pos.x, z: t.pos.z }
+    const speed = dt > 0 ? moved / dt : 0
+    this.walkPhase += speed * dt * 1.3
+
+    // diagonal pairs: left fore + right hind swing together, like a trotting horse
+    const swing = Math.sin(this.walkPhase) * Math.min(0.42, speed * 0.05)
+    p.armL.pivot.rotation.x = swing
+    p.legR.pivot.rotation.x = swing * 0.8
+    p.armR.pivot.rotation.x = -swing
+    p.legL.pivot.rotation.x = -swing * 0.8
+    p.legL.lower.rotation.x = Math.max(0, swing) * 0.7
+    p.legR.lower.rotation.x = Math.max(0, -swing) * 0.7
+    p.torso.rotation.x = t.state === 'chase' ? 0.03 : 0
+    if (p.head) p.head.rotation.x = 0
+
+    if (t.state === 'attack') {
+      // the bite: rear back through the windup, then snap the head down and forward
+      const wind = Math.min(1, t.stateTime / SWAT_WINDUP)
+      p.group.rotation.x = -0.1 * wind + (wind >= 1 ? 0.22 : 0)
+      if (p.head) p.head.rotation.x = -0.5 * wind + (wind >= 1 ? 0.9 : 0)
+      p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = -0.25 * wind
+    } else if (t.state === 'leap') {
+      p.armL.pivot.rotation.x = p.armR.pivot.rotation.x = -0.6
+      p.legL.pivot.rotation.x = p.legR.pivot.rotation.x = 0.5
+      p.legL.lower.rotation.x = p.legR.lower.rotation.x = 0.8
+    }
   }
 }
 

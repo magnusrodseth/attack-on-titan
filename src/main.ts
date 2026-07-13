@@ -2,7 +2,7 @@ import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeo
 import { initAnalytics, track } from './analytics'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
-import type { SettingsValues } from './hud'
+import type { SettingsValues, ThreatPing } from './hud'
 import { formatRaceTime, Hud } from './hud'
 import type { Account } from './net/client'
 import { clearAccount, fetchLeaderboard, fetchTrials, loadAccount, login, postTrial, register } from './net/client'
@@ -1340,6 +1340,37 @@ let prevCrippled = new Set<number>()
 let saveTimer = 0
 let hitstop = 0 // brief sim freeze on kills; rendering continues
 
+/**
+ * Projects a world point onto the viewport for an edge indicator: `onScreen` when it
+ * sits inside the safe frame, otherwise x/y clamped to the screen edge plus the angle
+ * an upward-pointing triangle must rotate by to aim at it. Shared by the race caret
+ * and the titan threat radar.
+ */
+function edgeProject(world: Vector3): { onScreen: boolean; x: number; y: number; angle: number } {
+  const ndc = world.project(camera)
+  const behind = ndc.z > 1
+  const onScreen = !behind && Math.abs(ndc.x) <= 0.92 && Math.abs(ndc.y) <= 0.88
+  // behind the camera the NDC flips: negate so the caret points the right way
+  let dx = behind ? -ndc.x : ndc.x
+  let dy = behind ? -ndc.y : ndc.y
+  if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) dy = -1
+  const scale = 0.92 / Math.max(Math.abs(dx), Math.abs(dy))
+  dx *= scale
+  dy *= scale
+  return {
+    onScreen,
+    x: ((dx + 1) / 2) * innerWidth,
+    y: ((1 - dy) / 2) * innerHeight,
+    angle: Math.atan2(dx, dy), // 0 = up; the caret triangle points up by default
+  }
+}
+
+// threat radar: titans this close ping the screen edge when they are not in view.
+// 70 m covers a normal's full aggro range (55) with warning slack; abnormals sprint
+// in from further out, but a radar that lights half the map would read as noise.
+const THREAT_RADIUS = 70
+const THREAT_MAX = 4 // only the nearest few — a horde should not wallpaper the edges
+
 renderer.setAnimationLoop(() => {
   const now = performance.now()
   const dt = Math.min(now - last, 100) / 1000
@@ -1502,7 +1533,7 @@ renderer.setAnimationLoop(() => {
   audio.setMuffled(game.focusActive)
   audio.setDucked((game.phase === 'playing' && !inAction && !debug.silent) || game.phase === 'menu')
   hud.setFocusVignette(game.focusActive)
-  minimap.update(game, yaw)
+  minimap.update(game, yaw, coopBattle && coop ? coop.soldiers.values() : undefined)
   // a crippled titan leaving that state alive has regenerated and risen
   const crippledNow = new Set(
     game.titans.filter((t) => t.state === 'crippled').map((t) => t.id),
@@ -1559,28 +1590,36 @@ renderer.setAnimationLoop(() => {
     const gate = game.race.course.gates[game.race.nextGate]
     if (gate && game.phase === 'playing') {
       const world = new Vector3(gate.x, gate.y, gate.z)
-      const dist = world.distanceTo(game.player.pos)
-      const ndc = world.project(camera)
-      const behind = ndc.z > 1
-      const onScreen = !behind && Math.abs(ndc.x) <= 0.92 && Math.abs(ndc.y) <= 0.88
-      // behind the camera the NDC flips: negate so the caret points the right way
-      let dx = behind ? -ndc.x : ndc.x
-      let dy = behind ? -ndc.y : ndc.y
-      if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) dy = -1
-      const scale = 0.92 / Math.max(Math.abs(dx), Math.abs(dy))
-      dx *= scale
-      dy *= scale
-      hud.updateRace(game, {
-        dist,
-        onScreen,
-        x: ((dx + 1) / 2) * innerWidth,
-        y: ((1 - dy) / 2) * innerHeight,
-        angle: Math.atan2(dx, dy), // 0 = up; the caret triangle points up by default
-      })
+      const dist = world.distanceTo(game.player.pos) // before project() mutates world
+      hud.updateRace(game, { dist, ...edgeProject(world) })
     } else {
       hud.updateRace(game, null)
     }
   }
+
+  // threat radar: the nearest living titans in the vicinity that the camera cannot see
+  // ping the screen edge as red triangles, brighter the closer they loom
+  const pings: ThreatPing[] = []
+  if (game.phase === 'playing' && !playgroundMode && !spectating) {
+    const nearby = game.titans
+      .filter((t) => t.hp > 0)
+      .map((t) => ({ t, dist: t.pos.distanceTo(game.player.pos) }))
+      .filter((n) => n.dist <= THREAT_RADIUS)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, THREAT_MAX)
+    for (const { t, dist } of nearby) {
+      const proj = edgeProject(new Vector3(t.pos.x, t.pos.y + t.height * 0.55, t.pos.z))
+      if (proj.onScreen) continue // visible titans need no arrow
+      pings.push({
+        x: proj.x,
+        y: proj.y,
+        angle: proj.angle,
+        alpha: 0.45 + 0.55 * (1 - dist / THREAT_RADIUS),
+        hot: t.state === 'chase' || t.state === 'leap',
+      })
+    }
+  }
+  hud.updateThreats(pings)
 
   saveTimer += dt
   if (saveTimer >= 1) {

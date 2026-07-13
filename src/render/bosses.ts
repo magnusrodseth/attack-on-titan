@@ -19,6 +19,8 @@ import type { BossFight } from '../sim/boss'
 import { bossPartCenter, steamRadius } from '../sim/boss'
 import type { GameState } from '../sim/game'
 import type { TitanState } from '../sim/titan'
+import type { BossBodyVisual } from './titans/lib'
+import { BOSS_BODY_BUILDERS } from './titans/registry'
 import { makeWeakPoint, makeWeakPointMats, TitanVisual } from './titans'
 
 const textureLoader = new TextureLoader()
@@ -42,6 +44,7 @@ const textureLoader = new TextureLoader()
  */
 export class BossFxView {
   private fightTitanId: number | null = null
+  private body: BossBodyVisual | null = null
   private rig: TitanVisual | null = null
   private glb: Group | null = null
   private glbBaseY = 0
@@ -100,15 +103,23 @@ export class BossFxView {
       this.fightTitanId = t.id
       this.walkPhase = 0
       this.lastPos = { x: t.pos.x, z: t.pos.z }
-      this.rig = new TitanVisual(t)
-      // the capsule rig advertises nape and heels; a Shifter sells only its lit part
-      this.rig.group.traverse((obj) => {
-        if (obj instanceof Sprite) obj.visible = false
-      })
-      this.rig.addTo(this.scene)
-      this.loadGlb(fight)
+      const builder = BOSS_BODY_BUILDERS[fight.spec.id]
+      if (builder) {
+        // the ported procedural body: articulated, textured, owns its own pose
+        this.body = builder(t)
+        this.body.addTo(this.scene)
+      } else {
+        this.rig = new TitanVisual(t)
+        // the capsule rig advertises nape and heels; a Shifter sells only its lit part
+        this.rig.group.traverse((obj) => {
+          if (obj instanceof Sprite) obj.visible = false
+        })
+        this.rig.addTo(this.scene)
+        this.loadGlb(fight)
+      }
     }
-    if (this.glb) this.driveStatue(fight, dt)
+    if (this.body) this.body.sync(fight, dt)
+    else if (this.glb) this.driveStatue(fight, dt)
     else if (this.rig) this.rig.syncPose(t, dt)
   }
 
@@ -198,6 +209,10 @@ export class BossFxView {
   }
 
   private clearBody(): void {
+    if (this.body) {
+      this.body.removeFrom(this.scene)
+      this.body = null
+    }
     if (this.rig) {
       this.rig.removeFrom(this.scene)
       this.rig = null
@@ -219,7 +234,10 @@ export class BossFxView {
       return
     }
     this.glow.visible = true
-    this.glow.position.copy(bossPartCenter(t, partSpec))
+    // a ported body offers the real joint; statues and rigs fall back to spec fractions
+    const anchor = this.body?.partAnchor(partSpec.id) ?? null
+    if (anchor) anchor.getWorldPosition(this.glow.position)
+    else this.glow.position.copy(bossPartCenter(t, partSpec))
     this.glow.scale.setScalar(t.height)
     const part = fight.state.parts[fight.state.phase]!
     const pulse = Math.sin(performance.now() * 0.005)

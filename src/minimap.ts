@@ -1,4 +1,5 @@
 import type { Arena } from './sim/city'
+import type { RemoteSoldier } from './sim/coopClient'
 import type { GameState } from './sim/game'
 import { isFootballer } from './sim/titan'
 
@@ -7,7 +8,8 @@ const CENTER = SIZE / 2
 
 /**
  * Top-right canvas minimap: static city pre-rendered once, then per-frame titan blips
- * (red normals, orange abnormals, yellow kneeling cripples) and the player arrow.
+ * (red normals, orange abnormals, yellow kneeling cripples), co-op teammate arrows,
+ * and the player arrow.
  */
 export class Minimap {
   private ctx: CanvasRenderingContext2D
@@ -75,7 +77,7 @@ export class Minimap {
     }
   }
 
-  update(game: GameState, yaw: number): void {
+  update(game: GameState, yaw: number, teammates?: Iterable<RemoteSoldier>): void {
     const ctx = this.ctx
     ctx.clearRect(0, 0, SIZE, SIZE)
     ctx.drawImage(this.background, 0, 0)
@@ -144,6 +146,32 @@ export class Minimap {
         ctx.beginPath()
         ctx.arc(x, y, radius + 2.5, 0, Math.PI * 2)
         ctx.stroke()
+      }
+    }
+
+    // co-op teammates: smaller cyan arrows so friends read apart from every enemy blip;
+    // a dead soldier hollows out and dims (matching the squad panel) until respawn
+    if (teammates) {
+      for (const mate of teammates) {
+        if (!mate.connected) continue
+        ctx.save()
+        ctx.translate(CENTER + mate.pos.x * this.scale, CENTER + mate.pos.z * this.scale)
+        ctx.rotate(-mate.yaw)
+        ctx.beginPath()
+        ctx.moveTo(0, -4.6)
+        ctx.lineTo(3.3, 3.8)
+        ctx.lineTo(-3.3, 3.8)
+        ctx.closePath()
+        if (mate.alive) {
+          ctx.fillStyle = '#5ec8ff'
+          ctx.fill()
+        } else {
+          ctx.globalAlpha = 0.45
+          ctx.strokeStyle = '#5ec8ff'
+          ctx.lineWidth = 1.2
+          ctx.stroke()
+        }
+        ctx.restore()
       }
     }
 

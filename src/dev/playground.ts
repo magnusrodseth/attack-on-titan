@@ -7,6 +7,10 @@ import type { SoldierPool } from '../render/soldiers'
 import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
 import type { FigureKind, FootballerFigure } from '../render/strikers'
 import { buildFootballer, KIT_DEFAULTS } from '../render/strikers'
+import type { BossBodyVisual } from '../render/titans/lib'
+import { BOSS_BODY_BUILDERS } from '../render/titans/registry'
+import type { BossFight } from '../sim/boss'
+import { BOSS_LADDER, createBossFight } from '../sim/boss'
 import { EYE_HEIGHT } from '../sim/constants'
 import type { RemoteSoldier } from '../sim/coopClient'
 import { clockFraction } from '../sim/daynight'
@@ -100,6 +104,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   const dummies = new Map<string, RemoteSoldier>()
   const figures: FootballerFigure[] = []
   const glbStatues: Object3D[] = []
+  const bodies: { fight: BossFight; visual: BossBodyVisual }[] = []
   const glbCache = new Map<string, Promise<GLTF>>()
   const styles: Record<FigureKind, Record<string, string>> = {
     striker: { ...KIT_DEFAULTS.striker },
@@ -172,6 +177,18 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     })
   }
 
+  /** A ported procedural boss body as a standing statue: a real (unstepped) BossFight. */
+  function spawnBody(slug: string, x: number, z: number, facing: number): void {
+    const spec = BOSS_LADDER.find((s) => s.id === `${slug}-titan`)
+    const builder = BOSS_BODY_BUILDERS[`${slug}-titan`]
+    if (!spec || !builder) return
+    const fight = createBossFight(titanId++, spec, spec.wave, 'playground', x, z)
+    fight.titan.facing = facing
+    const visual = builder(fight.titan)
+    visual.addTo(scene)
+    bodies.push({ fight, visual })
+  }
+
   function clearAll(): void {
     game.titans = []
     dummies.clear()
@@ -180,6 +197,8 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     figures.length = 0
     for (const statue of glbStatues) scene.remove(statue)
     glbStatues.length = 0
+    for (const body of bodies) body.visual.removeFrom(scene)
+    bodies.length = 0
   }
 
   /** One of everything on the plaza, facing the muster point; player teleported to it. */
@@ -202,6 +221,25 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     spawnTitanGlb('female', 24, -30, face(24, -30))
     spawnTitanGlb('warhammer', 32, -38, face(32, -38))
     spawnTitanGlb('colossus', 0, -110, face(0, -110)) // looms behind the lineup
+    // ported procedural bodies stand a step ahead of their statue for the side-by-side
+    const statueSpots: Record<string, [number, number]> = {
+      beast: [-26, -30],
+      founding: [-34, -38],
+      attack: [-14, -34],
+      cart: [-6, -24],
+      jaw: [6, -24],
+      armored: [14, -34],
+      female: [24, -30],
+      warhammer: [32, -38],
+      colossus: [0, -110],
+    }
+    for (const id of Object.keys(BOSS_BODY_BUILDERS)) {
+      const slug = id.replace(/-titan$/, '')
+      const spot = statueSpots[slug]
+      if (!spot) continue
+      const [sx, sz] = slug === 'colossus' ? spot : [spot[0], spot[1] + 8]
+      spawnBody(slug, sx, sz, face(sx, sz))
+    }
     game.player.pos.set(viewer.x, EYE_HEIGHT + 1, viewer.z)
     game.player.vel.set(0, 0, 0)
     ctx.setView(0, 0.14)
@@ -239,6 +277,8 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
         <button data-glb="warhammer">War Hammer</button>
         <button data-glb="founding">Founding</button>
       </div>
+      <div class="dv-label">Ported bodies (three.js)</div>
+      <div class="dv-row" id="dv-bodies"></div>
       <div class="dv-row">
         <button id="dv-lineup">Muster the Lineup</button>
         <button id="dv-clear">Clear</button>
@@ -328,6 +368,18 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       const { x, z, faceBack } = spotAhead(slug === 'colossus' ? 100 : 34)
       spawnTitanGlb(slug, x, z, faceBack)
     })
+  }
+  // one button per ported body; the row grows as the port registry does
+  const bodiesRow = q<HTMLDivElement>('#dv-bodies')
+  for (const id of Object.keys(BOSS_BODY_BUILDERS)) {
+    const slug = id.replace(/-titan$/, '')
+    const btn = document.createElement('button')
+    btn.textContent = slug
+    btn.addEventListener('click', () => {
+      const { x, z, faceBack } = spotAhead(slug === 'colossus' ? 100 : 34)
+      spawnBody(slug, x, z, faceBack)
+    })
+    bodiesRow.appendChild(btn)
   }
   q<HTMLButtonElement>('#dv-lineup').addEventListener('click', musterLineup)
   q<HTMLButtonElement>('#dv-clear').addEventListener('click', clearAll)
@@ -484,6 +536,9 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
 
   // --- boot ----------------------------------------------------------------------
 
+  // headless verification hook: drive ported bodies (gait, poses) without the sim
+  ;(window as unknown as Record<string, unknown>).__aotPlayground = { bodies, spawnBody, clearAll }
+
   renderStyleRows()
   musterLineup()
   setDrawerOpen(true)
@@ -495,11 +550,13 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     // mirror the live battery so drain (and refills at the station) read on the slider
     lampVal.textContent = `${Math.round(game.player.lamp)}s`
     if (document.activeElement !== lampSlider) lampSlider.value = String(game.player.lamp)
+    for (const body of bodies) body.visual.sync(body.fight, dt)
     if (turntable) {
       for (const titan of game.titans) titan.facing += dt * 0.4
       for (const figure of figures) figure.group.rotation.y += dt * 0.4
       for (const dummy of dummies.values()) dummy.yaw += dt * 0.4
       for (const statue of glbStatues) statue.rotation.y += dt * 0.4
+      for (const body of bodies) body.fight.titan.facing += dt * 0.4
     }
     // after the turntable spin so the nape/ankle volumes track facing without a frame of lag
     hitboxes.sync(
