@@ -104,7 +104,7 @@ Vercel for production).
 
 Dev builds also ship a playground (`http://localhost:5173/?playground=1`, or the
 `Playground · Dev` menu button): a statue gallery in the real city with free ODM flight and no
-titan AI, for inspecting the soldier and titan models and styling the Striker/Captain figures
+titan AI, for inspecting the soldier, titan, and Shifter boss models and styling the recruit
 live (backquote toggles the drawer). It is dynamic-imported behind `import.meta.env.DEV`, so
 production bundles contain none of it.
 
@@ -136,7 +136,6 @@ Music (two tracks alternating in-game):
 - Textures (rough plaster, mixed brick, weathered ceramic + slate roofs, cobblestone, castle wall, rock face, bark, forest leaves, rough linen, metal plate, brown leather for titan skin) from [Poly Haven](https://polyhaven.com/textures)
 - Brushed-steel blade texture from [ambientCG](https://ambientcg.com/view?id=Metal012) (Metal012, CC0)
 - Galvanized steel wire rope (ODM cables) and brushed grapple-hook steel from [ambientCG](https://ambientcg.com): [Rope002](https://ambientcg.com/view?id=Rope002), [Metal011](https://ambientcg.com/view?id=Metal011) (both CC0)
-- Soldier textures (Survey-Corps cloak linen, ODM-harness/boot leather, uniform cloth) from [ambientCG](https://ambientcg.com): [Fabric045](https://ambientcg.com/view?id=Fabric045), [Leather028](https://ambientcg.com/view?id=Leather028), [Fabric062](https://ambientcg.com/view?id=Fabric062) (all CC0)
 - Weathered wood planks (market stalls, carts, bridge walkways, doors, the sealed gate) from [Poly Haven](https://polyhaven.com/a/weathered_planks) (Weathered Planks, CC0)
 - Canal water surface (dark color + ripple normal) from [TextureCan](https://www.texturecan.com/details/531/) (Rain Ripples on Puddle, CC0)
 - Window photo texture from the brick-building set on [OpenGameArt](https://opengameart.org)
@@ -149,5 +148,3 @@ Music (two tracks alternating in-game):
 - Cart Titan grin: [advanced periodontal disease, intraoral](https://wwwn.cdc.gov/phil/Details.aspx?pid=19466) — CDC Public Health Image Library #19466 (public domain)
 - Beast/Founding/Female grins (cropped): [skull lithograph, "The anatomy, physiology and pathology of the human teeth"](https://commons.wikimedia.org/wiki/File:Human_Skull;The_anatomy,_physiology_and_pathology_of_the_human_teeth(1844).jpg) — 1844 (public domain by age)
 - Boss titan eyes (cropped): [Bloodshot](https://commons.wikimedia.org/wiki/File:Bloodshot.jpg) by Psychonaught (PD-self), [Diplocoria on human eye](https://commons.wikimedia.org/wiki/File:Diplocoria_on_human_eye.png) by Global Donald (CC0), [Eyes tell no lies](https://commons.wikimedia.org/wiki/File:Eyes_tell_no_lies_(Unsplash).jpg) by Amanda Dalbjörn (CC0), [A human male brown eye](https://commons.wikimedia.org/wiki/File:A_human_male_brown_eye.jpg) by Bobbyphotographer (CC0), [GreenEye3](https://commons.wikimedia.org/wiki/File:GreenEye3.jpg) by Skitterphoto (CC0), [Blefarocalasi2.0](https://commons.wikimedia.org/wiki/File:Blefarocalasi2.0.jpg) by FuocoLiquido (CC0), [030608 Pupil](https://commons.wikimedia.org/wiki/File:030608_Pupil.jpg) by Ylem (PD-self), [Myosis due to opiate use](https://commons.wikimedia.org/wiki/File:Myosis_due_to_opiate_use.jpg) by Anonymous (CC0) — all Wikimedia Commons
-- Striker face photo (cropped): ["Erling Haaland Morocco v Norway 7 June 2026-51"](https://commons.wikimedia.org/wiki/File:Erling_Haaland_Morocco_v_Norway_7_June_2026-51.jpg) by Bryan Berlin, Wikimedia Commons — [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0), not CC0
-- Captain face photo (cropped): ["Harry Kane on October 10, 2023"](https://commons.wikimedia.org/wiki/File:Harry_Kane_on_October_10,_2023.jpg) by the UK Prime Minister's Office, Wikimedia Commons — [CC BY 2.0](https://creativecommons.org/licenses/by/2.0), not CC0

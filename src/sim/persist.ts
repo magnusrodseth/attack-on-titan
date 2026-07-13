@@ -25,8 +25,11 @@ import { UPGRADE_POOL } from './upgrades'
  * v2 addendum (kill-charged focus): focusCharge joined the shape additively. Saves from
  * before it load with an empty meter (nobody spawns pre-charged); an in-flight strike dash
  * is never saved — a restore lands you wherever the dash had gotten to, in normal flight.
+ *
+ * v3 (footballer removal, 2026-07-13): the matchday mode and the striker/captain titan
+ * kinds no longer exist, so any v2 save could reference them; old runs are discarded.
  */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 type V3 = [number, number, number]
 

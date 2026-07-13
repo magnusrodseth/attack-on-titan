@@ -31,13 +31,13 @@ describe('registerKill', () => {
     expect(points).toBe(Math.round(100 * 1.25 * 1.5))
   })
 
-  it('pays 3x for a footballer, above the abnormal 1.75x', () => {
+  it('pays 1.75x for an abnormal: the top rarity tier', () => {
     const s = createScore()
-    const star = registerKill(s, { speed: KILL_SPEED, airborne: false, oneCut: false, footballer: true }, KILL_SPEED)
-    expect(star).toBe(Math.round(100 * 3 * (1 + 0.25 * 0))) // first kill of the chain
+    const rare = registerKill(s, { speed: KILL_SPEED, airborne: false, oneCut: false, abnormal: true }, KILL_SPEED)
+    expect(rare).toBe(Math.round(100 * 1.75)) // first kill of the chain
     const s2 = createScore()
-    const rare = registerKill(s2, { speed: KILL_SPEED, airborne: false, oneCut: false, abnormal: true }, KILL_SPEED)
-    expect(star).toBeGreaterThan(rare)
+    const plain = registerKill(s2, { speed: KILL_SPEED, airborne: false, oneCut: false }, KILL_SPEED)
+    expect(rare).toBeGreaterThan(plain)
   })
 
   it('builds a kill-chain multiplier', () => {
@@ -66,9 +66,9 @@ describe('registerSpearKill', () => {
     expect(chained.combo).toBe(2)
   })
 
-  it('pays the footballer jackpot tier, same as a blade kill', () => {
+  it('pays the abnormal rarity tier, same as a blade kill', () => {
     const s = createScore()
-    expect(registerSpearKill(s, { footballer: true })).toBe(75 * 3)
+    expect(registerSpearKill(s, { abnormal: true })).toBe(Math.round(75 * 1.75))
   })
 })
 

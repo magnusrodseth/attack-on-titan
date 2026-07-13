@@ -45,7 +45,7 @@ import { collectPickups, fireSpear, PICKUPS_PER_WAVE, spawnPickups, stepSpears }
 import type { StrikeState } from './strike'
 import { createStrike, findStrikeTarget, stepStrike } from './strike'
 import type { TitanKind, TitanState } from './titan'
-import { aggroRange, createTitan, forwardOf, isFootballer, raycastTitan, stepTitan } from './titan'
+import { aggroRange, createTitan, forwardOf, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead' | 'finished'
@@ -382,10 +382,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       }
     }
     for (const kill of blast.kills) {
-      const points = registerSpearKill(g.score, {
-        abnormal: kill.kind === 'abnormal',
-        footballer: isFootballer(kill.kind),
-      })
+      const points = registerSpearKill(g.score, { abnormal: kill.kind === 'abnormal' })
       p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
       const heartGained = p.hp < p.config.maxHp
       if (heartGained) p.hp += 1 // a kill is a kill: the heart comes back
@@ -589,10 +586,9 @@ function emitSlashOutcome(g: GameState, result: SlashResult, airborne: boolean):
   if (result.killed && result.titanId !== undefined) {
     const killed = g.titans.find((t) => t.id === result.titanId)
     const abnormal = killed?.kind === 'abnormal'
-    const footballer = killed !== undefined && isFootballer(killed.kind)
     const points = registerKill(
       g.score,
-      { speed: result.speed, airborne, oneCut: result.oneCut, abnormal, footballer },
+      { speed: result.speed, airborne, oneCut: result.oneCut, abnormal },
       p.config.killSpeed,
     )
     p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
@@ -828,7 +824,6 @@ function stepStrikeDash(g: GameState, dt: number): void {
         airborne: true,
         oneCut: result.oneCut,
         abnormal: killed.kind === 'abnormal',
-        footballer: isFootballer(killed.kind),
       },
       p.config.killSpeed,
     )

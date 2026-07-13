@@ -10,7 +10,7 @@ import { spawnPickups } from './spear'
 import { createTitan } from './titan'
 import { applyUpgrade, offerUpgrades } from './upgrades'
 import type { TitanSpawn } from './waves'
-import { matchdayComposition, waveComposition } from './waves'
+import { waveComposition } from './waves'
 
 /**
  * A game mode owns a run's objective: what a fresh run spawns, how it progresses each
@@ -42,7 +42,7 @@ type Composition = (
 function spawnWave(g: GameState, composition: Composition): void {
   const milestone = bossForMilestone(g.wave, g.mode.id)
   if (milestone) {
-    // the milestone: one Shifter through the gate, outranking even the matchday duo.
+    // the milestone: one Shifter through the gate.
     // Solo-only by construction — the co-op server spawns via waveComposition directly.
     const [gx, gz] = bossSpawnPoint(g.arena)
     const [x, z] = nearestWalkable(g.nav, gx, gz)
@@ -103,14 +103,6 @@ const wavesMode: GameMode = {
   ...waveLoop(waveComposition),
 }
 
-/** Matchday, all ninety minutes of it: nothing takes the pitch but footballers. */
-const matchdayMode: GameMode = {
-  id: 'matchday',
-  name: 'Matchday',
-  desc: 'The fixture list from hell: every titan on the pitch is a Striker or a Captain. Faster, hungrier, higher-leaping, and worth triple score. Survive full time.',
-  ...waveLoop(matchdayComposition),
-}
-
 /**
  * The Nine: nothing but the Shifter ladder, one boss per wave, upgrades between fights.
  * spawnWave treats every wave as a milestone here, so the composition never fires.
@@ -125,7 +117,7 @@ const bossRushMode: GameMode = {
 /** The Culling rides the same wave skeleton; the countdown and relentless rule wrap it. */
 const huntMode: GameMode = createHuntMode(waveLoop(waveComposition))
 
-export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode, bossRushMode, raceMode, huntMode]
+export const GAME_MODES: GameMode[] = [wavesMode, bossRushMode, raceMode, huntMode]
 
 export const DEFAULT_MODE_ID = 'waves'
 

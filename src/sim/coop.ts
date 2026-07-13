@@ -16,7 +16,7 @@ import { createScore, registerKill, registerSpearKill, stepScore } from './score
 import type { SpearPickup, SpearState } from './spear'
 import { BLAST_RADIUS, collectPickups, fireSpear, PICKUPS_PER_WAVE, spawnPickups, stepSpears } from './spear'
 import type { TitanBehavior, TitanKind, TitanState } from './titan'
-import { aggroRange, createTitan, isFootballer, stepTitan } from './titan'
+import { aggroRange, createTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 import { applyUpgrade, offerUpgrades } from './upgrades'
 import { waveComposition } from './waves'
@@ -514,10 +514,9 @@ function slashResultEvents(w: CoopWorld, p: CoopPlayer, result: SlashResult): Co
   if (result.killed && result.titanId !== undefined) {
     const killed = w.titans.find((t) => t.id === result.titanId)
     const abnormal = killed?.kind === 'abnormal'
-    const footballer = killed !== undefined && isFootballer(killed.kind)
     const points = registerKill(
       p.score,
-      { speed: result.speed, airborne: !p.onGround, oneCut: result.oneCut, abnormal, footballer },
+      { speed: result.speed, airborne: !p.onGround, oneCut: result.oneCut, abnormal },
       p.body.config.killSpeed,
     )
     const heartGained = p.body.hp < p.body.config.maxHp
@@ -569,10 +568,7 @@ function stepCoopSpears(w: CoopWorld, dt: number): CoopEvent[] {
     const owner = ownerId !== undefined ? w.players.get(ownerId) : undefined
     for (const kill of blast.kills) {
       const points = owner
-        ? registerSpearKill(owner.score, {
-            abnormal: kill.kind === 'abnormal',
-            footballer: isFootballer(kill.kind),
-          })
+        ? registerSpearKill(owner.score, { abnormal: kill.kind === 'abnormal' })
         : 0
       let heartGained = false
       if (owner) {

@@ -1,7 +1,6 @@
 import type { Arena } from './sim/city'
 import type { RemoteSoldier } from './sim/coopClient'
 import type { GameState } from './sim/game'
-import { isFootballer } from './sim/titan'
 
 const SIZE = 170
 const CENTER = SIZE / 2
@@ -132,11 +131,9 @@ export class Minimap {
           ? '#ffd257'
           : t.kind === 'shifter'
             ? '#f5c542' // the Shifter reads as the milestone: gold, ringed below
-            : isFootballer(t.kind)
-              ? '#ffffff' // the matchday duo reads as stars on the map
-              : t.kind === 'abnormal'
-                ? '#ff7a3c'
-                : '#e0352b'
+            : t.kind === 'abnormal'
+              ? '#ff7a3c'
+              : '#e0352b'
       ctx.beginPath()
       ctx.arc(x, y, radius, 0, Math.PI * 2)
       ctx.fill()

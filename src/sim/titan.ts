@@ -5,12 +5,8 @@ import { GRAVITY } from './constants'
 import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
 
-export type TitanKind = 'normal' | 'abnormal' | 'striker' | 'captain' | 'shifter'
+export type TitanKind = 'normal' | 'abnormal' | 'shifter'
 
-/** The matchday footballers: rare event titans, one tier above the abnormal. */
-export function isFootballer(kind: TitanKind): boolean {
-  return kind === 'striker' || kind === 'captain'
-}
 export type TitanBehavior = 'wander' | 'chase' | 'attack' | 'leap' | 'crippled' | 'staggered' | 'dead'
 
 export const CRIPPLE_DURATION = 60 // seconds on its knees before it regenerates and rises
@@ -51,16 +47,12 @@ export interface KindStats {
 }
 
 /**
- * Behavior profile per kind (user decisions, 2026-07-09): footballers see further, run
- * faster, swing sooner, and leap higher than any other titan; otherwise they follow the
- * same state machine. The shifter entry is a baseline — each boss passes its own stats
- * into stepTitan.
+ * Behavior profile per kind. The shifter entry is a baseline — each boss passes its own
+ * stats into stepTitan.
  */
 const KIND_STATS: Record<TitanKind, KindStats> = {
   normal: { aggro: 55, turn: 1.4, walk: 0.2, swatRest: 2.2, leaps: false, leapY: 13 },
   abnormal: { aggro: 130, turn: 2.2, walk: 0.38, swatRest: 1.2, leaps: true, leapY: 13 },
-  striker: { aggro: 160, turn: 2.5, walk: 0.44, swatRest: 0.9, leaps: true, leapY: 17 },
-  captain: { aggro: 160, turn: 2.5, walk: 0.44, swatRest: 0.9, leaps: true, leapY: 17 },
   shifter: { aggro: 10000, turn: 1.8, walk: 0.24, swatRest: 1.8, leaps: false, leapY: 13 },
 }
 

@@ -64,23 +64,11 @@ describe('the mode seam', () => {
   })
 })
 
-describe('matchday mode', () => {
-  it('is registered and fields only footballers, wave after wave', () => {
-    expect(getMode('matchday').id).toBe('matchday')
-    const game = createGame('fixture-list', null, 'matchday')
-    startGame(game)
-    expect(game.titans.length).toBeGreaterThan(0)
-    expect(game.titans.every((t) => t.kind === 'striker' || t.kind === 'captain')).toBe(true)
-
-    for (const t of game.titans) {
-      t.hp = 0
-      t.state = 'dead'
-    }
-    stepGame(game, neutralInput(), DT)
-    expect(game.phase).toBe('upgrading')
-    chooseUpgrade(game, game.offers[0]!.id)
-    expect(game.wave).toBe(2)
-    expect(game.titans.every((t) => t.kind === 'striker' || t.kind === 'captain')).toBe(true)
+describe('mode registry fallback', () => {
+  it('resolves a removed or unknown mode id to the default mode', () => {
+    // e.g. localStorage remembering the retired matchday mode must not strand the menu
+    expect(getMode('matchday').id).toBe('waves')
+    expect(getMode('definitely-not-a-mode').id).toBe('waves')
   })
 })
 
@@ -170,14 +158,6 @@ describe('shifter waves', () => {
     expect(game.boss).toBeNull()
     expect(game.titans.length).toBeGreaterThan(1)
     expect(game.titans.every((t) => t.kind !== 'shifter')).toBe(true)
-  })
-
-  it('matchday mode never sees a boss at wave 5', () => {
-    const game = createGame('matchday-no-boss', null, 'matchday')
-    startGame(game)
-    advanceToWave(game, 5)
-    expect(game.boss).toBeNull()
-    expect(game.titans.every((t) => t.kind === 'striker' || t.kind === 'captain')).toBe(true)
   })
 
   it('the boss dying clears the wave like any roster', () => {

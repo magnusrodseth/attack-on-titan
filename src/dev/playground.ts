@@ -3,8 +3,6 @@ import { CanvasTexture, Sprite, SpriteMaterial, SRGBColorSpace, Vector3 } from '
 import type { Hud } from '../hud'
 import type { SoldierPool } from '../render/soldiers'
 import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
-import type { FigureKind, FootballerFigure } from '../render/strikers'
-import { buildFootballer, KIT_DEFAULTS } from '../render/strikers'
 import type { BossBodyVisual } from '../render/titans/lib'
 import { BOSS_BODY_BUILDERS } from '../render/titans/registry'
 import type { BossFight } from '../sim/boss'
@@ -23,8 +21,7 @@ import { TitanHitboxes } from './hitboxes'
  * nothing that bites. Loaded via dynamic import behind import.meta.env.DEV, so none
  * of this (or the drawer DOM) exists in production builds. Titans here are plain
  * TitanState statues the normal TitanPool renders; soldiers are RemoteSoldier dummies
- * through the normal SoldierPool; the Striker and Captain are the strikers.ts figures
- * with live-editable color slots; the nine Shifters are the ported procedural bodies
+ * through the normal SoldierPool; the nine Shifters are the ported procedural bodies
  * from src/render/titans/ posed by unstepped BossFights.
  */
 
@@ -101,7 +98,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   let titanId = 5000 // far above wave ids; no waves spawn here anyway
   let recruitN = 0
   const dummies = new Map<string, RemoteSoldier>()
-  const figures: FootballerFigure[] = []
   const bodies: { fight: BossFight; visual: BossBodyVisual; tag: Sprite }[] = []
 
   /**
@@ -129,11 +125,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     sprite.scale.set(w, w / 4, 1)
     return sprite
   }
-  const styles: Record<FigureKind, Record<string, string>> = {
-    striker: { ...KIT_DEFAULTS.striker },
-    captain: { ...KIT_DEFAULTS.captain },
-  }
-  const figureHeights: Record<FigureKind, number> = { striker: 12, captain: 12 }
   let turntable = false
 
   /** Ground spot `dist` ahead of the camera, and the yaw that looks back at the player. */
@@ -173,14 +164,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     })
   }
 
-  function spawnFigure(kind: FigureKind, x: number, z: number, facing: number): void {
-    const figure = buildFootballer(kind, styles[kind], figureHeights[kind])
-    figure.group.position.set(x, 0, z)
-    figure.group.rotation.y = facing
-    scene.add(figure.group)
-    figures.push(figure)
-  }
-
   /** A ported procedural boss body as a standing statue: a real (unstepped) BossFight. */
   function spawnBody(slug: string, x: number, z: number, facing: number): void {
     const spec = BOSS_LADDER.find((s) => s.id === `${slug}-titan`)
@@ -200,8 +183,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     game.titans = []
     dummies.clear()
     recruitN = 0
-    for (const figure of figures) figure.dispose(scene)
-    figures.length = 0
     for (const body of bodies) {
       body.visual.removeFrom(scene)
       scene.remove(body.tag)
@@ -218,8 +199,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     spawnStatue('normal', 10.5, -16, -16, face(-16, -16))
     spawnStatue('abnormal', 8.5, -8, -18, face(-8, -18))
     spawnDummy(3, -12, face(3, -12))
-    spawnFigure('striker', 9, -18, face(9, -18))
-    spawnFigure('captain', 17, -16, face(17, -16))
     spawnBody('beast', -26, -30, face(-26, -30))
     spawnBody('founding', -34, -38, face(-34, -38))
     spawnBody('attack', -14, -34, face(-14, -34))
@@ -251,8 +230,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
         <button data-spawn="titan">Titan</button>
         <button data-spawn="aberrant">Aberrant</button>
         <button data-spawn="soldier">Soldier</button>
-        <button data-spawn="striker">Striker</button>
-        <button data-spawn="captain">Captain</button>
       </div>
       <div class="dv-label">The Nine (procedural)</div>
       <div class="dv-row" id="dv-bodies"></div>
@@ -281,15 +258,13 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       </div>
     </div>
     <div class="dv-section">
-      <div class="dv-label">Kit styling</div>
-      <select id="dv-kind">
-        <option value="striker">Striker · Haaland</option>
-        <option value="captain">Captain · Kane</option>
-        <option value="recruit">Recruit · Soldier</option>
-      </select>
-      <div id="dv-slots"></div>
+      <div class="dv-label">Recruit styling</div>
+      <div class="dv-slot">
+        <span>tint</span>
+        <input type="color" id="dv-recruit-tint">
+      </div>
       <div class="dv-row" style="align-items:center">
-        <label>Height <input type="range" id="dv-height" min="6" max="16" step="0.5"></label>
+        <label>Height <input type="range" id="dv-height" min="1.5" max="6" step="0.1"></label>
         <span id="dv-height-val"></span>
       </div>
       <button id="dv-copy">Copy Style JSON</button>
@@ -330,12 +305,9 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       if (what === 'titan' || what === 'aberrant') {
         const { x, z, faceBack } = spotAhead(24)
         spawnStatue(what === 'aberrant' ? 'abnormal' : 'normal', what === 'aberrant' ? 8.5 : 10.5, x, z, faceBack)
-      } else if (what === 'soldier') {
+      } else {
         const { x, z, faceBack } = spotAhead(9)
         spawnDummy(x, z, faceBack)
-      } else {
-        const { x, z, faceBack } = spotAhead(26)
-        spawnFigure(what as FigureKind, x, z, faceBack)
       }
     })
   }
@@ -405,103 +377,25 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     game.player.lamp = lampSlider.valueAsNumber
   })
 
-  // --- kit styling -------------------------------------------------------------
+  // --- recruit styling: one shared tint over the KayKit atlas + height in metres ---
 
-  const kindSelect = q<HTMLSelectElement>('#dv-kind')
-  const slotsRoot = q<HTMLDivElement>('#dv-slots')
+  const tintInput = q<HTMLInputElement>('#dv-recruit-tint')
   const heightInput = q<HTMLInputElement>('#dv-height')
   const heightVal = q<HTMLSpanElement>('#dv-height-val')
 
-  function currentKind(): FigureKind {
-    return kindSelect.value as FigureKind
-  }
-
-  const isRecruit = (): boolean => kindSelect.value === 'recruit'
-
-  function applySlot(kind: FigureKind, slot: string, hex: string): void {
-    styles[kind][slot] = hex
-    for (const figure of figures) {
-      if (figure.kind === kind) figure.setColor(slot, hex)
-    }
-  }
-
-  function renderStyleRows(): void {
-    slotsRoot.innerHTML = ''
-    if (isRecruit()) {
-      // one shared tint layered over the KayKit atlas; height is metres, not statue units
-      const row = document.createElement('div')
-      row.className = 'dv-slot'
-      const label = document.createElement('span')
-      label.textContent = 'tint'
-      const input = document.createElement('input')
-      input.type = 'color'
-      input.value = getRecruitStyle().tint ?? '#ffffff'
-      input.addEventListener('input', () => setRecruitStyle({ tint: input.value }))
-      row.append(label, input)
-      slotsRoot.appendChild(row)
-      heightInput.min = '1.5'
-      heightInput.max = '6'
-      heightInput.step = '0.1'
-      const { height } = getRecruitStyle()
-      heightInput.value = String(height)
-      heightVal.textContent = `${height}m`
-      return
-    }
-    heightInput.min = '6'
-    heightInput.max = '16'
-    heightInput.step = '0.5'
-    const kind = currentKind()
-    for (const [slot, hex] of Object.entries(styles[kind])) {
-      const row = document.createElement('div')
-      row.className = 'dv-slot'
-      const label = document.createElement('span')
-      label.textContent = slot
-      const input = document.createElement('input')
-      input.type = 'color'
-      input.value = hex
-      input.addEventListener('input', () => applySlot(kind, slot, input.value))
-      row.append(label, input)
-      slotsRoot.appendChild(row)
-    }
-    heightInput.value = String(figureHeights[kind])
-    heightVal.textContent = `${figureHeights[kind]}`
-  }
-
-  kindSelect.addEventListener('change', renderStyleRows)
+  tintInput.value = getRecruitStyle().tint ?? '#ffffff'
+  tintInput.addEventListener('input', () => setRecruitStyle({ tint: tintInput.value }))
+  heightInput.value = String(getRecruitStyle().height)
+  heightVal.textContent = `${getRecruitStyle().height}m`
   heightInput.addEventListener('input', () => {
-    if (isRecruit()) {
-      setRecruitStyle({ height: heightInput.valueAsNumber })
-      heightVal.textContent = `${heightInput.value}m`
-      return
-    }
-    const kind = currentKind()
-    figureHeights[kind] = heightInput.valueAsNumber
-    heightVal.textContent = heightInput.value
-    for (const figure of figures) {
-      if (figure.kind === kind) figure.setHeight(figureHeights[kind])
-    }
+    setRecruitStyle({ height: heightInput.valueAsNumber })
+    heightVal.textContent = `${heightInput.value}m`
   })
   q<HTMLButtonElement>('#dv-copy').addEventListener('click', () => {
-    if (isRecruit()) {
-      const json = JSON.stringify({ kind: 'recruit', ...getRecruitStyle() }, null, 2)
-      void navigator.clipboard
-        .writeText(json)
-        .finally(() => hud.toast('recruit style copied to clipboard'))
-      return
-    }
-    const kind = currentKind()
-    const json = JSON.stringify({ kind, height: figureHeights[kind], colors: styles[kind] }, null, 2)
+    const json = JSON.stringify({ kind: 'recruit', ...getRecruitStyle() }, null, 2)
     void navigator.clipboard
       .writeText(json)
-      .catch(() => {
-        const scratch = document.createElement('textarea')
-        scratch.value = json
-        document.body.appendChild(scratch)
-        scratch.select()
-        document.execCommand('copy')
-        scratch.remove()
-      })
-      .finally(() => hud.toast(`${kind} style copied to clipboard`))
+      .finally(() => hud.toast('recruit style copied to clipboard'))
   })
 
   // --- boot ----------------------------------------------------------------------
@@ -509,7 +403,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   // headless verification hook: drive ported bodies (gait, poses) without the sim
   ;(window as unknown as Record<string, unknown>).__aotPlayground = { bodies, spawnBody, clearAll }
 
-  renderStyleRows()
   musterLineup()
   setDrawerOpen(true)
   hud.showBanner('Playground', 2200)
@@ -523,7 +416,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     for (const body of bodies) body.visual.sync(body.fight, dt)
     if (turntable) {
       for (const titan of game.titans) titan.facing += dt * 0.4
-      for (const figure of figures) figure.group.rotation.y += dt * 0.4
       for (const dummy of dummies.values()) dummy.yaw += dt * 0.4
       for (const body of bodies) body.fight.titan.facing += dt * 0.4
     }

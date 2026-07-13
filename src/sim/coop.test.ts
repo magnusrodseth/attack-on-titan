@@ -110,10 +110,10 @@ describe('thunder spears in the shared world', () => {
     expect(w.spears).toHaveLength(1)
   })
 
-  it('a blast kill credits the firing soldier: spear tier, footballer jackpot, heart back', () => {
+  it('a blast kill credits the firing soldier: spear tier, abnormal bonus, heart back', () => {
     const w = createCoopWorld('spear-coop', ['levi'])
     const titan = w.titans[0]!
-    titan.kind = 'striker'
+    titan.kind = 'abnormal'
     const p = w.players.get('levi')!
     p.body.hp = p.body.config.maxHp - 1
     applyPlayerUpdate(w, 'levi', { pos: new Vector3(0, 10, 8), vel: new Vector3(), onGround: false })
@@ -131,7 +131,7 @@ describe('thunder spears in the shared world', () => {
     expect(kills[0]).toMatchObject({
       playerId: 'levi',
       weapon: 'spear',
-      points: 75 * 3, // footballer jackpot, no chain yet
+      points: Math.round(75 * 1.75), // abnormal rarity bonus, no chain yet
       heartGained: true,
     })
     expect(titan.hp).toBe(0)

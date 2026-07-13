@@ -28,6 +28,15 @@ import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, saveBest, startGame, stepGame } from './sim/game'
+import {
+  commendationName,
+  commendationRows,
+  createCommendations,
+  flushCommendations,
+  loadCommendations,
+  resetCommendationRun,
+  stepCommendations,
+} from './sim/commendations'
 import { loadHuntBest } from './sim/hunt'
 import { DEFAULT_MODE_ID, GAME_MODES } from './sim/modes'
 import type { SavedRun } from './sim/persist'
@@ -39,8 +48,7 @@ import { loadRaceBest, restartRace } from './sim/race'
 import { releaseHook } from './sim/rope'
 import { createScore } from './sim/score'
 import { SPEAR_FUSE } from './sim/spear'
-import { anklePos, isFootballer, napeCenter } from './sim/titan'
-import { isMatchday } from './sim/waves'
+import { anklePos, napeCenter } from './sim/titan'
 import { UPGRADE_POOL, applyUpgrade } from './sim/upgrades'
 
 function dailySeed(): string {
@@ -82,6 +90,8 @@ const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 initAnalytics()
 const game = createGame(seed, undefined, modeId)
+// the soldier's record: lifetime commendations riding the solo event bus (ticket 010)
+const commendations = createCommendations(loadCommendations(game.storage))
 const { scene, updateScenery, dayNight } = buildScene(game.arena)
 const camera = new PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 900)
 camera.rotation.order = 'YXZ'
@@ -274,6 +284,7 @@ function beginRun(): void {
   pauseShown = false
   if (game.phase === 'menu' || game.phase === 'dead' || game.phase === 'finished') {
     startGame(game)
+    resetCommendationRun(commendations)
     prevPhase = game.phase
     if (waveBased()) announceWave(game.wave)
     else hud.showBanner(game.mode.name)
@@ -285,22 +296,16 @@ function beginRun(): void {
 
 const waveBased = () =>
   game.mode.id === 'waves' ||
-  game.mode.id === 'matchday' ||
   game.mode.id === 'bossrush' ||
   game.mode.id === 'hunt'
 
-/** Every 3rd wave the footballers walk; in Matchday mode, every wave is theirs. */
 function announceWave(wave: number): void {
   if (game.mode.id === 'hunt') {
-    // The Culling speaks in levels; the matchday duo still gets its drum
+    // The Culling speaks in levels
     hud.showBanner(`Level ${wave}`, 2400)
-    if (isMatchday(wave)) audio.boom()
   } else if (bossForMilestone(wave, game.mode.id)) {
-    // the milestone outranks even matchday: the Shifter gets the whole drum roll
+    // the milestone: the Shifter gets the whole drum roll
     hud.showBanner(`${bossForMilestone(wave, game.mode.id)!.spec.name} Approaches`, 3400)
-    audio.boom()
-  } else if (game.mode.id === 'matchday' || isMatchday(wave)) {
-    hud.showBanner(`Matchday · Wave ${wave}`, 3000)
     audio.boom()
   } else {
     hud.showBanner(`Wave ${wave}`)
@@ -409,6 +414,11 @@ hud.onOpenModes = () => {
 }
 hud.onCloseModes = () => {
   hud.hideModes()
+  hud.showStart(game.phase === 'playing', game)
+}
+hud.onOpenCommendations = () => hud.showCommendations(commendationRows(commendations.save))
+hud.onCloseCommendations = () => {
+  hud.hideCommendations()
   hud.showStart(game.phase === 'playing', game)
 }
 hud.onPickMode = (id) => {
@@ -538,6 +548,8 @@ document.addEventListener('visibilitychange', () => {
 
 const restored = !coopMode && !playgroundMode && runSave !== null && restoreRun(runSave, game)
 if (restored) {
+  // the pre-restore boost history is gone: the current wave cannot vouch for Cold Steel
+  resetCommendationRun(commendations, { restored: true })
   if (runSave?.view) {
     yaw = runSave.view.yaw
     pitch = runSave.view.pitch
@@ -683,8 +695,7 @@ function handleCoopEvents(events: CoopEvent[]): void {
       }
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
-        const star = isFootballer(event.kind)
-        const aberrant = event.kind === 'abnormal' || star
+        const aberrant = event.kind === 'abnormal'
         if (titan) {
           const nape = napeCenter(titan)
           effects.burst(nape, 0xd42b35, aberrant ? 52 : 40)
@@ -698,12 +709,11 @@ function handleCoopEvents(events: CoopEvent[]): void {
           if (audio.has('aberrant-slain')) {
             audio.play('aberrant-slain', { volume: aberrant ? 0.95 : 0.4, rate: aberrant ? 1 : 1.25 })
           }
-          if (star) hud.showBanner(event.kind === 'striker' ? 'Striker Sent Off!' : 'Captain Sent Off!', 2000)
-          else if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
+          if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
           hud.popPoints(event.points, event.oneCut, event.heartGained)
         } else {
           audio.killHit(0.25)
-          const prey = star ? `the ${event.kind === 'striker' ? 'Striker' : 'Captain'}` : aberrant ? 'an aberrant' : 'a titan'
+          const prey = aberrant ? 'an aberrant' : 'a titan'
           hud.addFeedLine(`<b>${event.playerId}</b> slew ${prey} +${event.points}`)
         }
         break
@@ -1029,8 +1039,7 @@ function handleEvents(events: GameEvent[]): void {
         break
       case 'kill': {
         const titan = game.titans.find((t) => t.id === event.titanId)
-        const star = isFootballer(event.kind)
-        const aberrant = event.kind === 'abnormal' || star
+        const aberrant = event.kind === 'abnormal'
         if (titan) {
           const nape = napeCenter(titan)
           effects.burst(nape, 0xd42b35, aberrant ? 52 : 40) // blood
@@ -1049,8 +1058,7 @@ function handleEvents(events: GameEvent[]): void {
         if (audio.has('aberrant-slain')) {
           audio.play('aberrant-slain', { volume: aberrant ? 0.95 : 0.4, rate: aberrant ? 1 : 1.25 })
         }
-        if (star) hud.showBanner(event.kind === 'striker' ? 'Striker Sent Off!' : 'Captain Sent Off!', 2000)
-        else if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
+        if (aberrant) hud.showBanner('Aberrant Slain!', 1600)
         hud.popPoints(event.points, event.oneCut, event.heartGained)
         break
       }
@@ -1454,6 +1462,14 @@ renderer.setAnimationLoop(() => {
     else acc += dt * (game.focusActive ? FOCUS_TIME_SCALE : 1)
     while (acc >= SIM_DT) {
       stepGame(game, input, SIM_DT)
+      if (!coopMode && !debug.autopilot && !debug.silent) {
+        const awarded = stepCommendations(commendations, game, SIM_DT)
+        if (awarded.length > 0) {
+          for (const id of awarded) hud.commendationToast(commendationName(id))
+          audio.chime()
+        }
+        flushCommendations(commendations, game.storage)
+      }
       handleEvents(game.events)
       acc -= SIM_DT
     }
@@ -1468,6 +1484,7 @@ renderer.setAnimationLoop(() => {
       hud.hideStart() // a lingering pause overlay must not sit under the new menu
       hud.hideSettings()
       hud.hideModes()
+      hud.hideCommendations()
       pauseShown = false
       if (game.phase === 'upgrading') {
         hud.showUpgrades(game.offers)
