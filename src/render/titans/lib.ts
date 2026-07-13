@@ -1,11 +1,16 @@
 import {
+  AdditiveBlending,
   BoxGeometry,
+  CanvasTexture,
   Color,
+  NormalBlending,
   CylinderGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  PlaneGeometry,
   RepeatWrapping,
   Scene,
   SphereGeometry,
@@ -76,7 +81,7 @@ export interface BodyMatOpts {
 
 /** Builds one body's materials and fades them all together for the death dissolve. */
 export class MatBag {
-  private readonly mats: MeshStandardMaterial[] = []
+  private readonly mats: (MeshStandardMaterial | MeshBasicMaterial)[] = []
 
   make(opts: BodyMatOpts): MeshStandardMaterial {
     const mat = new MeshStandardMaterial({
@@ -93,6 +98,50 @@ export class MatBag {
     if (opts.emissive !== undefined) {
       mat.emissive = new Color(opts.emissive)
       mat.emissiveIntensity = opts.emissiveIntensity ?? 0.5
+    }
+    this.mats.push(mat)
+    return mat
+  }
+
+  /**
+   * A photo-decal material for face features (the pure titans' eye/teeth pattern).
+   * PNGs with alpha ride as-is (alphaTest); JPGs get a feathered radial mask baked
+   * into a canvas so the photo melts into the flesh instead of ending at a crop
+   * edge; additive makes dark backgrounds vanish (ghost grins from X-ray plates).
+   */
+  decal(
+    path: string,
+    opts: { tint?: Color | string | number; feather?: boolean; additive?: boolean } = {},
+  ): MeshBasicMaterial {
+    const mat = new MeshBasicMaterial({
+      color: new Color(opts.tint ?? 0xffffff),
+      transparent: true,
+      depthWrite: false,
+      blending: opts.additive ? AdditiveBlending : NormalBlending,
+    })
+    if (opts.feather) {
+      const img = new Image()
+      img.addEventListener('load', () => {
+        const size = 256
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = size
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, size, size)
+        ctx.globalCompositeOperation = 'destination-in'
+        const mask = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+        mask.addColorStop(0.55, 'rgba(0,0,0,1)')
+        mask.addColorStop(0.95, 'rgba(0,0,0,0)')
+        ctx.fillStyle = mask
+        ctx.fillRect(0, 0, size, size)
+        const texture = new CanvasTexture(canvas)
+        texture.colorSpace = SRGBColorSpace
+        mat.map = texture
+        mat.needsUpdate = true
+      })
+      img.src = path
+    } else {
+      mat.map = sharedTexture(path)
+      mat.alphaTest = 0.2
     }
     this.mats.push(mat)
     return mat
@@ -204,6 +253,26 @@ export class PartFrame {
     mesh.position.copy(this.rel(x, y, z))
     if (rot) mesh.rotation.set(rot[0], rot[2], -rot[1])
     mesh.castShadow = true
+    this.node.add(mesh)
+    return mesh
+  }
+
+  /**
+   * A face-decal plane at absolute Blender coords, facing the character's front
+   * (Blender -y). Blender-axis rotations as in ball(); dims are (width, height).
+   */
+  plane(
+    mat: MeshBasicMaterial,
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    rot?: readonly [number, number, number],
+  ): Mesh {
+    const mesh = new Mesh(new PlaneGeometry(w, h), mat)
+    mesh.position.copy(this.rel(x, y, z))
+    if (rot) mesh.rotation.set(rot[0], rot[2], -rot[1])
     this.node.add(mesh)
     return mesh
   }

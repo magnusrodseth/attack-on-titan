@@ -146,5 +146,8 @@ Music (two tracks alternating in-game):
 - Night-sky star map from [Deep Star Maps 2020](https://svs.gsfc.nasa.gov/4851) — NASA/Goddard Space Flight Center Scientific Visualization Studio (public domain; Gaia DR2 data)
 - Moon texture from the [CGI Moon Kit](https://svs.gsfc.nasa.gov/4720) — NASA's Scientific Visualization Studio (public domain; LRO/LROC data)
 - Wing glyph in the social-preview card (`public/og.png`): ["Feathered wing"](https://game-icons.net/1x1/lorc/feathered-wing.html) by Lorc, game-icons.net — [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), not CC0
+- Founding Titan maw: [sea lamprey mouth](https://commons.wikimedia.org/wiki/File:Lamprey_mouth.jpg) — U.S. EPA Great Lakes Image Collection (U.S. federal government work, public domain)
+- Cart Titan grin: [advanced periodontal disease, intraoral](https://wwwn.cdc.gov/phil/Details.aspx?pid=19466) — CDC Public Health Image Library #19466 (public domain)
+- Female Titan ghost grin: [X-ray of human skull with juvenile and permanent teeth](https://commons.wikimedia.org/wiki/File:X-ray_of_human_skull_with_juvenile_and_permanent_teeth_(1910).jpg) — The Tacoma Times, 1910 (public domain, pre-1931 US publication)
 - Striker face photo (cropped): ["Erling Haaland Morocco v Norway 7 June 2026-51"](https://commons.wikimedia.org/wiki/File:Erling_Haaland_Morocco_v_Norway_7_June_2026-51.jpg) by Bryan Berlin, Wikimedia Commons — [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0), not CC0
 - Captain face photo (cropped): ["Harry Kane on October 10, 2023"](https://commons.wikimedia.org/wiki/File:Harry_Kane_on_October_10,_2023.jpg) by the UK Prime Minister's Office, Wikimedia Commons — [CC BY 2.0](https://creativecommons.org/licenses/by/2.0), not CC0

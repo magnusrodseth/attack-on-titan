@@ -180,3 +180,55 @@ state the snapshots already carry.
 - Creates the rescue moments co-op currently lacks; pairs well with a possible grab-type titan
   (discussed, not yet adopted) where cutting the wrist frees a grabbed teammate.
 
+## Commendations: achievements riding the event bus (audit idea, agreed 2026-07-13)
+
+An achievement system as a pure listener over the sim event stream. The `GameEvent` union in
+`src/sim/game.ts` (51 types) already covers nearly every skillful act: one-cuts, ankle slices,
+spear multi-kills, boss breaks and flawless kills, grab escapes, lamp-dead night survival.
+Zero sim changes; the layer subscribes to events plus run stats and persists earned ids in
+localStorage (e.g. `aot-odm-commendations`).
+
+- **Registry, scales indefinitely** (user note): each commendation is data (id, name, flavor
+  text, predicate over events/run state), so new ones append to a list without touching any
+  system. Tiers (bronze/silver/gold counts) come free from the same shape.
+- **In-game toast** (user note): earning one mid-run shows a toast, reusing the existing
+  banner/pop machinery in `src/hud.ts`; framed as military commendations in the established
+  brass/Cinzel menu language, with a commendations panel in the menu listing earned/locked.
+- **Ties into existing ideas**: gives the close-quarters bonus ("Point-Blank!") a home before
+  its score multiplier lands, and gives future features (crawler, daily seed) a cheap reward
+  surface.
+- **Co-op**: the `CoopEvent` union (21 types, `src/sim/coop.ts`) can feed the same client-side
+  registry later; solo-first is fine.
+
+## Civilian evacuation events (audit idea, agreed 2026-07-13)
+
+The game currently has no one to protect, which is half the AoT fantasy. Seeded rare wave
+events where a civilian crowd streams along the street nav grid toward the gatehouse; titans
+divert to them; saves pay score.
+
+- **Sim**: civilians as simple agents on the existing NavGrid (`src/sim/nav.ts` `findPath`);
+  titan targeting generalizes the sticky chaser-token system (`MAX_CHASERS` in
+  `src/sim/game.ts`) into a second token pool so some titans hunt civilians instead of the
+  player. Spawn roll seeded via `hashSeed(seed + ':evac:wave')` so replays match.
+- **Render**: the humanoid-pool pattern is proven by `SoldierPool` (`src/render/soldiers.ts`);
+  low-poly civilians reusing credited cloth/skin textures per the texture rule. Civilian blips
+  on the minimap.
+- **Scope path**: start as a rare wave event with a save-count banner and score bonus, graduate
+  to a full escort mode only if the event proves fun. Co-op later.
+- **To scope**: instant devour vs grab (could reuse `src/sim/grab.ts` so a slash frees them);
+  whether lost civilians cost anything or only saved ones pay; how many agents the perf budget
+  allows.
+
+## QoL: key rebinding and colorblind weak-point option (audit idea, agreed 2026-07-13)
+
+Two small gaps found in audit, both real for accessibility.
+
+- **Key rebinding**: the settings panel (`src/hud.ts` `initSettings`, persisted under
+  `aot-odm-settings`) covers FOV/sensitivity/music/SFX/fullscreen but not bindings, a notable
+  gap for a movement-tech game (Q focus, F strike, E/middle-mouse spear, Shift dash are all
+  hardcoded). A bindings map in settings plus a press-to-capture UI row per action.
+- **Colorblind option**: the red weak-point bloom (`makeWeakPointMats` in
+  `src/render/titans.ts`, shared by pures, footballers and bosses) is the only kill signal,
+  rough for red-green colorblindness. A palette toggle swapping the shared material colors
+  (e.g. cyan or yellow glow) is a small fix; tint matching minimap/HUD accents consistently.
+

@@ -73,9 +73,10 @@ export function buildCartTitan(t: TitanState): BossBodyVisual {
   head.ball(skin, 0, -2.7, 2.7, 0.42)
   head.ball(skin, 0, -3.95, 2.02, 0.26)
   head.chain(skin, 0, -3.0, 2.4, 0, -3.9, 2.08, 0.42, 0.28)
-  // big fleshy lips wrapping the muzzle end + mouth slit
+  // big fleshy lips wrapping the muzzle end; between them, rotten human teeth
+  // and diseased gums (CDC PHIL #19466, public domain — see README credits)
   head.ball(lip, 0, -3.98, 2.05, 0.3, { scale: [1.1, 0.55, 0.75] })
-  head.box(dark, 0, -4.18, 2.02, [0.5, 0.1, 0.05])
+  head.plane(mats.decal('/textures/teeth-rot.jpg', { feather: true }), 0, -4.21, 2.03, 0.4, 0.26)
   // eyes high on the skull (skull-front depth hardcoded in build.py), ears
   for (const s of [1, -1]) {
     head.ball(dark, s * 0.24, -3.14, 2.58, 0.09, { scale: [1.1, 0.3, 0.8] })
