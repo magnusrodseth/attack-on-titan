@@ -28,5 +28,9 @@ colors.** Specifically:
   a bare `color:` with no `map:` on a visible surface is not.
 - Accepted exceptions: gameplay indicator glows (nape weak point, resupply ring, lit windows'
   overbright tint), distant 2-triangle bird silhouettes, and transient particle/trail effects.
+- Dated exception (user decision, 2026-07-13): the nine Shifter boss statues
+  (`public/models/*-titan.glb`) ship with their flat Blender colors until a CC0
+  texture/bake pass lands (follow-up in wayfinder ticket 009). This waiver covers the
+  boss statues only — it is not a precedent for other surfaces.
 
 When adding any new visible mesh, source its texture first or reuse an already-credited asset.

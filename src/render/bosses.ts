@@ -23,13 +23,9 @@ import { makeWeakPoint, makeWeakPointMats, TitanVisual } from './titans'
 
 const textureLoader = new TextureLoader()
 
-/**
- * Specs whose statue glb has passed the CC0 texture pass (the repo texture mandate).
- * The delivered models carry flat Blender colors — fine for dev, not shippable — so
- * production shows the texture-compliant capsule rig until a model graduates into this
- * set; dev builds always show the statues so the fights stay verifiable.
- */
-const TEXTURED_GLBS = new Set<string>([])
+// The statue glbs carry flat Blender colors. Shipping them anyway is a user-decided,
+// dated exception to the texture mandate (2026-07-13, recorded in CLAUDE.md): the boss
+// silhouettes go live now, the CC0 texture/bake pass follows as polish (ticket 009).
 
 /**
  * The Shifter's body and fight FX, driven straight from GameState.boss each frame.
@@ -118,7 +114,6 @@ export class BossFxView {
 
   private loadGlb(fight: BossFight): void {
     const specId = fight.spec.id
-    if (!import.meta.env.DEV && !TEXTURED_GLBS.has(specId)) return
     let pending = BossFxView.glbCache.get(specId)
     if (!pending) {
       pending = new GLTFLoader()

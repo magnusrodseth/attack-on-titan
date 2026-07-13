@@ -64,10 +64,9 @@ Glossary: Shifter, Weak Point, Plated, Staggered (extended) in CONTEXT.md.
 All nine glbs landed in `public/models/` (flat Blender colors, ~45k tris each, feet at
 y=0 facing +Z, native canon heights — Jaw 5 m, Cart 3.1 m quadruped, Colossus 60 m).
 `BossFxView` Box3-fits each model to its spec height, so native-height drift is
-absorbed. Because the materials are flat colors, glb skins are **dev-only** behind
-`TEXTURED_GLBS` in `src/render/bosses.ts` (empty allowlist); production shows the
-texture-compliant capsule rig until a model passes its CC0 texture/bake pass — then
-graduating it is a one-line allowlist add. Rebuild recipe per titan:
+absorbed. The materials are flat colors; the user waived the texture mandate for the
+boss statues (dated exception in CLAUDE.md, 2026-07-13), so the glbs render in
+production now and the CC0 texture/bake pass is follow-up polish. Rebuild recipe per titan:
 `blender/titans/<slug>/build.py` + `blender/export_titan.py` (see the models handoff
 and the vault Blender loop note).
 
@@ -96,7 +95,7 @@ the run save additively; "Fresh Spear Caches Dropped" banner on restock.
 
 ## Follow-ups (not in v1)
 
-- Texture/bake pass per model → graduate ids into `TEXTURED_GLBS`.
+- CC0 texture/bake pass per model (closes the dated mandate exception in CLAUDE.md).
 - Glows anchored to semantic mesh names (`Eye`, `Plates`, `Mask`, …) instead of
   height-fraction anchors, for pixel-perfect placement on the statues.
 - War Hammer weapon-construct mechanic using the detachable `HammerPole`/`HammerHead`/
