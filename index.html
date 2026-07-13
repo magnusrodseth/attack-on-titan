@@ -320,7 +320,7 @@
       .overlay > :last-child { margin-bottom: auto; }
       .overlay.hidden { display: none; }
       /* an open menu hides the combat chrome behind it; the dark plate reads clean */
-      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #boss-strip, #race-dist, #race-caret, #threats, #zoom-mask) { visibility: hidden; }
+      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #boss-strip, #race-dist, #race-caret, #threats, #zoom-mask, #commend-toast) { visibility: hidden; }
       .overlay h1 { font-size: 84px; }
       .overlay h2 { font-size: 58px; }
       #mobile-gate { z-index: 10; background: radial-gradient(ellipse at 50% 30%, #16111afb, #07060aff 78%); }
@@ -595,6 +595,43 @@
         transition: opacity 0.25s ease, transform 0.25s ease;
       }
       #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+      /* commendations: the in-run award toast and the record panel */
+      #commend-toast {
+        position: fixed; left: 50%; top: 20px; z-index: 20; max-width: min(620px, 84vw);
+        opacity: 0; transform: translate(-50%, -14px); pointer-events: none;
+        color: var(--parchment); padding: 12px 26px; text-align: center;
+        background:
+          linear-gradient(180deg, #2a2218f2, #150f09f8),
+          url('/textures/linen.jpg') center / 260px;
+        border: 1px solid var(--brass);
+        box-shadow: 0 10px 24px #000d, inset 0 0 22px #000a;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+      #commend-toast.show { opacity: 1; transform: translate(-50%, 0); }
+      #commend-toast .commend-kicker {
+        display: block; font-family: var(--header-font); font-size: 11px;
+        letter-spacing: 4px; text-transform: uppercase; color: var(--brass-bright);
+      }
+      #commend-toast .commend-title { font-family: var(--header-font); font-size: 19px; letter-spacing: 1px; }
+      #commend-toast .commend-toast-desc { font-size: 14px; opacity: 0.75; }
+      #commend-rows {
+        display: flex; flex-direction: column; gap: 8px; text-align: left;
+        width: min(640px, 86vw); max-height: 52vh; overflow-y: auto; padding-right: 6px;
+      }
+      .commend-row {
+        display: flex; justify-content: space-between; align-items: center; gap: 18px;
+        padding: 8px 14px; border: 1px solid #ffffff14; background: #00000042;
+      }
+      .commend-row.awarded { border-color: var(--brass); background: #2a221866; }
+      .commend-name { font-family: var(--header-font); font-size: 16px; letter-spacing: 1px; }
+      .commend-row.awarded .commend-name { color: var(--brass-bright); }
+      .commend-row:not(.awarded) .commend-name { opacity: 0.75; }
+      .commend-desc { font-size: 13px; opacity: 0.6; }
+      .commend-meta { font-size: 13px; opacity: 0.85; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      .commend-tiers { letter-spacing: 3px; margin-left: 10px; font-size: 13px; }
+      .commend-tiers .lit { color: var(--brass-bright); }
+      .commend-tiers .unlit { opacity: 0.3; }
     </style>
   </head>
   <body>
@@ -674,6 +711,7 @@
         <div id="grab-hint">MASH <kbd>Space</kbd> TO BREAK FREE</div>
       </div>
       <div id="toast"></div>
+      <div id="commend-toast"></div>
 
       <div id="start" class="overlay">
         <h1 class="aot-title">Wings of Freedom</h1>
@@ -707,6 +745,7 @@
           <div class="menu-note solo-only" id="featured-note">One fixed district shared by every soldier: its trial times fill the global boards.</div>
           <div class="menu-row" id="menu-row">
             <button id="leaderboard-btn" class="compact">Leaderboard</button>
+            <button id="commend-btn" class="compact">Commendations</button>
             <button id="settings-btn" class="compact">Settings</button>
           </div>
         </div>
@@ -837,6 +876,13 @@
         </div>
         <button id="settings-reset" class="textlink">Reset to defaults</button>
         <button id="settings-back">Back</button>
+      </div>
+
+      <div id="commendations" class="overlay hidden">
+        <h2 class="aot-title">Commendations</h2>
+        <div class="sub" id="commend-count"></div>
+        <div id="commend-rows"></div>
+        <button id="commend-back">Back</button>
       </div>
 
       <div id="upgrade" class="overlay hidden">

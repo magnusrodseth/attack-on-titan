@@ -1,4 +1,5 @@
 import type { Leaderboard, LobbyMsg, TrialBoards } from './net/protocol'
+import type { CommendationRow } from './sim/commendations'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
@@ -151,6 +152,14 @@ export class Hud {
   private copyTimer: number | undefined
   private joinUrl = ''
 
+  private commendPanel = el('commendations')
+  private commendRowsEl = el('commend-rows')
+  private commendCountEl = el('commend-count')
+  private commendToastEl = el('commend-toast')
+  private commendToastTimer: number | undefined
+  private commendQueue: { name: string; desc: string }[] = []
+  private commendToastBusy = false
+
   onStart: () => void = () => {}
   onRestart: () => void = () => {}
   onGiveUp: () => void = () => {}
@@ -175,6 +184,8 @@ export class Hud {
   onLeaveLobby: () => void = () => {}
   onRematch: () => void = () => {}
   onOpenLeaderboard: () => void = () => {}
+  onOpenCommendations: () => void = () => {}
+  onCloseCommendations: () => void = () => {}
   onCloseLeaderboard: () => void = () => {}
   onRaceAgain: () => void = () => {}
   onFeatured: () => void = () => {}
@@ -223,6 +234,8 @@ export class Hud {
     el<HTMLButtonElement>('results-leave').addEventListener('click', () => this.onLeaveLobby())
     el<HTMLButtonElement>('leaderboard-btn').addEventListener('click', () => this.onOpenLeaderboard())
     el<HTMLButtonElement>('leaderboard-back').addEventListener('click', () => this.onCloseLeaderboard())
+    el<HTMLButtonElement>('commend-btn').addEventListener('click', () => this.onOpenCommendations())
+    el<HTMLButtonElement>('commend-back').addEventListener('click', () => this.onCloseCommendations())
     for (const id of SLIDER_IDS) {
       el<HTMLInputElement>(id).addEventListener('input', () => {
         this.refreshSettingsDisplay()
@@ -340,6 +353,87 @@ export class Hud {
 
   get modesOpen(): boolean {
     return !this.modesPanel.classList.contains('hidden')
+  }
+
+  showCommendations(rows: CommendationRow[]): void {
+    this.commendRowsEl.innerHTML = ''
+    let earned = 0
+    for (const row of rows) {
+      if (row.awarded) earned += 1
+      const rowEl = document.createElement('div')
+      rowEl.className = row.awarded ? 'commend-row awarded' : 'commend-row'
+      const left = document.createElement('div')
+      const name = document.createElement('div')
+      name.className = 'commend-name'
+      name.textContent = row.name
+      if (row.tiers) {
+        const tiers = document.createElement('span')
+        tiers.className = 'commend-tiers'
+        for (const [i, lit] of row.tiers.entries()) {
+          const pip = document.createElement('span')
+          pip.className = lit ? 'lit' : 'unlit'
+          pip.textContent = `${['I', 'II', 'III'][i]} `
+          tiers.appendChild(pip)
+        }
+        name.appendChild(tiers)
+      }
+      const desc = document.createElement('div')
+      desc.className = 'commend-desc'
+      desc.textContent = row.desc
+      left.append(name, desc)
+      const meta = document.createElement('div')
+      meta.className = 'commend-meta'
+      meta.textContent = row.awarded
+        ? '✓ Awarded'
+        : row.progress
+          ? `${row.progress.value.toLocaleString('en-US')} / ${row.progress.target.toLocaleString('en-US')}`
+          : 'Locked'
+      rowEl.append(left, meta)
+      this.commendRowsEl.appendChild(rowEl)
+    }
+    this.commendCountEl.textContent = `${earned} of ${rows.length} awarded`
+    this.start.classList.add('hidden')
+    this.commendPanel.classList.remove('hidden')
+  }
+
+  hideCommendations(): void {
+    this.commendPanel.classList.add('hidden')
+  }
+
+  get commendationsOpen(): boolean {
+    return !this.commendPanel.classList.contains('hidden')
+  }
+
+  /** Queue an award toast; simultaneous awards play one after another, ~3s each. */
+  commendationToast(name: string, desc: string): void {
+    this.commendQueue.push({ name, desc })
+    if (!this.commendToastBusy) this.nextCommendToast()
+  }
+
+  private nextCommendToast(): void {
+    const next = this.commendQueue.shift()
+    if (!next) {
+      this.commendToastBusy = false
+      return
+    }
+    this.commendToastBusy = true
+    this.commendToastEl.innerHTML = ''
+    const kicker = document.createElement('span')
+    kicker.className = 'commend-kicker'
+    kicker.textContent = 'Commendation'
+    const title = document.createElement('span')
+    title.className = 'commend-title'
+    title.textContent = next.name
+    const desc = document.createElement('span')
+    desc.className = 'commend-toast-desc'
+    desc.textContent = ` · ${next.desc}`
+    this.commendToastEl.append(kicker, title, desc)
+    this.commendToastEl.classList.add('show')
+    window.clearTimeout(this.commendToastTimer)
+    this.commendToastTimer = window.setTimeout(() => {
+      this.commendToastEl.classList.remove('show')
+      this.commendToastTimer = window.setTimeout(() => this.nextCommendToast(), 300)
+    }, 3000)
   }
 
   update(game: GameState, frame: HudFrame): void {

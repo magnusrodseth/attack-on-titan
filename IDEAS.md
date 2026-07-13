@@ -180,26 +180,6 @@ state the snapshots already carry.
 - Creates the rescue moments co-op currently lacks; pairs well with a possible grab-type titan
   (discussed, not yet adopted) where cutting the wrist frees a grabbed teammate.
 
-## Commendations: achievements riding the event bus (audit idea, agreed 2026-07-13)
-
-An achievement system as a pure listener over the sim event stream. The `GameEvent` union in
-`src/sim/game.ts` (51 types) already covers nearly every skillful act: one-cuts, ankle slices,
-spear multi-kills, boss breaks and flawless kills, grab escapes, lamp-dead night survival.
-Zero sim changes; the layer subscribes to events plus run stats and persists earned ids in
-localStorage (e.g. `aot-odm-commendations`).
-
-- **Registry, scales indefinitely** (user note): each commendation is data (id, name, flavor
-  text, predicate over events/run state), so new ones append to a list without touching any
-  system. Tiers (bronze/silver/gold counts) come free from the same shape.
-- **In-game toast** (user note): earning one mid-run shows a toast, reusing the existing
-  banner/pop machinery in `src/hud.ts`; framed as military commendations in the established
-  brass/Cinzel menu language, with a commendations panel in the menu listing earned/locked.
-- **Ties into existing ideas**: gives the close-quarters bonus ("Point-Blank!") a home before
-  its score multiplier lands, and gives future features (crawler, daily seed) a cheap reward
-  surface.
-- **Co-op**: the `CoopEvent` union (21 types, `src/sim/coop.ts`) can feed the same client-side
-  registry later; solo-first is fine.
-
 ## Civilian evacuation events (audit idea, agreed 2026-07-13)
 
 The game currently has no one to protect, which is half the AoT fantasy. Seeded rare wave
@@ -231,4 +211,194 @@ Two small gaps found in audit, both real for accessibility.
   `src/render/titans.ts`, shared by pures, footballers and bosses) is the only kill signal,
   rough for red-green colorblindness. A palette toggle swapping the shared material colors
   (e.g. cyan or yellow glow) is a small fix; tint matching minimap/HUD accents consistently.
+
+## Create your soldier: attribute-point builds (user idea, 2026-07-13)
+
+Pre-run character customization: a "create your soldier" screen where a fixed pool of
+attribute points is distributed across ODM gear stats (reel speed, hearts, blade racks,
+gas, ...), making the loadout deep and personal. The mechanical seam already exists:
+`PlayerConfig` (`src/sim/player.ts`) is the character sheet, `createPlayer(config)` already
+accepts a custom one, in-run upgrades already mutate it, and the run save already persists
+the mutated config, so a custom starting build rides every existing path for free.
+
+- **Hard prerequisite**: the placebo-upgrades fix above. `gasThrust`, `gasBurn` and
+  `airBoostThrust` are dead fields; a character sheet exposing dead stats is the placebo
+  defect squared. Only stats with a verified observable sim delta get a point track.
+- **Point economy: zero-sum respec, not bonus points.** The default soldier is the
+  baseline; buying a notch above baseline in one track requires selling a notch below in
+  another, so total power is constant. This keeps one leaderboard scope legal (builds are
+  shape, not power), keeps daily-seed mode fair, and honors the commendations decision that
+  meta-state never buys mechanical advantage: all points are available from run one,
+  horizontal expression, no grind ladder.
+- **Candidate tracks** (curated, not the whole config): `reelSpeed`, `hookRange`, `maxGas`,
+  `gasCanisters`, `bladePairs`, `bladeDurability`, `maxHp`, `spearCapacity`, `airControl`,
+  `runSpeed`, `speedCap`. Integer rack stats (canisters, blade pairs, spears, hearts) are
+  natural one-point notches; continuous stats get conservative percentage notches.
+- **Identity-sensitive stat**: `killSpeed` is damage, and speed-is-damage is the game's
+  core. Options: exclude it, price the buy direction steeply, or allow only the sell
+  direction (raise your own one-cut threshold to free points elsewhere, a self-imposed
+  hard mode). Deepens the dull-blades idea if that lands. To scope.
+- **Regiment presets**: the three regiments as starter builds plus full custom. Scout
+  (reel/speed/air control), Garrison (hearts/blades/spears), Military Police (gas
+  economy/hook range). Flavor, onboarding, and a name for what the nameplate shows.
+- **Determinism**: the build joins the replay identity. `?seed=` share URLs grow a compact
+  `&build=` param (notch string); same seed + same build replays bit-for-bit, different
+  build is honestly a different run. Persist the soldier (name + spread) under a versioned
+  `aot-odm-soldier` localStorage key via the same `StorageLike` seam commendations use.
+- **Upgrade interaction**: in-run upgrades multiply the built base, so a maxed track times
+  its matching upgrade is the ceiling to tune against. Bound notch ranges so worst-case
+  stacks stay inside feel and netcode limits: boosted `speedCap` chains must clear under
+  the co-op server's `MAX_REPORTED_SPEED` clamp (60, `src/sim/coop.ts`).
+- **Co-op**: clients own their movement, so builds work with zero netcode changes; the
+  lobby should broadcast each soldier's build/preset so nameplates and the spectator
+  overlay can show it. Asymmetric builds in co-op are a feature (someone tanks, someone
+  reels), not a fairness problem.
+- **Modes**: daily seed probably locks to the default soldier ("same seed, same gear" is
+  the mode's purity); alternatively record the build on the leaderboard entry. Hunt/race
+  PBs may want the build stored with the record. To scope per mode.
+- **Feel guardrail**: movement tracks (`airControl`, `speedCap`, `reelSpeed`) change game
+  feel, and the rope counter-force lesson applies: conservative ranges first, prototype
+  extreme notches behind a toggle, feel-test before shipping wide ranges.
+- **Placement**: `src/sim/soldier.ts` pure module (track registry, budget validation,
+  `applyBuild(config)`) with colocated vitest; one regression test per track asserting an
+  observable sim-behavior delta, generalizing the placebo-upgrade guard so a dead track
+  can never ship. UI as a menu plate ("The Barracks") with notch rows showing derived
+  numbers ("one-cut at 17.0 m/s", "boost chain tops out at 43 m/s"), free respec between
+  runs.
+
+## More maps for time trials (user idea, 2026-07-13)
+
+Framing first: every seed already IS a map. Signal Run generates a fresh course per seed
+(`generateCourse` in `src/sim/course.ts`) through a fresh city (`citygen.ts`), and PBs
+already scope per seed (`trialKey('race', seed)`). So "more maps" is three different
+products at three price points, and they stack.
+
+- **Tier 1, curation (days): named line packs.** Hand-pick seeds whose generated courses
+  are exceptional and name them: "The Cartographer's Dozen" as a map-select plate in the
+  menu, each with a name, a one-line flavor blurb, and its own leaderboard scope (which
+  already exists per seed, zero new systems). Add a **featured line** that rotates weekly
+  (`hashSeed('featured:' + ISO week)` picking from the pack), which composes directly with
+  the daily-seed idea above. Community lines fall out for free: any `?seed=` URL someone
+  shares is already a playable, comparable map.
+- **Tier 2, course archetypes (same city, new route shapes).** The generator currently
+  lays one shape: a point-to-point crossing with shuffled street/canyon/rooftop tiers.
+  New shapes are mostly route-logic in `course.ts`:
+  - **Circuit**: closed loop, start is finish, 2-3 laps with lap splits (the split
+    plumbing in `RaceBest.splits` already exists).
+  - **Ascent**: tier sequence sorted instead of shuffled, street to rooftop, finishing on
+    a wall-crest gate (wallHeight is 50; the finish as a climb reframes the whole line).
+  - **Canal slalom**: gates threaded low along the canal chord (`CANAL_X` in
+    `citygen.ts`) and under its swing-under bridges, a low-altitude discipline.
+  - **Wall ring**: gates riding the wall crest around the city, the vertigo line.
+  Each archetype is a new mode-id-like scope in `trialKey` (e.g.
+  `aot-odm-tt:race-circuit:<seed>`) so PBs and D1 leaderboards stay honest.
+- **Tier 3, district dials (medium): citygen presets.** Citygen v2 already has block
+  motifs and a noise height field; expose named parameter presets that bias them: Old
+  Town (low, dense, tight canyons, rooftop tier hugging 12 m), High District (tower-heavy
+  skyline, canyon tier stretched), Harbor (canal widened, warehouse motifs dominant),
+  Breach (a rubble wedge of collapsed buildings by the gate). Same generator, different
+  knobs; existing credited textures still satisfy the texture rule.
+- **Tier 4, new arena archetypes (the expensive, iconic ones).** Full look specs for both
+  in the two sections below (user-picked references, 2026-07-13).
+  - **Forest of Giant Trees**: the AoT locale. Trunks as hook anchors, and the three gate
+    tiers map naturally to floor/trunk/canopy. Needs a nav analog (open floor is all
+    walkable), a canopy-height analog to `localSkyline`, and sourced bark/foliage
+    textures (Poly Haven has both).
+  - **The Underground City**: cavern ceiling as a universal hook anchor, crystal shafts
+    for light, pairs with the lamp/flashlight system for a night line.
+  - Course generation must generalize first: `gateHeight`/`localSkyline` assume roofs, so
+    the arena grows an "anchor field" the course generator queries instead.
+  - Arena archetypes serve The Culling for free (modes are arena-agnostic), and a
+    relentless-titan hunt between giant trees is a different game.
+- **Replay identity**: the arena re-derives from the seed (`persist.ts` contract), so any
+  map parameter must join that identity: either a `?map=` param alongside `?seed=`, or
+  fold it into the seed string (`forest:abc123`). Same rule the soldier build above
+  follows; the share URL stays the whole map.
+- **Ghost replays** (flagged under daily seed as the time-trial payoff) are map-agnostic:
+  determinism carries them to every tier here, and a featured weekly line with the
+  world-record ghost is the endgame of this whole section.
+
+## Time-trial arena: the Underground City (look spec, user-picked 2026-07-13)
+
+Canon: the subterranean district beneath Mitras, built as a shelter colony, abandoned into
+a slum ([wiki](https://attackontitan.fandom.com/wiki/Underground_(Anime))). The anime
+frames it as a bowl of warm lamplight under a black void, and that is the whole visual
+thesis: **no sky, no horizon; the map reads entirely by its own lights.**
+
+- **The read** (from the references): a basin of dense tan brick/plaster buildings with
+  red clay tile roofs, thousands of warm windows and street lanterns against pure black.
+  Slender square towers glow like candles across the skyline. Giant natural rock pillars,
+  thick as the boss titans are tall, rise out of the city fabric to an unseen ceiling.
+  Street level is vertical even on foot: external stone staircases, arched underpasses,
+  balconies, multi-level alleys, grime and water stains everywhere.
+- **Gameplay geometry**: the cavern ceiling (25-45 m, undulating) is a universal hook
+  anchor, the mechanic the surface city never offers; ceiling-swing chains are this map's
+  identity. Rock pillars are round trunks for orbit-swings. One or two god-ray light
+  shafts from surface openings are canonical (the No Regrets stairwell beam) and become
+  the landmarks: start line at the great stairway to the surface, finish gate standing in
+  the light shaft. Gate tiers remap to street / rooftop / ceiling-vault.
+- **Systems synergy**: permanent night without the day-night cycle; the lamp/flashlight
+  battery and Lights Out commendation get a home arena. Lit windows (existing overbright
+  exception) carry the navigation read. Green/blue-tinted window districts from the
+  references are exactly the per-instance tint layering the texture rule encourages.
+- **Assets**: the big win is reuse. Buildings, roofs, plaster, stairs and lantern glow
+  are the existing credited city set. New surfaces needing sourced CC0 textures: cavern
+  rock (walls, ceiling, pillars, stalactites) and a rubble/dirt ground; Poly Haven and
+  ambientCG rock/cave sets are the candidates, verified by the usual research-subagent
+  pass at build time per the texture rule.
+- **Render/perf**: fog to black is free level-of-detail (the void hides everything
+  distant); the ceiling is one coarse displaced dome; god rays as a few transparent
+  volumetric cones (transient-effect exception). The lit-window and night pipelines
+  already exist.
+- User-provided references:
+  - https://static.wikia.nocookie.net/shingekinokyojin/images/0/06/Underground_City_%28Anime%29.png/revision/latest?cb=20170617171724 (the vista: lamplit bowl, rock pillars through the city, towers)
+  - https://i.pinimg.com/736x/b3/ca/74/b3ca7431ce17150cf423215010bdb466.jpg (balcony view: roofscape read by window light, pillar silhouettes)
+  - https://i.pinimg.com/736x/22/ba/1a/22ba1ad517033255689714b1e04e261a.jpg (street level: external stairs, arches, grime, tile roofs)
+
+## Time-trial arena: the Forest of Giant Trees (look spec, user-picked 2026-07-13)
+
+Canon: trees around 80 m tall, a maintained tourist attraction before the fall, now
+overgrown, the definitive ODM playground
+([wiki](https://attackontitan.fandom.com/wiki/Forest_of_Giant_Trees_(Anime))). Where the
+underground is read by light against black, the forest is read by scale: **trunks are
+cliffs, and ordinary trees are the bushes.**
+
+- **The read** (from the references): striated grey-brown trunks like vertical cliff
+  faces, cedar/sequoia bark with deep channels, flared buttress roots at the base.
+  Normal 10-20 m broadleaf trees grow between the giants and read as underbrush, the
+  scale cue that sells 80 m. Umbrella-shaped foliage pads sprout off the trunks at
+  intervals; thick horizontal branches are standable platforms (the Scouts camp on
+  them). Dim green mid-story, god rays slanting through, fern-and-moss floor with an
+  overgrown tourist path. At the treeline: rolling meadow, then a wall of forest.
+- **Gameplay geometry**: the vertical envelope triples the city's (gates today top out
+  around 26 m plus the 50 m wall; the canopy sits at 50-75 m). Gate tiers remap to
+  floor / trunk / canopy. Trunk spacing 30-60 m against the 90 m hook range makes
+  Tarzan-chains between giants the movement identity; branch platforms give rest points
+  and hook anchors at every height. Set dressing at the treeline: the abandoned
+  tourist-era cabins and white fences from the references, doubling as the resupply
+  station skin.
+- **Sim prerequisite**: buildings are axis-aligned rects (`insideBuildingXZ`,
+  `resolveBuildingCollision`, `groundHeightAt` in `src/sim/city.ts`); trunks and
+  underground pillars both want a cylindrical obstacle variant, and branches want
+  horizontal collision discs. One collision extension serves both arenas, and the
+  minimap draws trunk circles instead of block rects.
+- **Assets** (all new surfaces, the pricier of the two): bark for the giants, ordinary
+  bark for the mid-story, forest floor (leaves, moss, dirt path), foliage alpha cards
+  for pads and underbrush, meadow grass at the treeline. Poly Haven's bark and
+  forest-ground sets are the proven candidates; exact picks verified by the
+  research-subagent pass per the texture rule. Canopy pads build like the procedural
+  titan bodies: geometry plus tiled sourced texture, per-instance tint variety.
+- **Render/perf**: a few unique trunk meshes instanced with per-instance tint and
+  rotation; foliage pads and mid-story trees instanced; green-grey fog closes the
+  mid-story so trunk count stays low; god rays as sparse transparent cones. The Culling
+  in this arena (relentless titans weaving between trunks you cannot see past) is a
+  different game for free.
+- User-provided references:
+  - https://static.wikia.nocookie.net/shingekinokyojin/images/c/c9/The_Forest_of_the_Giant_Trees.png/revision/latest?cb=20130811103348 (treeline from the meadow: the approach read)
+  - https://m.media-amazon.com/images/M/MV5BMDdmNDE2ZTktYmQyYS00MzM4LTk2YzQtYzIxNDViM2VkMDI0XkEyXkFqcGc@._V1_.jpg (inside: trunks as cliff walls, riders dwarfed, light shafts)
+  - https://i.pinimg.com/736x/20/b3/31/20b331019144fae6e14eb0cc189091c3.jpg (misty avenue between giants, mid-story trees as underbrush)
+  - https://m.media-amazon.com/images/M/MV5BNDMwNTg4ZDUtN2NhOS00OWNkLWExN2ItYzNkZjM3YjVhNjQ3XkEyXkFqcGc@._V1_.jpg (abandoned tourist cabins and fences at the forest edge)
+  - https://pbs.twimg.com/media/EE2qVJuXsAESGop.jpg (trunk bases with buttress roots, humans for scale)
+  - https://i.pinimg.com/736x/c2/6b/ef/c26bef2694fa0072ea2b732fc109f574.jpg (foliage pads sprouting off trunks, god rays, mossy path)
+  - https://24.media.tumblr.com/e60d8607bdcf210c3235d608821bde26/tumblr_myjijaldho1srrq1ko1_1280.png (canopy level: standable branches, sunlit crown, the Scout's-eye view)
 

@@ -29,7 +29,7 @@ import { stepCoopClient } from './sim/coopClient'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, saveBest, startGame, stepGame } from './sim/game'
 import {
-  commendationName,
+  commendationInfo,
   commendationRows,
   createCommendations,
   flushCommendations,
@@ -1465,7 +1465,10 @@ renderer.setAnimationLoop(() => {
       if (!coopMode && !debug.autopilot && !debug.silent) {
         const awarded = stepCommendations(commendations, game, SIM_DT)
         if (awarded.length > 0) {
-          for (const id of awarded) hud.commendationToast(commendationName(id))
+          for (const id of awarded) {
+            const info = commendationInfo(id)
+            hud.commendationToast(info.name, info.desc)
+          }
           audio.chime()
         }
         flushCommendations(commendations, game.storage)
