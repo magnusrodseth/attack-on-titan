@@ -1,8 +1,9 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { BOSS_LADDER, bossPartCenter, createBossFight } from './boss'
 import { CYCLE_SECONDS, startFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS } from './flashlight'
-import type { GameEvent } from './game'
+import type { GameEvent, GameState } from './game'
 import { chooseUpgrade, createGame, MAX_CHASERS, startGame, stepGame } from './game'
 import {
   GRAB_ESCAPE_PRESSES,
@@ -861,5 +862,145 @@ describe('titan grabs', () => {
     for (let t = 0; t < 1; t += DT) stepGame(game, neutralInput(), DT)
     expect(titan.stateTime).toBe(stateTime)
     expect(titan.vel.length()).toBe(0)
+  })
+})
+
+describe('the shifter fight through the game loop', () => {
+  function bossGame(specId: string) {
+    const game = createGame('boss-loop', null, 'waves')
+    startGame(game)
+    const spec = BOSS_LADDER.find((s) => s.id === specId)!
+    const fight = createBossFight(game.nextTitanId++, spec, spec.wave, game.seed, 0, 0)
+    fight.titan.facing = 0
+    game.boss = fight
+    game.titans = [fight.titan]
+    return { game, fight }
+  }
+
+  function slashInput() {
+    const input = neutralInput()
+    input.slash = true
+    return input
+  }
+
+  function eventsOf(game: GameState, type: string) {
+    return game.events.filter((e) => e.type === type)
+  }
+
+  it('announces the engagement once, with the bar payload', () => {
+    const { game } = bossGame('beast-titan')
+    game.player.pos.set(20, 2, 0)
+    stepGame(game, neutralInput(), DT)
+    const engaged = eventsOf(game, 'bossEngaged') as Extract<GameEvent, { type: 'bossEngaged' }>[]
+    expect(engaged).toHaveLength(1)
+    expect(engaged[0]!.name).toBe('Beast Titan')
+    expect(engaged[0]!.parts).toHaveLength(3)
+    stepGame(game, neutralInput(), DT)
+    expect(eventsOf(game, 'bossEngaged')).toHaveLength(0)
+  })
+
+  it('breaking a weak point pays 250 and emits the break', () => {
+    const { game, fight } = bossGame('beast-titan')
+    const part = fight.spec.parts[0]!
+    game.player.pos.copy(bossPartCenter(fight.titan, part))
+    game.player.vel.set(game.player.config.killSpeed, 0, 0)
+    game.player.onGround = true
+    stepGame(game, slashInput(), DT)
+    const breaks = eventsOf(game, 'bossPartBroken') as Extract<GameEvent, { type: 'bossPartBroken' }>[]
+    expect(breaks).toHaveLength(1)
+    expect(breaks[0]!.points).toBe(250)
+    expect(game.score.score).toBe(250)
+    expect(game.score.combo).toBe(1)
+    expect(fight.titan.state).toBe('staggered')
+  })
+
+  it('the final nape cut kills, jackpots flawless, and clears the wave', () => {
+    const { game, fight } = bossGame('beast-titan')
+    // choreograph to the last phase: earlier parts broken by single clean cuts
+    for (let i = 0; i < fight.state.parts.length - 1; i++) {
+      const part = fight.state.parts[i]!
+      part.hp = 0
+      part.broken = true
+      part.hits = 1
+      part.chipped = false
+    }
+    fight.state.phase = fight.state.parts.length - 1
+    const napeSpec = fight.spec.parts[fight.spec.parts.length - 1]!
+    game.player.pos.copy(bossPartCenter(fight.titan, napeSpec))
+    game.player.vel.set(game.player.config.killSpeed, 0, 0)
+    game.player.onGround = true
+    stepGame(game, slashInput(), DT)
+    const killed = eventsOf(game, 'bossKilled') as Extract<GameEvent, { type: 'bossKilled' }>[]
+    expect(killed).toHaveLength(1)
+    expect(killed[0]!.flawless).toBe(true)
+    expect(killed[0]!.points).toBe(3000) // 2000 x flawless 1.5, chain 0, grounded
+    const kills = eventsOf(game, 'kill') as Extract<GameEvent, { type: 'kill' }>[]
+    expect(kills).toHaveLength(1)
+    expect(kills[0]!.kind).toBe('shifter')
+    expect(game.phase).toBe('upgrading') // the wave cleared on the same tick
+    expect(game.score.score).toBe(3000 + 250 * game.wave)
+  })
+
+  it('the boss death dissolves its living summons without paying kills', () => {
+    const { game, fight } = bossGame('female-titan')
+    const pure = createTitan({ id: 900, kind: 'normal', height: 9, x: 30, z: 30 })
+    game.titans.push(pure)
+    fight.state.summonIds.push(pure.id)
+    for (let i = 0; i < fight.state.parts.length - 1; i++) {
+      fight.state.parts[i]!.hp = 0
+      fight.state.parts[i]!.broken = true
+      fight.state.parts[i]!.hits = 1
+    }
+    fight.state.phase = fight.state.parts.length - 1
+    fight.state.parts[fight.state.phase]!.hp = 100
+    const napeSpec = fight.spec.parts[fight.spec.parts.length - 1]!
+    game.player.pos.copy(bossPartCenter(fight.titan, napeSpec))
+    game.player.vel.set(game.player.config.killSpeed, 0, 0)
+    stepGame(game, slashInput(), DT)
+    expect(fight.titan.hp).toBe(0)
+    expect(pure.hp).toBe(0)
+    expect((eventsOf(game, 'kill') as Extract<GameEvent, { type: 'kill' }>[]).every((e) => e.titanId !== pure.id)).toBe(true)
+  })
+
+  it('a roar shoves the soldier away', () => {
+    const { game } = bossGame('founding-titan')
+    game.player.pos.set(12, 1.6, 0)
+    game.player.vel.set(0, 0, 0)
+    let roared = false
+    for (let i = 0; i < 300 && !roared; i++) {
+      stepGame(game, neutralInput(), DT)
+      if (eventsOf(game, 'bossRoar').length > 0) roared = true
+    }
+    expect(roared).toBe(true)
+  })
+
+  it('the steam aura scalds a soldier inside it while venting', () => {
+    const { game, fight } = bossGame('colossus-titan')
+    fight.state.steamOn = true
+    fight.state.engaged = true
+    game.player.pos.set(10, 2, 0) // deep inside a 60m titan's aura
+    const hpBefore = game.player.hp
+    stepGame(game, neutralInput(), DT)
+    expect(game.player.hp).toBe(hpBefore - 1)
+    expect(eventsOf(game, 'playerHit')).toHaveLength(1)
+  })
+
+  it('a boulder landing next to the soldier costs a heart', () => {
+    const { game, fight } = bossGame('beast-titan')
+    game.player.pos.set(0, 1.6, 30)
+    fight.state.engaged = true
+    fight.state.projectiles.push({
+      id: 1,
+      pos: new Vector3(0, 1, 30),
+      vel: new Vector3(0, -40, 0),
+    })
+    const hpBefore = game.player.hp
+    const impacts: GameEvent[] = []
+    for (let i = 0; i < 10; i++) {
+      stepGame(game, neutralInput(), DT)
+      impacts.push(...eventsOf(game, 'bossProjectileImpact'))
+    }
+    expect(impacts.length).toBeGreaterThan(0)
+    expect(game.player.hp).toBe(hpBefore - 1)
   })
 })

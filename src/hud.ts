@@ -113,6 +113,12 @@ export class Hud {
   private huntLeft = el('hunt-left')
   private huntVignette = el('hunt-vignette')
 
+  private bossStrip = el('boss-strip')
+  private bossName = el('boss-name')
+  private bossBar = el('boss-bar')
+  private bossPart = el('boss-part')
+  private bossSegs: { seg: HTMLElement; fill: HTMLElement }[] = []
+
   private coopPanel = el('coop')
   private lobbyPanel = el('lobby')
   private resultsPanel = el('results')
@@ -383,6 +389,8 @@ export class Hud {
       this.grabTime.textContent = Math.max(0, game.grab.timeLeft).toFixed(1)
     }
 
+    this.updateBossBar(game)
+
     if (game.mode.id === 'race') {
       // racers think in meters per second; the station prompt is meaningless (R restarts)
       this.speedo.textContent = `${Math.round(frame.speed)} m/s`
@@ -394,6 +402,53 @@ export class Hud {
       this.prompt.textContent =
         frame.nearStation && game.phase === 'playing' ? 'R — RESUPPLY' : ''
     }
+  }
+
+  // --- Shifter bar ---------------------------------------------------------------
+
+  /**
+   * The branded boss gauge: one segment per Weak Point, filled from its pool, the lit one
+   * pulsing, plated ones reading steel. Shown only while a living Shifter is engaged.
+   */
+  private updateBossBar(game: GameState): void {
+    const fight = game.boss
+    const show =
+      fight !== null && fight.state.engaged && fight.titan.hp > 0 && game.phase === 'playing'
+    this.bossStrip.classList.toggle('hidden', !show)
+    if (!fight || !show) return
+
+    if (this.bossSegs.length !== fight.state.parts.length) {
+      this.bossBar.innerHTML = ''
+      this.bossSegs = fight.state.parts.map(() => {
+        const seg = document.createElement('div')
+        seg.className = 'boss-seg'
+        const fill = document.createElement('div')
+        fill.className = 'boss-seg-fill'
+        seg.appendChild(fill)
+        this.bossBar.appendChild(seg)
+        return { seg, fill }
+      })
+    }
+    this.bossName.textContent = fight.spec.name
+    for (const [i, { seg, fill }] of this.bossSegs.entries()) {
+      const part = fight.state.parts[i]!
+      fill.style.transform = `scaleX(${(part.hp / part.maxHp).toFixed(3)})`
+      seg.classList.toggle('plated', part.plated && !part.broken)
+      seg.classList.toggle('lit', i === fight.state.phase)
+    }
+    const lit = fight.spec.parts[fight.state.phase]
+    this.bossPart.textContent = lit
+      ? fight.state.parts[fight.state.phase]!.plated
+        ? `WEAK POINT — ${lit.name.toUpperCase()} · PLATED`
+        : `WEAK POINT — ${lit.name.toUpperCase()}`
+      : ''
+  }
+
+  /** A plate crack or part break flashes the whole bar bright for a beat. */
+  bossBarFlash(): void {
+    this.bossBar.classList.remove('crack')
+    void this.bossBar.offsetWidth // restart the animation
+    this.bossBar.classList.add('crack')
   }
 
   // --- Signal Run race strip ---------------------------------------------------

@@ -188,3 +188,67 @@ describe('serializeRun / restoreRun', () => {
     expect(fresh.player.hooks[0]!.local.toArray()).toEqual(g.player.hooks[0]!.local.toArray())
   })
 })
+
+describe('boss wave persistence', () => {
+  function bossWaveGame(seed = 'boss-save') {
+    const game = createGame(seed, null, 'waves')
+    startGame(game)
+    while (game.wave < 5) {
+      for (const t of game.titans) {
+        t.hp = 0
+        t.state = 'dead'
+      }
+      stepGame(game, neutralInput(), DT)
+      chooseUpgrade(game, game.offers[0]!.id)
+    }
+    return game
+  }
+
+  it('round-trips the whole fight: parts, phase, projectiles, summons, rng', () => {
+    const game = bossWaveGame()
+    // rough the fight up so the save is not a fresh default
+    const fight = game.boss!
+    fight.state.parts[0]!.hp -= 60
+    fight.state.parts[0]!.hits = 1
+    fight.state.parts[0]!.chipped = true
+    fight.state.engaged = true
+    fight.state.projectiles.push({ id: 3, pos: new Vector3(1, 20, 3), vel: new Vector3(2, -5, 1) })
+    fight.state.summonIds.push(777)
+    const save = serializeRun(game)
+
+    const restored = createGame(game.seed, null, 'waves')
+    expect(restoreRun(save, restored)).toBe(true)
+    expect(restored.boss).not.toBeNull()
+    expect(restored.boss!.spec.id).toBe(fight.spec.id)
+    expect(restored.boss!.state).toEqual(fight.state)
+    // the fight's titan must be the SAME object as the roster entry, or hooks/AI split
+    expect(restored.boss!.titan).toBe(restored.titans.find((t) => t.kind === 'shifter'))
+  })
+
+  it('a save carrying a shifter without its fight state is rejected untouched', () => {
+    const game = bossWaveGame('boss-save-2')
+    const save = serializeRun(game)
+    delete (save as { boss?: unknown }).boss
+    const restored = createGame(game.seed, null, 'waves')
+    expect(restoreRun(save, restored)).toBe(false)
+    expect(restored.wave).toBe(0) // untouched: createGame leaves the run un-started
+  })
+
+  it('restored boss waves keep stepping deterministically', () => {
+    const game = bossWaveGame('boss-save-3')
+    game.player.pos.set(50, 2, 0)
+    for (let i = 0; i < 60; i++) stepGame(game, neutralInput(), DT)
+    const save = serializeRun(game)
+
+    const a = createGame(game.seed, null, 'waves')
+    const b = createGame(game.seed, null, 'waves')
+    restoreRun(save, a)
+    restoreRun(save, b)
+    for (let i = 0; i < 240; i++) {
+      stepGame(a, neutralInput(), DT)
+      stepGame(b, neutralInput(), DT)
+    }
+    expect(a.boss!.titan.pos.toArray()).toEqual(b.boss!.titan.pos.toArray())
+    expect(a.boss!.state).toEqual(b.boss!.state)
+  })
+})

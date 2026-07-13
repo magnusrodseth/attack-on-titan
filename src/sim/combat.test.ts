@@ -8,6 +8,7 @@ import {
   stepSlashBuffer,
   trySlash,
 } from './combat'
+import { BOSS_LADDER, bossPartCenter, createBossFight } from './boss'
 import { createPlayer } from './player'
 import { anklePos, bodyCenter, createTitan, napeCenter } from './titan'
 
@@ -297,5 +298,72 @@ describe('slash buffer', () => {
     p.pos.copy(napeCenter(t)) // drifting into range after expiry must not connect
     expect(stepSlashBuffer(p, [t], aim, DT)).toBeNull()
     expect(t.hp).toBe(t.maxHp)
+  })
+})
+
+describe('slashing a shifter', () => {
+  function bossSetup(speed: number) {
+    const spec = BOSS_LADDER[0]!
+    const fight = createBossFight(1, spec, 5, 'combat-test', 0, 0)
+    fight.titan.facing = 0
+    const p = createPlayer()
+    p.pos.copy(bossPartCenter(fight.titan, spec.parts[0]!))
+    p.vel.set(speed, 0, 0)
+    p.onGround = false
+    return { p, fight }
+  }
+
+  it('a swing at the lit part damages the pool and wears the blade once', () => {
+    const { p, fight } = bossSetup(25)
+    const bladeBefore = p.bladeHp
+    const result = trySlash(p, [fight.titan], null, fight)
+    expect(result.hit).toBe(true)
+    expect(result.boss?.damage).toBe(100)
+    expect(fight.state.parts[0]!.hp).toBe(fight.state.parts[0]!.maxHp - 100)
+    expect(p.bladeHp).toBe(bladeBefore - 1)
+  })
+
+  it('the shifter nape is NOT a normal kill target before its phase', () => {
+    const { p, fight } = bossSetup(25)
+    const napeSpec = fight.spec.parts[fight.spec.parts.length - 1]!
+    p.pos.copy(bossPartCenter(fight.titan, napeSpec))
+    const result = trySlash(p, [fight.titan], null, fight)
+    expect(result.napeHit).toBe(false)
+    expect(result.killed).toBe(false)
+    expect(fight.titan.hp).toBeGreaterThan(0)
+  })
+
+  it('an off-part swing near the body clinks: double blade wear, zero damage', () => {
+    const { p, fight } = bossSetup(25)
+    p.pos.copy(bodyCenter(fight.titan))
+    const bladeBefore = p.bladeHp
+    const result = trySlash(p, [fight.titan], null, fight)
+    expect(result.hit).toBe(true)
+    expect(result.boss).toBeUndefined()
+    expect(result.bossBody).toBe(true)
+    expect(p.bladeHp).toBe(bladeBefore - 2)
+    expect(fight.titan.hp).toBe(fight.titan.maxHp)
+    expect(fight.state.parts.every((part) => part.hp === part.maxHp)).toBe(true)
+  })
+
+  it('a normal titan in the same swing still resolves by proximity', () => {
+    const { p, fight } = bossSetup(25)
+    const pure = createTitan({ id: 2, kind: 'normal', height: 15, x: 2, z: 0 })
+    pure.facing = 0
+    p.pos.copy(napeCenter(pure))
+    const result = trySlash(p, [fight.titan, pure], aimAt(p, napeCenter(pure)), fight)
+    expect(result.napeHit).toBe(true)
+    expect(result.titanId).toBe(2)
+    expect(pure.hp).toBe(0)
+  })
+
+  it('the buffered swing connects with the lit part too', () => {
+    const { p, fight } = bossSetup(25)
+    const partPos = bossPartCenter(fight.titan, fight.spec.parts[0]!)
+    p.pos.copy(partPos).add(new Vector3(0, 40, 0))
+    trySlash(p, [fight.titan], null, fight) // arms the buffer, nothing in reach
+    p.pos.copy(partPos)
+    const connected = stepSlashBuffer(p, [fight.titan], null, DT, fight)
+    expect(connected?.boss?.damage).toBe(100)
   })
 })

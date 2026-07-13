@@ -1,4 +1,6 @@
 import { Vector3 } from 'three'
+import type { BossState } from './boss'
+import { BOSS_LADDER } from './boss'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { GamePhase, GameState } from './game'
 import { loadHuntBest } from './hunt'
@@ -39,6 +41,11 @@ interface SavedHook {
 }
 
 type SavedTitan = Omit<TitanState, 'pos' | 'vel'> & { pos: V3; vel: V3 }
+
+/** The Shifter fight is plain data apart from projectile vectors, which flatten to V3. */
+type SavedBoss = Omit<BossState, 'projectiles'> & {
+  projectiles: { id: number; pos: V3; vel: V3 }[]
+}
 
 type SavedSpear = Omit<SpearState, 'pos' | 'vel' | 'local'> & { pos: V3; vel: V3; local: V3 }
 
@@ -83,6 +90,11 @@ export interface SavedRun {
   titans: SavedTitan[]
   spears: SavedSpear[]
   pickups: SpearPickup[]
+  /**
+   * The Shifter fight on a boss wave; absent everywhere else and in pre-boss saves
+   * (which cannot contain shifter titans, so absence is only invalid alongside one).
+   */
+  boss?: SavedBoss
   view?: { yaw: number; pitch: number }
   /**
    * The Culling's countdown, carried across a refresh so reloading never resets the
@@ -132,6 +144,22 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     titans: g.titans.map((t) => ({ ...t, pos: v3(t.pos), vel: v3(t.vel), ankles: [...t.ankles] as [boolean, boolean] })),
     spears: g.spears.map((s) => ({ ...s, pos: v3(s.pos), vel: v3(s.vel), local: v3(s.local) })),
     pickups: g.pickups.map((pk) => ({ ...pk })),
+    ...(g.boss
+      ? {
+          boss: {
+            ...g.boss.state,
+            parts: g.boss.state.parts.map((p) => ({ ...p })),
+            cooldowns: { ...g.boss.state.cooldowns },
+            pendingSpikes: g.boss.state.pendingSpikes.map((s) => ({ ...s })),
+            summonIds: [...g.boss.state.summonIds],
+            projectiles: g.boss.state.projectiles.map((p) => ({
+              id: p.id,
+              pos: v3(p.pos),
+              vel: v3(p.vel),
+            })),
+          },
+        }
+      : {}),
     ...(view ? { view: { ...view } } : {}),
     ...(g.hunt
       ? { hunt: { timeLeft: g.hunt.timeLeft, budget: g.hunt.budget, urgencyFired: g.hunt.urgencyFired } }
@@ -156,6 +184,13 @@ function serializeHook(hook: GameState['player']['hooks'][0]): SavedHook {
 export function restoreRun(save: SavedRun | null | undefined, g: GameState): boolean {
   if (!save || save.v !== SAVE_VERSION) return false
   if (save.seed !== g.seed || save.modeId !== g.mode.id) return false
+  // a shifter on the roster demands its fight state; a dangling boss payload is fine to drop
+  if (save.titans.some((t) => t.kind === 'shifter')) {
+    if (!save.boss) return false
+    const boss = save.boss
+    if (!BOSS_LADDER.some((spec) => spec.id === boss.specId)) return false
+    if (!save.titans.some((t) => t.id === boss.titanId)) return false
+  }
 
   g.phase = save.phase
   g.wave = save.wave
@@ -223,6 +258,29 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
     local: new Vector3(...s.local),
   }))
   g.pickups = save.pickups.map((pk) => ({ ...pk }))
+
+  const savedBoss = save.boss
+  const bossTitan = savedBoss ? g.titans.find((t) => t.id === savedBoss.titanId) : undefined
+  const bossSpec = savedBoss ? BOSS_LADDER.find((spec) => spec.id === savedBoss.specId) : undefined
+  g.boss =
+    savedBoss && bossTitan && bossSpec
+      ? {
+          spec: bossSpec,
+          titan: bossTitan, // the SAME object as the roster entry, so hooks and AI agree
+          state: {
+            ...savedBoss,
+            parts: savedBoss.parts.map((p) => ({ ...p })),
+            cooldowns: { ...savedBoss.cooldowns },
+            pendingSpikes: savedBoss.pendingSpikes.map((s) => ({ ...s })),
+            summonIds: [...savedBoss.summonIds],
+            projectiles: savedBoss.projectiles.map((p) => ({
+              id: p.id,
+              pos: new Vector3(...p.pos),
+              vel: new Vector3(...p.vel),
+            })),
+          },
+        }
+      : null
 
   // mode state: the relentless rule is The Culling's, and its clock rides the save
   g.relentless = g.mode.id === 'hunt'

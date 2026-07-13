@@ -62,6 +62,8 @@ export class AudioSystem {
   private heartGain: GainNode | null = null
   private heartTimer: number | undefined
   private heartOn = false
+  private bossGain: GainNode | null = null
+  private bossOn = false
 
   /** Idempotent; must be called from a user gesture (DEPLOY / retry / upgrade click). */
   init(): void {
@@ -416,6 +418,50 @@ export class AudioSystem {
       window.clearInterval(this.heartTimer)
       this.heartTimer = undefined
     }
+  }
+
+  /**
+   * The Shifter fight's music layer: a low detuned drone behind the regular tracks,
+   * swelling in while the boss bar is up and fading the moment the fight ends.
+   * Procedural like the heartbeat and wind, riding the sfx bus so the volume slider
+   * and menu ducking own it like everything else.
+   */
+  setBossLayer(on: boolean): void {
+    if (on === this.bossOn) return
+    this.bossOn = on
+    const ctx = this.ctx
+    if (!ctx || !this.sfx) return
+    if (!this.bossGain) {
+      this.bossGain = ctx.createGain()
+      this.bossGain.gain.value = 0
+      this.bossGain.connect(this.sfx)
+      // two detuned low saws and a sub through a dark, slowly breathing lowpass
+      const filter = ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = 210
+      filter.Q.value = 5
+      filter.connect(this.bossGain)
+      for (const [freq, level] of [
+        [55, 0.09],
+        [82.5, 0.07],
+        [36.7, 0.15],
+      ] as const) {
+        const osc = ctx.createOscillator()
+        osc.type = 'sawtooth'
+        osc.frequency.value = freq
+        const gain = ctx.createGain()
+        gain.gain.value = level
+        osc.connect(gain).connect(filter)
+        osc.start()
+      }
+      const lfo = ctx.createOscillator()
+      lfo.frequency.value = 0.13
+      const lfoGain = ctx.createGain()
+      lfoGain.gain.value = 80
+      lfo.connect(lfoGain).connect(filter.frequency)
+      lfo.start()
+    }
+    this.bossGain.gain.setTargetAtTime(on ? 0.9 : 0, ctx.currentTime, on ? 1.4 : 0.5)
   }
 
   private heartThump(delay: number): void {

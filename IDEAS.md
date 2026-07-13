@@ -62,29 +62,6 @@ when the Striker graduates to the wayfinder map, this section graduates with it.
   - https://img.a.transfermarkt.technology/portrait/big/132098-1700211169.jpg?lm=1 (portrait: swept-back hair and beard reference)
   - https://upload.wikimedia.org/wikipedia/commons/2/2f/Harry_Kane_England_v_Ghana_23_June_2026-024_%28cropped%29.jpg (Wikimedia Commons, same match: hair/beard/build in warm-up top)
 
-## Boss fight with boss health bar and weak-point phases (user idea, 2026-07-09)
-
-A boss titan encounter (natural finale for a wave milestone, e.g. every 10th wave, or its own
-entry on the GameMode registry). The map's fog already lists "boss/armored titan finale" —
-this pins the user's spec for it.
-
-- **Boss health bar**: a wide branded gauge across the top of the screen (same plate/brass
-  construction as the menu gauges, Cinzel name plate, segmented into phase chunks), shown only
-  while the boss is engaged.
-- **Parts of the body lighting up**: the fight is phase-driven — a body part (ankle tendon,
-  wrist, shoulder, eye, then finally the nape) glows as the current weak point, in the same
-  overbright emissive style as the existing nape indicator. Only the lit part takes damage;
-  cutting it staggers the boss, drains a phase chunk of the bar, and moves the glow to the
-  next part. The nape only becomes cuttable in the last phase.
-- **Sim shape**: a `boss` titan kind with a part-hitbox list (reuse the ankle/nape local-anchor
-  math), `phase` index and per-part hp in TitanState or a parallel BossState; events for
-  part-broken/phase-change drive HUD, sounds and bursts. Deterministic like everything else.
-- **Armor synergy**: an armored boss whose skin resists blades everywhere except the lit part
-  is the intended target for the Thunder Spear secondary weapon (shipped 2026-07-09; see
-  wayfinder/map.md) — spears crack plates open, blades finish the glowing flesh.
-- **Spectacle**: phase-change roar + camera shake + hitstop, unique music layer while the bar
-  is up, and a big multi-burst kill with its own banner ("The Wall Stands") and score bonus.
-
 ## Fix the placebo upgrades (defect found in sparring, 2026-07-09)
 
 Not a feature: a correctness fix, agreed to document here until scoped. Three config fields in

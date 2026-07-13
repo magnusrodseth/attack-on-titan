@@ -5,7 +5,7 @@ import { GRAVITY } from './constants'
 import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
 
-export type TitanKind = 'normal' | 'abnormal' | 'striker' | 'captain'
+export type TitanKind = 'normal' | 'abnormal' | 'striker' | 'captain' | 'shifter'
 
 /** The matchday footballers: rare event titans, one tier above the abnormal. */
 export function isFootballer(kind: TitanKind): boolean {
@@ -40,19 +40,28 @@ export interface TitanState {
   repathTimer: number
 }
 
+/** The stat block the titan state machine runs on; bosses override it per BossSpec. */
+export interface KindStats {
+  aggro: number
+  turn: number
+  walk: number
+  swatRest: number
+  leaps: boolean
+  leapY: number
+}
+
 /**
  * Behavior profile per kind (user decisions, 2026-07-09): footballers see further, run
  * faster, swing sooner, and leap higher than any other titan; otherwise they follow the
- * same state machine.
+ * same state machine. The shifter entry is a baseline — each boss passes its own stats
+ * into stepTitan.
  */
-const KIND_STATS: Record<
-  TitanKind,
-  { aggro: number; turn: number; walk: number; swatRest: number; leaps: boolean; leapY: number }
-> = {
+const KIND_STATS: Record<TitanKind, KindStats> = {
   normal: { aggro: 55, turn: 1.4, walk: 0.2, swatRest: 2.2, leaps: false, leapY: 13 },
   abnormal: { aggro: 130, turn: 2.2, walk: 0.38, swatRest: 1.2, leaps: true, leapY: 13 },
   striker: { aggro: 160, turn: 2.5, walk: 0.44, swatRest: 0.9, leaps: true, leapY: 17 },
   captain: { aggro: 160, turn: 2.5, walk: 0.44, swatRest: 0.9, leaps: true, leapY: 17 },
+  shifter: { aggro: 10000, turn: 1.8, walk: 0.24, swatRest: 1.8, leaps: false, leapY: 13 },
 }
 
 export function aggroRange(kind: TitanKind): number {
@@ -69,8 +78,7 @@ export interface TitanEvent {
 export const SWAT_WINDUP = 0.45
 export const TURN_RATE = { normal: 1.4, abnormal: 2.2 } // rad/s: titans commit to turns
 
-function turnToward(t: TitanState, targetYaw: number, dt: number): void {
-  const rate = KIND_STATS[t.kind].turn
+function turnToward(t: TitanState, targetYaw: number, dt: number, rate: number): void {
   let delta = targetYaw - t.facing
   while (delta > Math.PI) delta -= Math.PI * 2
   while (delta < -Math.PI) delta += Math.PI * 2
@@ -186,7 +194,9 @@ export function stepTitan(
   nav?: NavGrid,
   allowChase = true,
   relentless = false,
+  stats?: KindStats,
 ): TitanEvent[] {
+  const S = stats ?? KIND_STATS[t.kind]
   if (t.hp <= 0) {
     if (t.state !== 'dead') {
       t.state = 'dead'
@@ -212,9 +222,9 @@ export function stepTitan(
   const dx = playerPos.x - t.pos.x
   const dz = playerPos.z - t.pos.z
   const horizDist = Math.hypot(dx, dz)
-  const aggro = aggroRange(t.kind)
+  const aggro = S.aggro
   const reach = t.height * 0.5
-  const walkSpeed = t.height * KIND_STATS[t.kind].walk
+  const walkSpeed = t.height * S.walk
 
   // deeply embedded in a building (bad spawn, old save): wade straight out. This must
   // check the PHYSICAL footprint, not nav walkability — clearance cells near corners are
@@ -228,7 +238,7 @@ export function stepTitan(
   ) {
     const [wx, wz] = nearestWalkable(nav, t.pos.x, t.pos.z)
     const yaw = Math.atan2(wx - t.pos.x, wz - t.pos.z)
-    turnToward(t, yaw, dt * 4)
+    turnToward(t, yaw, dt * 4, S.turn)
     t.pos.x += Math.sin(yaw) * walkSpeed * dt
     t.pos.z += Math.cos(yaw) * walkSpeed * dt
     return events
@@ -285,13 +295,13 @@ export function stepTitan(
           }
         }
       }
-      if (t.avoidTimer <= 0) turnToward(t, Math.atan2(steerX, steerZ), dt)
-      if (KIND_STATS[t.kind].leaps && t.leapCooldown <= 0 && horizDist > 12 && horizDist < 80) {
+      if (t.avoidTimer <= 0) turnToward(t, Math.atan2(steerX, steerZ), dt, S.turn)
+      if (S.leaps && t.leapCooldown <= 0 && horizDist > 12 && horizDist < 80) {
         t.state = 'leap'
         t.stateTime = 0
         const inv = 1 / horizDist
         const speed = Math.min(35, horizDist * 1.2)
-        t.vel.set(dx * inv * speed, KIND_STATS[t.kind].leapY, dz * inv * speed)
+        t.vel.set(dx * inv * speed, S.leapY, dz * inv * speed)
         t.leapCooldown = 3 + rng() * 2
         break
       }
@@ -311,14 +321,14 @@ export function stepTitan(
       break
     }
     case 'attack': {
-      turnToward(t, Math.atan2(dx, dz), dt)
+      turnToward(t, Math.atan2(dx, dz), dt, S.turn)
       if (t.stateTime >= SWAT_WINDUP) {
         const swatPos = t.pos
           .clone()
           .addScaledVector(forwardOf(t), reach * 0.6)
           .add(new Vector3(0, t.height * 0.3, 0))
         events.push({ type: 'swat', titanId: t.id, pos: swatPos, radius: t.height * 0.35 })
-        t.attackCooldown = KIND_STATS[t.kind].swatRest
+        t.attackCooldown = S.swatRest
         t.state = 'chase'
         t.stateTime = 0
       }

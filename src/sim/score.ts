@@ -41,6 +41,37 @@ export function registerSpearKill(s: ScoreState, info: { abnormal?: boolean; foo
   return bankKill(s, Math.round(75 * rareMult * chainMult))
 }
 
+/**
+ * Breaking a Shifter's Weak Point sustains the chain like a kill but is not one: it banks
+ * 250 x chain, refreshes the combo window, and leaves the kill count alone.
+ */
+export function registerBossBreak(s: ScoreState): number {
+  const chainMult = 1 + 0.25 * Math.min(s.combo, 12)
+  const points = Math.round(250 * chainMult)
+  s.score += points
+  s.combo += 1
+  s.comboTimer = COMBO_WINDOW
+  s.bestChain = Math.max(s.bestChain, s.combo)
+  return points
+}
+
+/**
+ * The final cut on a Shifter: a 2000 jackpot composing the speed/air/chain identity.
+ * oneCut cannot apply to a pool fight, so its analog is Flawless (+50%): every part broke
+ * to a single clean cut.
+ */
+export function registerBossKill(
+  s: ScoreState,
+  info: { speed: number; airborne: boolean; flawless: boolean },
+  killSpeed: number,
+): number {
+  const speedMult = Math.max(1, info.speed / killSpeed)
+  const airMult = info.airborne ? 1.25 : 1
+  const chainMult = 1 + 0.25 * Math.min(s.combo, 12)
+  const flawlessMult = info.flawless ? 1.5 : 1
+  return bankKill(s, Math.round(2000 * speedMult * airMult * chainMult * flawlessMult))
+}
+
 function bankKill(s: ScoreState, points: number): number {
   s.score += points
   s.combo += 1

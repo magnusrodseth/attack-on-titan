@@ -151,3 +151,14 @@ describe('stepStrike', () => {
     expect(p.pos.y).toBeGreaterThanOrEqual(1.69) // never under eye height off the street
   })
 })
+
+describe('shifters and the focus strike', () => {
+  it('never locks a shifter nape: a guaranteed kill would bypass the part model', () => {
+    const arena = emptyArena()
+    const shifter = createTitan({ id: 5, kind: 'shifter', height: 17, x: 30, z: 0 })
+    shifter.facing = 0
+    const pos = new Vector3(0, 10, 0)
+    const look = aimAt(pos, napeCenter(shifter))
+    expect(findStrikeTarget(pos, look, [shifter], arena)).toBe(null)
+  })
+})

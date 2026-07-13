@@ -45,6 +45,7 @@ export function grabReach(t: TitanState): number {
 /** Grounded and able to act; a downed, frozen, dead or airborne titan has no free fist. */
 function canGrab(t: TitanState): boolean {
   if (t.hp <= 0) return false
+  if (t.kind === 'shifter') return false // bosses pressure through abilities, not the QTE
   return t.state === 'wander' || t.state === 'chase' || t.state === 'attack'
 }
 

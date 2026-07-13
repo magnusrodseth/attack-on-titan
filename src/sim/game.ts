@@ -1,6 +1,8 @@
 import { Vector3 } from 'three'
+import type { BossFight } from './boss'
+import { steamRadius, stepBoss } from './boss'
 import type { Arena } from './city'
-import { raycastHookTarget } from './city'
+import { baseGroundY, raycastHookTarget } from './city'
 import { generateCity } from './citygen'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
@@ -22,7 +24,7 @@ import {
 import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, getMode } from './modes'
 import type { NavGrid } from './nav'
-import { buildNavGrid } from './nav'
+import { buildNavGrid, nearestWalkable } from './nav'
 import type { RaceState } from './race'
 import type { InputState, PlayerState } from './player'
 import { BOOST_COST, createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
@@ -30,13 +32,20 @@ import type { Rng } from './rng'
 import { createRng, hashSeed } from './rng'
 import { attachHook, attachHookToTitan, releaseHook, updateTitanAnchor } from './rope'
 import type { ScoreState } from './score'
-import { createScore, registerKill, registerSpearKill, stepScore } from './score'
+import {
+  createScore,
+  registerBossBreak,
+  registerBossKill,
+  registerKill,
+  registerSpearKill,
+  stepScore,
+} from './score'
 import type { SpearPickup, SpearState } from './spear'
 import { collectPickups, fireSpear, stepSpears } from './spear'
 import type { StrikeState } from './strike'
 import { createStrike, findStrikeTarget, stepStrike } from './strike'
 import type { TitanKind, TitanState } from './titan'
-import { aggroRange, forwardOf, isFootballer, raycastTitan, stepTitan } from './titan'
+import { aggroRange, createTitan, forwardOf, isFootballer, raycastTitan, stepTitan } from './titan'
 import type { Upgrade } from './upgrades'
 
 export type GamePhase = 'menu' | 'playing' | 'upgrading' | 'dead' | 'finished'
@@ -78,6 +87,19 @@ export type GameEvent =
   | { type: 'grabFailed'; titanId: number; hp: number }
   | { type: 'grabReleased'; titanId: number }
   | { type: 'waveClear'; wave: number; bonus: number }
+  // the Shifter fight: engagement bar, plate feedback, breaks, and the fall
+  | { type: 'bossEngaged'; titanId: number; name: string; parts: { name: string; hp: number; maxHp: number }[] }
+  | { type: 'bossPlated'; titanId: number }
+  | { type: 'bossPlateCracked'; titanId: number; partIndex: number }
+  | { type: 'bossPartBroken'; titanId: number; partIndex: number; partName: string; points: number }
+  | { type: 'bossKilled'; titanId: number; name: string; points: number; flawless: boolean }
+  | { type: 'bossThrowWindup'; titanId: number }
+  | { type: 'bossProjectileImpact'; pos: Vector3 }
+  | { type: 'bossSummon'; titanId: number; count: number }
+  | { type: 'bossSteam'; on: boolean }
+  | { type: 'bossRoar'; titanId: number }
+  | { type: 'bossSpikeTelegraph'; x: number; z: number }
+  | { type: 'bossSpike'; x: number; z: number }
   | { type: 'resupply' }
   | { type: 'lampLow' }
   | { type: 'lampDead' }
@@ -143,6 +165,8 @@ export interface GameState {
   /** Loiter clock that arms a grab, plus the post-grab grace before it counts again. */
   grabWatch: GrabWatch
   mode: GameMode
+  /** The live Shifter fight on a boss wave; null everywhere else (boss.ts, ADR 0002). */
+  boss: BossFight | null
   /** Signal Run's course and clock; null in every other mode. */
   race: RaceState | null
   /** The Culling's countdown; null in every other mode. */
@@ -215,6 +239,7 @@ export function createGame(
     grab: null,
     grabWatch: createGrabWatch(),
     mode: getMode(modeId),
+    boss: null,
     race: null,
     hunt: null,
     relentless: false,
@@ -231,6 +256,7 @@ export function startGame(g: GameState): void {
   g.titans = []
   g.spears = []
   g.pickups = []
+  g.boss = null
   g.race = null
   g.hunt = null
   g.relentless = false
@@ -312,7 +338,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   }
 
   // spears resolve before titan AI so a fresh stagger suppresses this tick's swat
-  const spearResult = stepSpears(g.spears, g.titans, p.pos, g.arena, dt)
+  const spearResult = stepSpears(g.spears, g.titans, p.pos, g.arena, dt, g.boss)
   for (const stuck of spearResult.stuck) {
     g.events.push({ type: 'spearStuck', titanId: stuck.titanId })
   }
@@ -323,6 +349,27 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
     g.events.push({ type: 'spearDetonated', pos: blast.pos.clone() })
     for (const titanId of blast.staggered) {
       g.events.push({ type: 'staggered', titanId })
+    }
+    if (blast.boss && g.boss) {
+      const outcome = blast.boss
+      const titanId = g.boss.titan.id
+      if (outcome.cracked) {
+        g.events.push({ type: 'bossPlateCracked', titanId, partIndex: outcome.partIndex })
+      }
+      if (outcome.broken && !outcome.killed) {
+        const points = registerBossBreak(g.score)
+        g.events.push({
+          type: 'bossPartBroken',
+          titanId,
+          partIndex: outcome.partIndex,
+          partName: outcome.partName,
+          points,
+        })
+      }
+      if (outcome.killed) {
+        // a blast wound always chips, so a spear finish is never flawless by definition
+        bankBossKill(g, { speed: 0, airborne: false, flawless: false, weapon: 'spear' })
+      }
     }
     for (const kill of blast.kills) {
       const points = registerSpearKill(g.score, {
@@ -367,7 +414,19 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       titan.vel.set(0, 0, 0) // the holder stands still and squeezes; no walking, no swats
       continue
     }
-    for (const event of stepTitan(titan, p.pos, dt, g.rngLive, g.arena, g.nav, chasers.has(titan.id), g.relentless)) {
+    // a Shifter runs the shared state machine on its own spec stats, relentlessly
+    const shifter = titan.kind === 'shifter' && g.boss?.titan.id === titan.id
+    for (const event of stepTitan(
+      titan,
+      p.pos,
+      dt,
+      g.rngLive,
+      g.arena,
+      g.nav,
+      chasers.has(titan.id),
+      g.relentless || shifter,
+      shifter ? g.boss?.spec.stats : undefined,
+    )) {
       if (event.type !== 'swat') continue
       if (p.invulnTimer > 0) continue
       if (p.pos.distanceTo(event.pos) > event.radius) continue
@@ -385,6 +444,8 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
       }
     }
   }
+
+  stepBossFight(g, dt)
 
   stepScore(g.score, dt)
 
@@ -422,7 +483,7 @@ function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
   handleHookEdge(g, 1, input.hookR, g.prevInput.hookR, input)
 
   // a live swing from a fraction of a second ago connects the moment a titan arrives
-  const late = stepSlashBuffer(p, g.titans, input.lookDir, dt)
+  const late = stepSlashBuffer(p, g.titans, input.lookDir, dt, g.boss)
   if (late) {
     g.events.push({ type: 'slashConnect', napeHit: late.napeHit })
     emitSlashOutcome(g, late, !p.onGround)
@@ -433,7 +494,7 @@ function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
       g.events.push({ type: 'empty', kind: 'blades' }) // nothing to swing: jam, don't sweep
     } else {
       const airborne = !p.onGround
-      const result = trySlash(p, g.titans, input.lookDir)
+      const result = trySlash(p, g.titans, input.lookDir, g.boss)
       g.events.push({ type: 'slash', hit: result.hit, napeHit: result.napeHit })
       emitSlashOutcome(g, result, airborne)
     }
@@ -481,6 +542,30 @@ function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
 function emitSlashOutcome(g: GameState, result: SlashResult, airborne: boolean): void {
   const p = g.player
   if (result.bladeBroke) g.events.push({ type: 'bladeBroke' })
+  if (result.bossBody && result.titanId !== undefined) {
+    g.events.push({ type: 'bossPlated', titanId: result.titanId }) // the hide clinks
+  }
+  if (result.boss && g.boss) {
+    const outcome = result.boss
+    const titanId = g.boss.titan.id
+    if (outcome.plated) {
+      g.events.push({ type: 'bossPlated', titanId })
+    }
+    if (outcome.broken && !outcome.killed) {
+      const points = registerBossBreak(g.score)
+      g.events.push({
+        type: 'bossPartBroken',
+        titanId,
+        partIndex: outcome.partIndex,
+        partName: outcome.partName,
+        points,
+      })
+    }
+    if (outcome.killed) {
+      bankBossKill(g, { speed: result.speed, airborne, flawless: outcome.flawless, weapon: 'blade' })
+    }
+    return
+  }
   if (result.ankleHit && result.titanId !== undefined) {
     const titan = g.titans.find((t) => t.id === result.titanId)
     const remaining = titan ? titan.ankles.filter((cut) => !cut).length : 0
@@ -515,6 +600,161 @@ function emitSlashOutcome(g: GameState, result: SlashResult, airborne: boolean):
       weapon: 'blade',
     })
     grantFocusCharge(g)
+  }
+}
+
+/**
+ * The Shifter falls: jackpot scoring, the banner event, a heart back like any kill, and
+ * its living summons dissolve on the spot (no mop-up anticlimax, no points for corpses).
+ */
+function bankBossKill(
+  g: GameState,
+  info: { speed: number; airborne: boolean; flawless: boolean; weapon: 'blade' | 'spear' },
+): void {
+  const boss = g.boss
+  if (!boss) return
+  const p = g.player
+  const points = registerBossKill(
+    g.score,
+    { speed: info.speed, airborne: info.airborne, flawless: info.flawless },
+    p.config.killSpeed,
+  )
+  p.gas = Math.min(p.config.maxGas, p.gas + p.config.gasKillRefund)
+  const heartGained = p.hp < p.config.maxHp
+  if (heartGained) p.hp += 1
+  for (const id of boss.state.summonIds) {
+    const summon = g.titans.find((t) => t.id === id)
+    if (summon && summon.hp > 0) {
+      summon.hp = 0
+      summon.state = 'dead'
+      summon.stateTime = 0
+    }
+  }
+  g.events.push({
+    type: 'kill',
+    titanId: boss.titan.id,
+    points,
+    oneCut: false,
+    speed: info.speed,
+    heartGained,
+    kind: 'shifter',
+    weapon: info.weapon,
+  })
+  g.events.push({
+    type: 'bossKilled',
+    titanId: boss.titan.id,
+    name: boss.spec.name,
+    points,
+    flawless: info.flawless,
+  })
+  grantFocusCharge(g)
+}
+
+/** A boss-shaped hit on the soldier: same heart/invuln/knockback grammar as a swat. */
+function hurtPlayer(g: GameState, from: Vector3, knock: number, up: number): void {
+  const p = g.player
+  if (p.invulnTimer > 0) return
+  p.hp -= 1
+  p.invulnTimer = 1.2
+  const away = new Vector3(p.pos.x - from.x, 0, p.pos.z - from.z)
+  if (away.lengthSq() > 0) away.normalize()
+  else away.set(0, 0, 1)
+  p.vel.addScaledVector(away, knock)
+  p.vel.y += up
+  g.events.push({ type: 'playerHit', hp: p.hp })
+  if (p.hp <= 0) {
+    g.phase = 'dead'
+    saveBest(g)
+    g.events.push({ type: 'death' })
+  }
+}
+
+/** One tick of the Shifter's own behavior: abilities, projectiles, aura, summons. */
+function stepBossFight(g: GameState, dt: number): void {
+  const boss = g.boss
+  if (!boss || boss.titan.hp <= 0) return
+  const p = g.player
+  const titanId = boss.titan.id
+
+  const liveSummons = boss.state.summonIds.reduce((count, id) => {
+    const t = g.titans.find((titan) => titan.id === id)
+    return t && t.hp > 0 ? count + 1 : count
+  }, 0)
+
+  const events = stepBoss(boss, {
+    playerPos: p.pos,
+    dt,
+    liveSummons,
+    groundY: (x, z) => baseGroundY(g.arena, x, z),
+  })
+
+  for (const event of events) {
+    switch (event.type) {
+      case 'engaged':
+        g.events.push({
+          type: 'bossEngaged',
+          titanId,
+          name: boss.spec.name,
+          parts: boss.spec.parts.map((partSpec, i) => ({
+            name: partSpec.name,
+            hp: boss.state.parts[i]!.hp,
+            maxHp: boss.state.parts[i]!.maxHp,
+          })),
+        })
+        break
+      case 'throwWindup':
+        g.events.push({ type: 'bossThrowWindup', titanId })
+        break
+      case 'throw':
+        break // the flight itself is render-polled off boss.state.projectiles
+      case 'projectileImpact':
+        g.events.push({ type: 'bossProjectileImpact', pos: event.pos.clone() })
+        if (p.pos.distanceTo(event.pos) <= event.radius) hurtPlayer(g, event.pos, 20, 10)
+        break
+      case 'summon': {
+        for (const spawn of event.spawns) {
+          const [x, z] = nearestWalkable(g.nav, spawn.x, spawn.z)
+          const pure = createTitan({ id: g.nextTitanId++, kind: 'normal', height: spawn.height, x, z })
+          pure.state = 'chase' // screamed straight onto the soldier, no wandering in
+          g.titans.push(pure)
+          boss.state.summonIds.push(pure.id)
+        }
+        g.events.push({ type: 'bossSummon', titanId, count: event.spawns.length })
+        break
+      }
+      case 'steam':
+        g.events.push({ type: 'bossSteam', on: event.on })
+        break
+      case 'roar': {
+        g.events.push({ type: 'bossRoar', titanId })
+        // the shockwave shoves without wounding: repositioning pressure, not chip damage
+        const away = new Vector3(p.pos.x - boss.titan.pos.x, 0, p.pos.z - boss.titan.pos.z)
+        if (away.lengthSq() > 0) away.normalize()
+        else away.set(0, 0, 1)
+        p.vel.addScaledVector(away, 26)
+        p.vel.y += 12
+        break
+      }
+      case 'spikeTelegraph':
+        g.events.push({ type: 'bossSpikeTelegraph', x: event.x, z: event.z })
+        break
+      case 'spike': {
+        g.events.push({ type: 'bossSpike', x: event.x, z: event.z })
+        const horiz = Math.hypot(p.pos.x - event.x, p.pos.z - event.z)
+        if (horiz <= event.radius && p.pos.y < 6) {
+          hurtPlayer(g, new Vector3(event.x, 0, event.z), 10, 16)
+        }
+        break
+      }
+    }
+  }
+
+  // the steam aura is a standing zone, not an event: scald anyone inside while it vents
+  if (boss.state.steamOn) {
+    const horiz = Math.hypot(p.pos.x - boss.titan.pos.x, p.pos.z - boss.titan.pos.z)
+    if (horiz <= steamRadius(boss.titan) && p.pos.y < boss.titan.height) {
+      hurtPlayer(g, boss.titan.pos, 14, 8)
+    }
   }
 }
 
@@ -686,7 +926,12 @@ function pickChasers(g: GameState): Set<number> {
   candidates.sort((a, b) => a.key - b.key || a.id - b.id)
   // relentless (The Culling): no chase cap — the whole district converges
   const cap = g.relentless ? candidates.length : MAX_CHASERS
-  return new Set(candidates.slice(0, cap).map((c) => c.id))
+  const chosen = new Set(candidates.slice(0, cap).map((c) => c.id))
+  // a Shifter never yields its hunt to its own summons: the boss always holds a token
+  for (const t of g.titans) {
+    if (t.kind === 'shifter' && t.hp > 0) chosen.add(t.id)
+  }
+  return chosen
 }
 
 export function handleHookEdge(

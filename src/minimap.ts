@@ -126,16 +126,18 @@ export class Minimap {
       ctx.fillStyle =
         t.state === 'crippled'
           ? '#ffd257'
-          : isFootballer(t.kind)
-            ? '#ffffff' // the matchday duo reads as stars on the map
-            : t.kind === 'abnormal'
-              ? '#ff7a3c'
-              : '#e0352b'
+          : t.kind === 'shifter'
+            ? '#f5c542' // the Shifter reads as the milestone: gold, ringed below
+            : isFootballer(t.kind)
+              ? '#ffffff' // the matchday duo reads as stars on the map
+              : t.kind === 'abnormal'
+                ? '#ff7a3c'
+                : '#e0352b'
       ctx.beginPath()
       ctx.arc(x, y, radius, 0, Math.PI * 2)
       ctx.fill()
-      if (t.state === 'crippled') {
-        ctx.strokeStyle = '#ffd257'
+      if (t.state === 'crippled' || t.kind === 'shifter') {
+        ctx.strokeStyle = t.kind === 'shifter' ? '#f5c542' : '#ffd257'
         ctx.lineWidth = 1
         ctx.beginPath()
         ctx.arc(x, y, radius + 2.5, 0, Math.PI * 2)

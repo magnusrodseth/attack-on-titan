@@ -1,3 +1,4 @@
+import { bossForWave, bossSpawnPoint, createBossFight, isBossWave } from './boss'
 import type { GameState } from './game'
 import { saveBest } from './game'
 import { createHuntMode } from './hunt'
@@ -39,12 +40,24 @@ type Composition = (
 ) => TitanSpawn[]
 
 function spawnWave(g: GameState, composition: Composition): void {
-  const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
-  g.titans = composition(g.wave, rng, 1, g.arena.wallRadius).map((s) => {
-    // snap spawns onto walkable streets so no titan starts its life inside a house
-    const [x, z] = nearestWalkable(g.nav, s.x, s.z)
-    return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
-  })
+  if (isBossWave(g.wave, g.mode.id)) {
+    // the milestone: one Shifter through the gate, outranking even the matchday duo.
+    // Solo-only by construction — the co-op server spawns via waveComposition directly.
+    const { spec } = bossForWave(g.wave)
+    const [gx, gz] = bossSpawnPoint(g.arena)
+    const [x, z] = nearestWalkable(g.nav, gx, gz)
+    const fight = createBossFight(g.nextTitanId++, spec, g.wave, g.seed, x, z)
+    g.boss = fight
+    g.titans = [fight.titan]
+  } else {
+    g.boss = null
+    const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
+    g.titans = composition(g.wave, rng, 1, g.arena.wallRadius).map((s) => {
+      // snap spawns onto walkable streets so no titan starts its life inside a house
+      const [x, z] = nearestWalkable(g.nav, s.x, s.z)
+      return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
+    })
+  }
   // fresh spear caches each wave; spears riding last wave's corpses go with them
   g.pickups = spawnPickups(g.seed, g.wave, g.nav)
   g.spears = g.spears.filter((s) => s.titanId === null)

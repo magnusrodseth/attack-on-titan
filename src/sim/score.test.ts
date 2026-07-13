@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { createScore, registerKill, registerSpearKill, stepScore } from './score'
+import {
+  createScore,
+  registerBossBreak,
+  registerBossKill,
+  registerKill,
+  registerSpearKill,
+  stepScore,
+} from './score'
 
 const KILL_SPEED = 22
 
@@ -62,6 +69,38 @@ describe('registerSpearKill', () => {
   it('pays the footballer jackpot tier, same as a blade kill', () => {
     const s = createScore()
     expect(registerSpearKill(s, { footballer: true })).toBe(75 * 3)
+  })
+})
+
+describe('boss scoring', () => {
+  it('a weak point break banks 250 x chain and sustains the combo without counting a kill', () => {
+    const s = createScore()
+    expect(registerBossBreak(s)).toBe(250)
+    expect(s.combo).toBe(1)
+    expect(s.kills).toBe(0)
+    expect(s.comboTimer).toBeGreaterThan(0)
+    expect(registerBossBreak(s)).toBe(Math.round(250 * 1.25)) // chain carried in
+  })
+
+  it('the boss kill jackpots 2000 with speed, air and chain multipliers', () => {
+    const s = createScore()
+    const base = registerBossKill(s, { speed: KILL_SPEED, airborne: false, flawless: false }, KILL_SPEED)
+    expect(base).toBe(2000)
+    expect(s.kills).toBe(1)
+
+    const styled = createScore()
+    const points = registerBossKill(
+      styled,
+      { speed: KILL_SPEED * 2, airborne: true, flawless: false },
+      KILL_SPEED,
+    )
+    expect(points).toBe(Math.round(2000 * 2 * 1.25))
+  })
+
+  it('a flawless kill (every part in one clean cut) pays +50%', () => {
+    const s = createScore()
+    const points = registerBossKill(s, { speed: KILL_SPEED, airborne: false, flawless: true }, KILL_SPEED)
+    expect(points).toBe(3000)
   })
 })
 

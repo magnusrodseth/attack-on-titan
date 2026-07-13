@@ -1,4 +1,6 @@
 import type { Vector3 } from 'three'
+import type { BossFight, BossSlashOutcome } from './boss'
+import { applyBossSlash, bossPartCenter, bossPartRadius } from './boss'
 import type { PlayerState } from './player'
 import type { TitanState } from './titan'
 import { anklePos, bodyCenter, crippleTitan, napeCenter } from './titan'
@@ -15,6 +17,10 @@ export interface SlashResult {
   bladeBroke: boolean
   titanId?: number
   ankleSide?: 0 | 1
+  /** Set when the swing landed on a Shifter's lit Weak Point (ADR 0002). */
+  boss?: BossSlashOutcome
+  /** The swing clinked off a Shifter away from the lit part: wear, no wound. */
+  bossBody?: boolean
 }
 
 /**
@@ -63,26 +69,30 @@ export function napeAimOk(
 
 interface SlashTarget {
   titan: TitanState
-  kind: 'nape' | 'ankle' | 'body'
+  kind: 'nape' | 'ankle' | 'body' | 'bossPart' | 'bossBody'
   side: 0 | 1
+  fight?: BossFight
 }
 
 /**
  * The volume a swing lands in. Nape and ankles compete on distance normalized to their
  * radii — proximity is intent, so a shin-level slash cuts the tendon even where the
- * volumes overlap. The body is a consolation fallback: it never steals a swing from a
- * precise target, only catches the ones that would otherwise whiff.
+ * volumes overlap. A Shifter exposes exactly one volume — its lit Weak Point — which
+ * competes on the same normalized distance; its nape and ankles are never normal targets
+ * (ADR 0002). The body is a consolation fallback: it never steals a swing from a precise
+ * target, only catches the ones that would otherwise whiff (on a Shifter it clinks).
  */
 function resolveSlash(
   p: PlayerState,
   titans: TitanState[],
   aim: Vector3 | null,
+  boss: BossFight | null | undefined,
 ): SlashTarget | null {
   const range = p.config.slashRange
   let best: SlashTarget | null = null
   let bestNorm = 1
   for (const t of titans) {
-    if (t.hp <= 0) continue
+    if (t.hp <= 0 || t.kind === 'shifter') continue
     const napeNorm = p.pos.distanceTo(napeCenter(t)) / napeHitRadius(range, t)
     if (napeNorm <= bestNorm && napeAimOk(p.pos, aim, t, range)) {
       best = { titan: t, kind: 'nape', side: 0 }
@@ -98,13 +108,28 @@ function resolveSlash(
       }
     }
   }
+  if (boss && boss.titan.hp > 0) {
+    const partSpec = boss.spec.parts[boss.state.phase]
+    if (partSpec) {
+      const norm =
+        p.pos.distanceTo(bossPartCenter(boss.titan, partSpec)) / bossPartRadius(range, boss.titan)
+      if (norm <= bestNorm) {
+        best = { titan: boss.titan, kind: 'bossPart', side: 0, fight: boss }
+        bestNorm = norm
+      }
+    }
+  }
   if (best) return best
   let bodyNorm = 1
   for (const t of titans) {
     if (t.hp <= 0) continue
+    if (t.kind === 'shifter' && (!boss || boss.titan.id !== t.id)) continue
     const norm = p.pos.distanceTo(bodyCenter(t)) / bodyHitRadius(range, t)
     if (norm <= bodyNorm) {
-      best = { titan: t, kind: 'body', side: 0 }
+      best =
+        t.kind === 'shifter'
+          ? { titan: t, kind: 'bossBody', side: 0, fight: boss ?? undefined }
+          : { titan: t, kind: 'body', side: 0 }
       bodyNorm = norm
     }
   }
@@ -120,7 +145,12 @@ export const SLASH_BUFFER_S = 0.15
  * with nothing in reach arms the swing buffer instead of whiffing outright — call
  * stepSlashBuffer every tick to let it connect mid-pass.
  */
-export function trySlash(p: PlayerState, titans: TitanState[], aim: Vector3 | null): SlashResult {
+export function trySlash(
+  p: PlayerState,
+  titans: TitanState[],
+  aim: Vector3 | null,
+  boss?: BossFight | null,
+): SlashResult {
   const speed = p.vel.length()
   const none: SlashResult = {
     hit: false,
@@ -137,7 +167,7 @@ export function trySlash(p: PlayerState, titans: TitanState[], aim: Vector3 | nu
   if (p.blades <= 0) return none
   p.slashTimer = p.config.slashCooldown
 
-  const target = resolveSlash(p, titans, aim)
+  const target = resolveSlash(p, titans, aim, boss)
   if (!target) {
     p.slashBuffer = SLASH_BUFFER_S
     return none
@@ -152,9 +182,10 @@ export function stepSlashBuffer(
   titans: TitanState[],
   aim: Vector3 | null,
   dt: number,
+  boss?: BossFight | null,
 ): SlashResult | null {
   if (p.slashBuffer <= 0) return null
-  const target = resolveSlash(p, titans, aim)
+  const target = resolveSlash(p, titans, aim, boss)
   if (!target) {
     p.slashBuffer = Math.max(0, p.slashBuffer - dt)
     return null
@@ -166,6 +197,41 @@ export function stepSlashBuffer(
 /** Lands the swing on the resolved volume: wear, wounds and the result the caller scores. */
 function applySlash(p: PlayerState, target: SlashTarget, speed: number): SlashResult {
   const t = target.titan
+
+  if (target.kind === 'bossPart' && target.fight) {
+    const bladeBroke = wearBlade(p, 1)
+    const outcome = applyBossSlash(target.fight, speed, p.config.killSpeed)
+    return {
+      hit: true,
+      napeHit: false,
+      ankleHit: false,
+      crippled: false,
+      killed: false, // the boss kill is scored via the boss outcome, not the kill path
+      oneCut: false,
+      damage: outcome.damage,
+      speed,
+      bladeBroke,
+      titanId: t.id,
+      boss: outcome,
+    }
+  }
+
+  if (target.kind === 'bossBody') {
+    const bladeBroke = wearBlade(p, 2) // armor-hard hide: the clink costs edge, not flesh
+    return {
+      hit: true,
+      napeHit: false,
+      ankleHit: false,
+      crippled: false,
+      killed: false,
+      oneCut: false,
+      damage: 0,
+      speed,
+      bladeBroke,
+      titanId: t.id,
+      bossBody: true,
+    }
+  }
 
   if (target.kind === 'ankle') {
     const bladeBroke = wearBlade(p, 1)

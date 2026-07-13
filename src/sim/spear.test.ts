@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { BOSS_LADDER, bossPartCenter, createBossFight } from './boss'
 import { emptyArena } from './city'
 import { buildNavGrid } from './nav'
 import { createPlayer } from './player'
@@ -248,5 +249,55 @@ describe('spear pickups', () => {
     const pickups = [{ id: 1, x: 0, z: 0, taken: false }]
     p.pos.set(0, 20, 0)
     expect(collectPickups(pickups, p)).toEqual([])
+  })
+})
+
+describe('blasting a shifter', () => {
+  function bossBlastSetup(specId = 'beast-titan') {
+    const spec = BOSS_LADDER.find((s) => s.id === specId)!
+    const fight = createBossFight(9, spec, spec.wave, 'spear-test', 0, 0)
+    fight.titan.facing = 0
+    return fight
+  }
+
+  it('a blast at the lit part wounds the pool for 60 and reports it', () => {
+    const fight = bossBlastSetup()
+    const partPos = bossPartCenter(fight.titan, fight.spec.parts[0]!)
+    const spears = [stuckSpear(partPos)]
+    const result = stepSpears(spears, [fight.titan], null, emptyArena(), DT * 2, fight)
+    const blast = result.blasts[0]!
+    expect(blast.boss?.affected).toBe(true)
+    expect(blast.boss?.damage).toBe(60)
+    expect(fight.state.parts[0]!.hp).toBe(fight.state.parts[0]!.maxHp - 60)
+    expect(blast.kills).toHaveLength(0)
+  })
+
+  it('a blast at the shifter nape does NOT instakill before its phase', () => {
+    const fight = bossBlastSetup()
+    const napeSpec = fight.spec.parts[fight.spec.parts.length - 1]!
+    const spears = [stuckSpear(bossPartCenter(fight.titan, napeSpec))]
+    const result = stepSpears(spears, [fight.titan], null, emptyArena(), DT * 2, fight)
+    expect(result.blasts[0]!.kills).toHaveLength(0)
+    expect(result.blasts[0]!.boss?.affected).toBeFalsy()
+    expect(fight.titan.hp).toBeGreaterThan(0)
+  })
+
+  it('cracks a plated lit part open instead of wounding it', () => {
+    const fight = bossBlastSetup('armored-titan')
+    const partPos = bossPartCenter(fight.titan, fight.spec.parts[0]!)
+    const spears = [stuckSpear(partPos)]
+    const result = stepSpears(spears, [fight.titan], null, emptyArena(), DT * 2, fight)
+    expect(result.blasts[0]!.boss?.cracked).toBe(true)
+    expect(fight.state.parts[0]!.plated).toBe(false)
+    expect(fight.state.parts[0]!.hp).toBe(fight.state.parts[0]!.maxHp)
+  })
+
+  it('pure titans in the same blast still take normal damage', () => {
+    const fight = bossBlastSetup()
+    const partPos = bossPartCenter(fight.titan, fight.spec.parts[0]!)
+    const pure = makeTitan(2, partPos.x + 2, partPos.z)
+    const spears = [stuckSpear(partPos)]
+    stepSpears(spears, [fight.titan, pure], null, emptyArena(), DT * 2, fight)
+    expect(pure.hp).toBeLessThan(pure.maxHp)
   })
 })

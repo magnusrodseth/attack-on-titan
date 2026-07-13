@@ -1,4 +1,6 @@
 import { Vector3 } from 'three'
+import type { BossBlastOutcome, BossFight } from './boss'
+import { applyBossBlast } from './boss'
 import type { Arena } from './city'
 import { groundHeightAt, raycastHookTarget } from './city'
 import type { NavGrid } from './nav'
@@ -66,6 +68,8 @@ export interface BlastResult {
   kills: { titanId: number; kind: TitanKind }[]
   staggered: number[]
   playerInBlast: boolean
+  /** Set when a Shifter was in play: how the blast met its lit Weak Point (ADR 0002). */
+  boss?: BossBlastOutcome
 }
 
 export interface SpearStepResult {
@@ -85,6 +89,7 @@ export function stepSpears(
   playerPos: Vector3 | null, // null in co-op: the caller checks every soldier against the blast
   arena: Arena,
   dt: number,
+  boss?: BossFight | null,
 ): SpearStepResult {
   const result: SpearStepResult = { stuck: [], fizzled: [], blasts: [] }
 
@@ -144,7 +149,7 @@ export function stepSpears(
     }
     spear.fuse -= dt
     if (spear.fuse <= 0) {
-      result.blasts.push(detonate(spear, titans, playerPos))
+      result.blasts.push(detonate(spear, titans, playerPos, boss))
       spears.splice(i, 1)
     }
   }
@@ -152,7 +157,12 @@ export function stepSpears(
   return result
 }
 
-function detonate(spear: SpearState, titans: TitanState[], playerPos: Vector3 | null): BlastResult {
+function detonate(
+  spear: SpearState,
+  titans: TitanState[],
+  playerPos: Vector3 | null,
+  boss?: BossFight | null,
+): BlastResult {
   const blast: BlastResult = {
     spearId: spear.id,
     pos: spear.pos.clone(),
@@ -160,8 +170,14 @@ function detonate(spear: SpearState, titans: TitanState[], playerPos: Vector3 | 
     staggered: [],
     playerInBlast: playerPos !== null && playerPos.distanceTo(spear.pos) <= BLAST_RADIUS,
   }
+  // the Shifter only ever reacts at its lit Weak Point: no nape instakill, no body damage
+  if (boss && boss.titan.hp > 0) {
+    const outcome = applyBossBlast(boss, blast.pos, BLAST_RADIUS)
+    blast.boss = outcome
+    if (outcome.staggered) blast.staggered.push(boss.titan.id)
+  }
   for (const t of titans) {
-    if (t.hp <= 0) continue
+    if (t.hp <= 0 || t.kind === 'shifter') continue
     if (napeCenter(t).distanceTo(blast.pos) <= BLAST_RADIUS) {
       // on or near the nape: the kill needs no speed — that is the whole point of the spear
       t.hp = 0

@@ -17,6 +17,8 @@ import { buildScene } from './render/scene'
 import { SoldierPool } from './render/soldiers'
 import { SpearsView } from './render/spears'
 import { TitanPool } from './render/titanPool'
+import { BossFxView } from './render/bosses'
+import { bossForWave, bossPartCenter, isBossWave } from './sim/boss'
 import { raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
 import { clockFraction } from './sim/daynight'
@@ -102,6 +104,7 @@ const audio = new AudioSystem()
 const minimap = new Minimap(game.arena)
 const spearsView = new SpearsView(scene)
 const gatesView = new GatesView(scene)
+const bossFx = new BossFxView(scene)
 hud.setRaceUi(game.mode.id === 'race')
 hud.setHuntUi(game.mode.id === 'hunt')
 let roarTimer = 3
@@ -287,6 +290,10 @@ function announceWave(wave: number): void {
     // The Culling speaks in levels; the matchday duo still gets its drum
     hud.showBanner(`Level ${wave}`, 2400)
     if (isMatchday(wave)) audio.boom()
+  } else if (isBossWave(wave, game.mode.id)) {
+    // the milestone outranks even matchday: the Shifter gets the whole drum roll
+    hud.showBanner(`${bossForWave(wave).spec.name} Approaches`, 3400)
+    audio.boom()
   } else if (game.mode.id === 'matchday' || isMatchday(wave)) {
     hud.showBanner(`Matchday · Wave ${wave}`, 3000)
     audio.boom()
@@ -1140,6 +1147,92 @@ function handleEvents(events: GameEvent[]): void {
       case 'staggered':
         hud.popText('Staggered!')
         break
+      case 'bossEngaged': {
+        const dist = game.boss?.titan.pos.distanceTo(game.player.pos) ?? 40
+        hud.showBanner(`${event.name} · Break Its Guard`, 2800)
+        audio.playAt(ROARS, dist, { volume: 1.7, rate: 0.55 })
+        effects.addShake(0.5)
+        break
+      }
+      case 'bossPlated':
+        hud.popText('Plated · Crack It With a Spear!')
+        audio.thud(0.5)
+        audio.click()
+        break
+      case 'bossPlateCracked': {
+        hud.showBanner('Plate Cracked · Blades In!', 1800)
+        hud.bossBarFlash()
+        const fight = game.boss
+        if (fight) {
+          const part = fight.spec.parts[event.partIndex]
+          if (part) effects.burst(bossPartCenter(fight.titan, part), 0xcdd6de, 34)
+        }
+        effects.addShake(0.5)
+        audio.snap()
+        break
+      }
+      case 'bossPartBroken': {
+        hud.showBanner(`${event.partName} Severed  +${event.points}`, 2200)
+        hud.bossBarFlash()
+        const fight = game.boss
+        if (fight) {
+          const part = fight.spec.parts[event.partIndex]
+          if (part) {
+            const at = bossPartCenter(fight.titan, part)
+            effects.burst(at, 0xd42b35, 46)
+            effects.burst(at.clone().add(new Vector3(0, 2, 0)), 0xbfc7cc, 24)
+          }
+          audio.playAt(ROARS, fight.titan.pos.distanceTo(game.player.pos), { volume: 1.6, rate: 0.65 })
+        }
+        effects.addShake(0.8)
+        hitstop = 0.12
+        audio.killHit(0.9)
+        break
+      }
+      case 'bossKilled':
+        hud.showBanner(event.flawless ? 'The Wall Stands · Flawless' : 'The Wall Stands', 4200)
+        effects.addShake(1)
+        hitstop = 0.18
+        audio.boom()
+        if (audio.has('aberrant-slain')) audio.play('aberrant-slain', { volume: 1, rate: 0.85 })
+        break
+      case 'bossThrowWindup': {
+        hud.popText('Incoming!')
+        const dist = game.boss?.titan.pos.distanceTo(game.player.pos) ?? 60
+        audio.playAt(ROARS, dist, { volume: 1.2, rate: 0.9 })
+        break
+      }
+      case 'bossProjectileImpact':
+        effects.burst(event.pos, 0x8a8a90, 44)
+        effects.burst(event.pos.clone().add(new Vector3(0, 1.5, 0)), 0xb59a72, 26)
+        effects.addShake(0.5)
+        audio.spearBoom(event.pos.distanceTo(game.player.pos))
+        break
+      case 'bossSummon': {
+        hud.showBanner('The Scream · Pures Answer', 2200)
+        const dist = game.boss?.titan.pos.distanceTo(game.player.pos) ?? 40
+        audio.playAt(ROARS, dist, { volume: 1.5, rate: 1.2 })
+        break
+      }
+      case 'bossSteam':
+        hud.popText(event.on ? 'Scalding Steam!' : 'The Steam Thins · Dive!')
+        audio.gasBurst()
+        break
+      case 'bossRoar': {
+        const dist = game.boss?.titan.pos.distanceTo(game.player.pos) ?? 20
+        audio.playAt(ROARS, dist, { volume: 1.9, rate: 0.5 })
+        effects.addShake(0.9)
+        hud.popText('Thrown by the Roar!')
+        break
+      }
+      case 'bossSpikeTelegraph':
+        audio.click()
+        break
+      case 'bossSpike':
+        effects.burst(new Vector3(event.x, 1.2, event.z), 0x9a927f, 38)
+        effects.addShake(0.4)
+        audio.thud(0.8)
+        break
       case 'spearPickup':
         hud.showBanner(`Thunder Spear Racked · ${event.remaining}`, 1200)
         audio.pickupChime()
@@ -1386,6 +1479,7 @@ renderer.setAnimationLoop(() => {
   hud.setStrikePrompt(lockedTitan !== undefined)
 
   titanPool.sync(game.titans, dt)
+  bossFx.sync(game, dt)
   spearsView.sync(game.spears, game.pickups, dt)
   gatesView.sync(game, now * 0.001)
   updateSpearBeeps(dt)
@@ -1445,6 +1539,14 @@ renderer.setAnimationLoop(() => {
   if (game.mode.id === 'hunt') {
     audio.setHeartbeat(game.hunt !== null && hud.updateHunt(game))
   }
+
+  // the boss drone swells while a living Shifter is engaged and dies with the fight
+  audio.setBossLayer(
+    game.boss !== null &&
+      game.boss.state.engaged &&
+      game.boss.titan.hp > 0 &&
+      game.phase === 'playing',
+  )
 
   if (game.race) {
     // project the active gate: distance readout on screen, an edge caret when it is not

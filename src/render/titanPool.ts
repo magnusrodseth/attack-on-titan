@@ -17,6 +17,7 @@ export class TitanPool {
   sync(titans: TitanState[], dt: number): void {
     const alive = new Set<number>()
     for (const t of titans) {
+      if (t.kind === 'shifter') continue // the boss body belongs to BossFxView (bosses.ts)
       alive.add(t.id)
       let visual = this.visuals.get(t.id)
       if (!visual) {

@@ -118,3 +118,74 @@ describe('waves mode through the seam', () => {
     expect(run()).toBe(run())
   })
 })
+
+describe('shifter waves', () => {
+  function clearWave(game: ReturnType<typeof createGame>) {
+    for (const t of game.titans) {
+      t.hp = 0
+      t.state = 'dead'
+    }
+    stepGame(game, neutralInput(), DT)
+    if (game.phase === 'upgrading') chooseUpgrade(game, game.offers[0]!.id)
+  }
+
+  function advanceToWave(game: ReturnType<typeof createGame>, target: number) {
+    while (game.wave < target) clearWave(game)
+  }
+
+  it('wave 5 of Wave Survival fields exactly one shifter, arriving via the gate', () => {
+    const game = createGame('boss-spawn', null, 'waves')
+    startGame(game)
+    advanceToWave(game, 5)
+    expect(game.titans).toHaveLength(1)
+    expect(game.titans[0]!.kind).toBe('shifter')
+    expect(game.boss).not.toBeNull()
+    expect(game.boss!.spec.id).toBe('beast-titan')
+    expect(game.boss!.titan.id).toBe(game.titans[0]!.id)
+    // breached at the gate side: same wall angle, deep in the district
+    const t = game.titans[0]!
+    const angle = Math.atan2(t.pos.z, t.pos.x)
+    let delta = angle - game.arena.gateAngle
+    while (delta > Math.PI) delta -= Math.PI * 2
+    while (delta < -Math.PI) delta += Math.PI * 2
+    expect(Math.abs(delta)).toBeLessThan(0.35)
+    expect(Math.hypot(t.pos.x, t.pos.z)).toBeGreaterThan(game.arena.wallRadius * 0.6)
+    // spear caches still spawn: the plated fights need them
+    expect(game.pickups.length).toBeGreaterThan(0)
+  })
+
+  it('wave 15 collides with matchday and the shifter outranks the duo', () => {
+    const game = createGame('boss-vs-matchday', null, 'waves')
+    startGame(game)
+    advanceToWave(game, 15)
+    expect(game.titans).toHaveLength(1)
+    expect(game.titans[0]!.kind).toBe('shifter')
+    expect(game.boss!.spec.id).toBe('jaw-titan')
+  })
+
+  it('waves 6 and 7 return to normal hordes with the boss cleared', () => {
+    const game = createGame('boss-then-horde', null, 'waves')
+    startGame(game)
+    advanceToWave(game, 6)
+    expect(game.boss).toBeNull()
+    expect(game.titans.length).toBeGreaterThan(1)
+    expect(game.titans.every((t) => t.kind !== 'shifter')).toBe(true)
+  })
+
+  it('matchday mode never sees a boss at wave 5', () => {
+    const game = createGame('matchday-no-boss', null, 'matchday')
+    startGame(game)
+    advanceToWave(game, 5)
+    expect(game.boss).toBeNull()
+    expect(game.titans.every((t) => t.kind === 'striker' || t.kind === 'captain')).toBe(true)
+  })
+
+  it('the boss dying clears the wave like any roster', () => {
+    const game = createGame('boss-clear', null, 'waves')
+    startGame(game)
+    advanceToWave(game, 5)
+    game.boss!.titan.hp = 0
+    stepGame(game, neutralInput(), DT)
+    expect(game.phase).toBe('upgrading')
+  })
+})

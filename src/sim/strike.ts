@@ -47,7 +47,9 @@ export function findStrikeTarget(
   let bestId: number | null = null
   let bestCos = STRIKE_CONE_COS
   for (const t of titans) {
-    if (t.hp <= 0) continue
+    // a Shifter's nape only exists as its final Weak Point; a guaranteed-kill dash would
+    // bypass the whole part model (ADR 0002), so the lock never offers one
+    if (t.hp <= 0 || t.kind === 'shifter') continue
     const to = napeCenter(t).sub(pos)
     const dist = to.length()
     if (dist < STRIKE_MIN_RANGE || dist > STRIKE_RANGE) continue

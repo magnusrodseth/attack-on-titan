@@ -6,6 +6,7 @@ import {
   GRAB_REGRAB_COOLDOWN,
   GRAB_SPEED_LIMIT,
   createGrabWatch,
+  findGrabCandidates,
   grabHoldPoint,
   grabReach,
   startGrab,
@@ -154,5 +155,16 @@ describe('grabHoldPoint', () => {
     const horiz = Math.hypot(point.x - titan.pos.x, point.z - titan.pos.z)
     expect(horiz).toBeGreaterThan(0)
     expect(horiz).toBeLessThan(titan.height * 0.5)
+  })
+})
+
+describe('shifters and the grab', () => {
+  it('a shifter never grabs: its pressure comes from abilities instead', () => {
+    const player = createPlayer()
+    player.vel.set(0, 0, 0)
+    const shifter = createTitan({ id: 5, kind: 'shifter', height: 17, x: 0, z: 0 })
+    shifter.state = 'chase'
+    player.pos.set(2, 2, 0) // deep inside grab reach
+    expect(findGrabCandidates(player, [shifter])).toHaveLength(0)
   })
 })

@@ -16,8 +16,16 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
   _Avoid_: weapon class (there is no class system; spears augment the one standard kit).
 - **Spear pickup** — a seeded cache in the city that restocks Thunder Spears; blipped on the
   minimap.
-- **Staggered** — a titan briefly frozen by a spear blast; unlike a crippled titan it keeps
-  its wounds when it recovers.
+- **Staggered** — a titan briefly frozen, by a spear blast or by breaking a Shifter's Weak
+  Point; unlike a crippled titan it keeps its wounds when it recovers.
+- **Weak Point** — the one lit body part where a Shifter can currently be hurt, by blade or
+  blast alike; cutting through it breaks it, Staggers the Shifter, drains one chunk of its
+  bar, and lights the next part. The nape is always the last.
+- **Plated** — an armored Weak Point that blades cannot cut until a Thunder Spear blast
+  cracks it open.
+- **Shifter** — one of the Nine named boss titans (Beast, Cart, Jaw, Female, Armored,
+  War Hammer, Attack, Colossus, Founding), fought as the milestone event every 5th wave of
+  Wave Survival, in a fixed ladder ending with the Founding.
 - **Focus** — the slow-motion meter (Q).
 - **Seed** — the string that determines the whole city and every random stream; same seed, same world.
 
