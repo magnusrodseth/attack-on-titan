@@ -1,7 +1,5 @@
-import type { Mesh, Object3D, PerspectiveCamera, Scene } from 'three'
+import type { PerspectiveCamera, Scene } from 'three'
 import { Vector3 } from 'three'
-import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { Hud } from '../hud'
 import type { SoldierPool } from '../render/soldiers'
 import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
@@ -26,7 +24,8 @@ import { TitanHitboxes } from './hitboxes'
  * of this (or the drawer DOM) exists in production builds. Titans here are plain
  * TitanState statues the normal TitanPool renders; soldiers are RemoteSoldier dummies
  * through the normal SoldierPool; the Striker and Captain are the strikers.ts figures
- * with live-editable color slots.
+ * with live-editable color slots; the nine Shifters are the ported procedural bodies
+ * from src/render/titans/ posed by unstepped BossFights.
  */
 
 export interface DevCtx {
@@ -103,9 +102,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
   let recruitN = 0
   const dummies = new Map<string, RemoteSoldier>()
   const figures: FootballerFigure[] = []
-  const glbStatues: Object3D[] = []
   const bodies: { fight: BossFight; visual: BossBodyVisual }[] = []
-  const glbCache = new Map<string, Promise<GLTF>>()
   const styles: Record<FigureKind, Record<string, string>> = {
     striker: { ...KIT_DEFAULTS.striker },
     captain: { ...KIT_DEFAULTS.captain },
@@ -158,25 +155,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     figures.push(figure)
   }
 
-  /** Blender-loop titan statues (blender/titans/<slug>/build.py → public/models/<slug>-titan.glb). */
-  function spawnTitanGlb(slug: string, x: number, z: number, facing: number): void {
-    let gltf = glbCache.get(slug)
-    if (!gltf) {
-      gltf = new GLTFLoader().loadAsync(`/models/${slug}-titan.glb`)
-      glbCache.set(slug, gltf)
-    }
-    void gltf.then((loaded) => {
-      const statue = loaded.scene.clone(true)
-      statue.traverse((obj) => {
-        if ((obj as Mesh).isMesh) obj.castShadow = obj.receiveShadow = true
-      })
-      statue.position.set(x, 0, z)
-      statue.rotation.y = facing
-      scene.add(statue)
-      glbStatues.push(statue)
-    })
-  }
-
   /** A ported procedural boss body as a standing statue: a real (unstepped) BossFight. */
   function spawnBody(slug: string, x: number, z: number, facing: number): void {
     const spec = BOSS_LADDER.find((s) => s.id === `${slug}-titan`)
@@ -195,8 +173,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     recruitN = 0
     for (const figure of figures) figure.dispose(scene)
     figures.length = 0
-    for (const statue of glbStatues) scene.remove(statue)
-    glbStatues.length = 0
     for (const body of bodies) body.visual.removeFrom(scene)
     bodies.length = 0
   }
@@ -212,34 +188,15 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     spawnDummy(3, -12, face(3, -12))
     spawnFigure('striker', 9, -18, face(9, -18))
     spawnFigure('captain', 17, -16, face(17, -16))
-    spawnTitanGlb('beast', -26, -30, face(-26, -30))
-    spawnTitanGlb('founding', -34, -38, face(-34, -38))
-    spawnTitanGlb('attack', -14, -34, face(-14, -34))
-    spawnTitanGlb('cart', -6, -24, face(-6, -24))
-    spawnTitanGlb('jaw', 6, -24, face(6, -24))
-    spawnTitanGlb('armored', 14, -34, face(14, -34))
-    spawnTitanGlb('female', 24, -30, face(24, -30))
-    spawnTitanGlb('warhammer', 32, -38, face(32, -38))
-    spawnTitanGlb('colossus', 0, -110, face(0, -110)) // looms behind the lineup
-    // ported procedural bodies stand a step ahead of their statue for the side-by-side
-    const statueSpots: Record<string, [number, number]> = {
-      beast: [-26, -30],
-      founding: [-34, -38],
-      attack: [-14, -34],
-      cart: [-6, -24],
-      jaw: [6, -24],
-      armored: [14, -34],
-      female: [24, -30],
-      warhammer: [32, -38],
-      colossus: [0, -110],
-    }
-    for (const id of Object.keys(BOSS_BODY_BUILDERS)) {
-      const slug = id.replace(/-titan$/, '')
-      const spot = statueSpots[slug]
-      if (!spot) continue
-      const [sx, sz] = slug === 'colossus' ? spot : [spot[0], spot[1] + 8]
-      spawnBody(slug, sx, sz, face(sx, sz))
-    }
+    spawnBody('beast', -26, -30, face(-26, -30))
+    spawnBody('founding', -34, -38, face(-34, -38))
+    spawnBody('attack', -14, -34, face(-14, -34))
+    spawnBody('cart', -6, -24, face(-6, -24))
+    spawnBody('jaw', 6, -24, face(6, -24))
+    spawnBody('armored', 14, -34, face(14, -34))
+    spawnBody('female', 24, -30, face(24, -30))
+    spawnBody('warhammer', 32, -38, face(32, -38))
+    spawnBody('colossus', 0, -110, face(0, -110)) // looms behind the lineup
     game.player.pos.set(viewer.x, EYE_HEIGHT + 1, viewer.z)
     game.player.vel.set(0, 0, 0)
     ctx.setView(0, 0.14)
@@ -265,19 +222,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
         <button data-spawn="striker">Striker</button>
         <button data-spawn="captain">Captain</button>
       </div>
-      <div class="dv-label">Blender titan statues</div>
-      <div class="dv-row">
-        <button data-glb="beast">Beast</button>
-        <button data-glb="attack">Attack</button>
-        <button data-glb="armored">Armored</button>
-        <button data-glb="female">Female</button>
-        <button data-glb="colossus">Colossus</button>
-        <button data-glb="jaw">Jaw</button>
-        <button data-glb="cart">Cart</button>
-        <button data-glb="warhammer">War Hammer</button>
-        <button data-glb="founding">Founding</button>
-      </div>
-      <div class="dv-label">Ported bodies (three.js)</div>
+      <div class="dv-label">The Nine (procedural)</div>
       <div class="dv-row" id="dv-bodies"></div>
       <div class="dv-row">
         <button id="dv-lineup">Muster the Lineup</button>
@@ -362,14 +307,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       }
     })
   }
-  for (const btn of drawer.querySelectorAll<HTMLButtonElement>('[data-glb]')) {
-    btn.addEventListener('click', () => {
-      const slug = btn.dataset.glb!
-      const { x, z, faceBack } = spotAhead(slug === 'colossus' ? 100 : 34)
-      spawnTitanGlb(slug, x, z, faceBack)
-    })
-  }
-  // one button per ported body; the row grows as the port registry does
+  // one button per ported Shifter body, straight from the registry
   const bodiesRow = q<HTMLDivElement>('#dv-bodies')
   for (const id of Object.keys(BOSS_BODY_BUILDERS)) {
     const slug = id.replace(/-titan$/, '')
@@ -555,7 +493,6 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
       for (const titan of game.titans) titan.facing += dt * 0.4
       for (const figure of figures) figure.group.rotation.y += dt * 0.4
       for (const dummy of dummies.values()) dummy.yaw += dt * 0.4
-      for (const statue of glbStatues) statue.rotation.y += dt * 0.4
       for (const body of bodies) body.fight.titan.facing += dt * 0.4
     }
     // after the turntable spin so the nape/ankle volumes track facing without a frame of lag

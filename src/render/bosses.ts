@@ -1,5 +1,4 @@
 import {
-  Box3,
   Group,
   IcosahedronGeometry,
   Mesh,
@@ -12,9 +11,7 @@ import {
   SpriteMaterial,
   SRGBColorSpace,
   TextureLoader,
-  Vector3,
 } from 'three'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { BossFight } from '../sim/boss'
 import { bossPartCenter, steamRadius } from '../sim/boss'
 import type { GameState } from '../sim/game'
@@ -25,18 +22,15 @@ import { makeWeakPoint, makeWeakPointMats, TitanVisual } from './titans'
 
 const textureLoader = new TextureLoader()
 
-// The statue glbs carry flat Blender colors. Shipping them anyway is a user-decided,
-// dated exception to the texture mandate (2026-07-13, recorded in CLAUDE.md): the boss
-// silhouettes go live now, the CC0 texture/bake pass follows as polish (ticket 009).
-
 /**
  * The Shifter's body and fight FX, driven straight from GameState.boss each frame.
  *
- * Body: the statue glb named after the spec (public/models/<spec-id>.glb, the contract
- * with the Blender modeling session) with procedural root motion — glide, bob, chase
- * lean, stagger reel, death topple — since the statues carry no rig. Until the glb
- * resolves (or if it is missing), the existing capsule-limb TitanVisual walks instead,
- * with its nape/heel glows muted: a Shifter advertises only its lit Weak Point.
+ * Body: the procedural builder registered for the spec (src/render/titans/<slug>.ts,
+ * transcribed from the blender/ statue builds) — articulated, textured per the mandate,
+ * and driven by the shared TitanPoser plus per-boss overlays (throw windup, steam
+ * shudder, quadruped gait). If a spec ever ships without a builder, the capsule-limb
+ * TitanVisual walks instead, with its nape/heel glows muted: a Shifter advertises only
+ * its lit Weak Point.
  *
  * FX, all within the texture rule: the lit-part bloom reuses the nape indicator style
  * (accepted exception), boulders wear the credited rock texture, spike telegraphs are
@@ -46,10 +40,6 @@ export class BossFxView {
   private fightTitanId: number | null = null
   private body: BossBodyVisual | null = null
   private rig: TitanVisual | null = null
-  private glb: Group | null = null
-  private glbBaseY = 0
-  private walkPhase = 0
-  private lastPos = { x: 0, z: 0 }
 
   private readonly weakMats = makeWeakPointMats()
   private readonly glow: Group
@@ -64,8 +54,6 @@ export class BossFxView {
   })
   private readonly steam: Sprite[] = []
   private steamMat: SpriteMaterial | null = null
-
-  private static glbCache = new Map<string, Promise<Group | null>>()
 
   constructor(private scene: Scene) {
     this.glow = makeWeakPoint(this.weakMats, 0.4, 0.15)
@@ -101,8 +89,6 @@ export class BossFxView {
     if (this.fightTitanId !== t.id) {
       this.clearBody()
       this.fightTitanId = t.id
-      this.walkPhase = 0
-      this.lastPos = { x: t.pos.x, z: t.pos.z }
       const builder = BOSS_BODY_BUILDERS[fight.spec.id]
       if (builder) {
         // the ported procedural body: articulated, textured, owns its own pose
@@ -115,97 +101,10 @@ export class BossFxView {
           if (obj instanceof Sprite) obj.visible = false
         })
         this.rig.addTo(this.scene)
-        this.loadGlb(fight)
       }
     }
     if (this.body) this.body.sync(fight, dt)
-    else if (this.glb) this.driveStatue(fight, dt)
     else if (this.rig) this.rig.syncPose(t, dt)
-  }
-
-  private loadGlb(fight: BossFight): void {
-    const specId = fight.spec.id
-    let pending = BossFxView.glbCache.get(specId)
-    if (!pending) {
-      pending = new GLTFLoader()
-        .loadAsync(`/models/${specId}.glb`)
-        .then((gltf) => {
-          const root = gltf.scene
-          root.traverse((obj) => {
-            if (obj instanceof Mesh) {
-              obj.castShadow = true
-              obj.receiveShadow = true
-              for (const mat of Array.isArray(obj.material) ? obj.material : [obj.material]) {
-                mat.transparent = true // the death dissolve fades the statue out
-              }
-            }
-          })
-          return root
-        })
-        .catch(() => null) // model not delivered yet: the capsule rig stays on duty
-      BossFxView.glbCache.set(specId, pending)
-    }
-    pending.then((template) => {
-      // the fight may be long over (or replaced) by the time the model arrives
-      if (!template || this.fightTitanId !== fight.titan.id) return
-      const root = template.clone(true)
-      root.traverse((obj) => {
-        if (obj instanceof Mesh) {
-          obj.material = Array.isArray(obj.material)
-            ? obj.material.map((m) => m.clone())
-            : obj.material.clone()
-        }
-      })
-      // statues export facing +Z with feet at y=0, but heights may drift: fit to the sim
-      const box = new Vector3()
-      root.updateMatrixWorld(true)
-      const bounds = new Box3().setFromObject(root)
-      bounds.getSize(box)
-      const fit = box.y > 0.01 ? fight.titan.height / box.y : 1
-      root.scale.multiplyScalar(fit)
-      this.glbBaseY = -bounds.min.y * fit
-      if (this.rig) {
-        this.rig.removeFrom(this.scene)
-        this.rig = null
-      }
-      this.glb = root
-      this.scene.add(root)
-    })
-  }
-
-  /** Root motion for an unrigged statue: glide, bob, lean, reel, and the final topple. */
-  private driveStatue(fight: BossFight, dt: number): void {
-    const t = fight.titan
-    const root = this.glb!
-    root.position.set(t.pos.x, t.pos.y + this.glbBaseY, t.pos.z)
-    root.rotation.set(0, t.facing, 0)
-
-    if (t.state === 'dead') {
-      const fall = Math.min(1, t.stateTime / 0.9)
-      root.rotation.x = (Math.PI / 2) * (1 - (1 - fall) * (1 - fall))
-      const fade = Math.max(0, 1 - Math.max(0, t.stateTime - 1) / 2)
-      root.traverse((obj) => {
-        if (obj instanceof Mesh) {
-          for (const mat of Array.isArray(obj.material) ? obj.material : [obj.material]) {
-            mat.opacity = fade
-          }
-        }
-      })
-      root.visible = fade > 0.01
-      return
-    }
-
-    const moved = Math.hypot(t.pos.x - this.lastPos.x, t.pos.z - this.lastPos.z)
-    this.lastPos = { x: t.pos.x, z: t.pos.z }
-    const speed = dt > 0 ? moved / dt : 0
-    this.walkPhase += speed * dt * 1.6
-    root.position.y += Math.abs(Math.sin(this.walkPhase)) * t.height * 0.012
-
-    if (t.state === 'staggered') {
-      root.rotation.x = -0.08 + Math.sin(performance.now() * 0.035) * 0.015
-    } else if (t.state === 'chase') {
-      root.rotation.x = 0.05
-    }
   }
 
   private clearBody(): void {
@@ -216,10 +115,6 @@ export class BossFxView {
     if (this.rig) {
       this.rig.removeFrom(this.scene)
       this.rig = null
-    }
-    if (this.glb) {
-      this.scene.remove(this.glb)
-      this.glb = null
     }
     this.fightTitanId = null
   }

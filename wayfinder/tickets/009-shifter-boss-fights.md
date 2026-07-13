@@ -95,11 +95,13 @@ the run save additively; "Fresh Spear Caches Dropped" banner on restock.
 
 ## Follow-ups (not in v1)
 
-- CC0 texture/bake pass per model (closes the dated mandate exception in CLAUDE.md).
-- Glows anchored to semantic mesh names (`Eye`, `Plates`, `Mask`, …) instead of
-  height-fraction anchors, for pixel-perfect placement on the statues.
-- War Hammer weapon-construct mechanic using the detachable `HammerPole`/`HammerHead`/
-  `HammerSpike*` meshes.
+- ~~CC0 texture/bake pass per model~~ and ~~semantic glow anchors~~: both subsumed by
+  the 2026-07-13 procedural port (`src/render/titans/<slug>.ts`) — every boss body is
+  now primitives with credited CC0 maps + build.py palette tints, the glow rides real
+  `partAnchor` joints, and the statue glbs + the dated CLAUDE.md texture waiver are
+  deleted. The `blender/` builds remain as the transcription source of truth.
+- War Hammer weapon-construct mechanic using the detachable hammer sub-group on the
+  hammer-hand wrist (see `src/render/titans/warhammer.ts`).
 - Co-op Shifters: part state into snapshots + server-side break validation (solo-only v1
   by decision).
 

@@ -38,7 +38,7 @@ export interface BossPartSpec {
 }
 
 export interface BossSpec {
-  /** Also the model filename stem: public/models/<id>.glb. */
+  /** Also the body-builder key in src/render/titans/registry.ts. */
   id: string
   name: string
   /** Ladder slot: the first wave this shifter walks. */
