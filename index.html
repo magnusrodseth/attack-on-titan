@@ -241,6 +241,21 @@
       @keyframes boss-crack { 0% { filter: brightness(2.6); } 100% { filter: brightness(1); } }
       #boss-part { font-family: var(--header-font); font-size: 13px; letter-spacing: 4px; margin-top: 5px; color: #ffd57a; text-shadow: 0 0 10px #ffb347aa; }
 
+      /* field glasses (hold C): two soft lens circles carve the view, the rest goes dark.
+         The div is a solid plate; the mask intersects "outside the left lens" with
+         "outside the right lens", so the union of both circles stays clear. */
+      #zoom-mask {
+        position: absolute; inset: 0; pointer-events: none; opacity: 0; background: #04030a;
+        -webkit-mask-image:
+          radial-gradient(circle 44vmin at calc(50% - 15vmin) 50%, transparent 93%, #000 99%),
+          radial-gradient(circle 44vmin at calc(50% + 15vmin) 50%, transparent 93%, #000 99%);
+        -webkit-mask-composite: source-in;
+        mask-image:
+          radial-gradient(circle 44vmin at calc(50% - 15vmin) 50%, transparent 93%, #000 99%),
+          radial-gradient(circle 44vmin at calc(50% + 15vmin) 50%, transparent 93%, #000 99%);
+        mask-composite: intersect;
+      }
+
       /* damage vignette + slash flash */
       #vignette { position: absolute; inset: 0; box-shadow: inset 0 0 140px 40px #c1121f; opacity: 0; transition: opacity 0.15s; }
       #flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, #ffffff2e 0%, transparent 55%); opacity: 0; }
@@ -305,7 +320,7 @@
       .overlay > :last-child { margin-bottom: auto; }
       .overlay.hidden { display: none; }
       /* an open menu hides the combat chrome behind it; the dark plate reads clean */
-      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #boss-strip, #race-dist, #race-caret, #threats) { visibility: hidden; }
+      #hud:has(> .overlay:not(.hidden)) :is(#crosshair, #meters, #scorebox, #speedo, #controls, #minimap, #squad, #feed, #prompt, #race-strip, #hunt-strip, #boss-strip, #race-dist, #race-caret, #threats, #zoom-mask) { visibility: hidden; }
       .overlay h1 { font-size: 84px; }
       .overlay h2 { font-size: 58px; }
       #mobile-gate { z-index: 10; background: radial-gradient(ellipse at 50% 30%, #16111afb, #07060aff 78%); }
@@ -640,11 +655,13 @@
         <div class="ctl-row"><span class="ctl-label">spear</span><kbd>E</kbd></div>
         <div class="ctl-row ctl-focus"><span class="ctl-label">focus</span><kbd>Q</kbd></div>
         <div class="ctl-row"><span class="ctl-label">resupply</span><kbd>R</kbd></div>
+        <div class="ctl-row"><span class="ctl-label">zoom</span><kbd>C</kbd></div>
         <div class="ctl-row"><span class="ctl-label">pause</span><kbd>Esc</kbd></div>
       </div>
       <div id="banner" class="aot-title"></div>
       <div id="popup"></div>
       <div id="prompt"></div>
+      <div id="zoom-mask"></div>
       <div id="vignette"></div>
       <div id="flash"></div>
       <div id="strike-fx"></div>
@@ -677,6 +694,7 @@
             <span class="key-item"><kbd>Q</kbd> focus</span> (3 kills charge it; slows time, then <span class="key-item"><kbd>F</kbd> strikes the nape</span>)</div>
           <div><span class="key-group">Field</span>
             <span class="key-item"><kbd>R</kbd> resupply</span> ·
+            <span class="key-item"><kbd>C</kbd> hold to zoom</span> ·
             <span class="key-item"><kbd>Esc</kbd> pause</span></div>
         </div>
         <div class="menu-col">

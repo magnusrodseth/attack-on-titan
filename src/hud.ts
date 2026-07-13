@@ -122,6 +122,8 @@ export class Hud {
   private raceSplitTimer: number | undefined
   private threats = el('threats')
   private threatPool: HTMLElement[] = []
+  private zoomMask = el('zoom-mask')
+  private zoomShown = -1
   private huntStrip = el('hunt-strip')
   private huntTimer = el('hunt-timer')
   private huntLeft = el('hunt-left')
@@ -494,6 +496,14 @@ export class Hud {
       this.raceCaret.style.top = `${caret.y.toFixed(0)}px`
       this.raceCaret.style.transform = `translate(-50%, -50%) rotate(${caret.angle.toFixed(3)}rad)`
     }
+  }
+
+  /** Binocular mask strength 0..1, faded by main in step with the optical zoom. */
+  setZoom(strength: number): void {
+    const v = Math.round(strength * 100) / 100
+    if (v === this.zoomShown) return
+    this.zoomShown = v
+    this.zoomMask.style.opacity = v.toFixed(2)
   }
 
   /** Per-frame threat radar: one red edge triangle per nearby off-screen titan. */

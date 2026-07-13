@@ -161,7 +161,9 @@ window.addEventListener('mouseup', (e) => {
 window.addEventListener('contextmenu', (e) => e.preventDefault())
 window.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return
-  const look = 0.0023 * settings.sensitivity
+  // zoomed look slows with the current FOV so field-glass aiming stays controllable
+  // (clamped so speed/strike widening never makes the mouse FASTER than 1:1)
+  const look = 0.0023 * settings.sensitivity * Math.min(1, camera.fov / settings.fov)
   const dy = settings.invertY ? -e.movementY : e.movementY
   yaw -= e.movementX * look
   pitch = Math.min(1.45, Math.max(-1.45, pitch - dy * look))
@@ -1371,6 +1373,10 @@ function edgeProject(world: Vector3): { onScreen: boolean; x: number; y: number;
 const THREAT_RADIUS = 70
 const THREAT_MAX = 4 // only the nearest few — a horde should not wallpaper the edges
 
+// field glasses (hold C): the zoomed-in field of view. ~3.5× magnification at the
+// default 70° base; the mouselook handler slows to match so aiming stays controllable.
+const ZOOM_FOV = 20
+
 renderer.setAnimationLoop(() => {
   const now = performance.now()
   const dt = Math.min(now - last, 100) / 1000
@@ -1496,13 +1502,20 @@ renderer.setAnimationLoop(() => {
     camera.position.copy(game.player.pos)
   }
   const speed = game.player.vel.length()
+  // field glasses: hold C to narrow the FOV. Purely client-side (the sim never sees
+  // it); the strike dash keeps priority, since its FOV slam is most of the strike feel.
+  const zooming = keys.has('KeyC') && inAction && !game.strike
   // the strike dash slams the FOV wide open; the snap-in is most of the ZOOM feel.
   // The settings FOV is the base; speed widening and the strike offset ride on top.
   const targetFov = game.strike
     ? settings.fov + 37
-    : settings.fov + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
-  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * (game.strike ? 18 : 8))
+    : zooming
+      ? ZOOM_FOV
+      : settings.fov + 22 * Math.min(1, Math.max(0, (speed - 10) / 30))
+  camera.fov += (targetFov - camera.fov) * Math.min(1, dt * (game.strike ? 18 : zooming ? 14 : 8))
   camera.updateProjectionMatrix()
+  // the lens mask fades in step with the optical zoom itself, not the key edge
+  hud.setZoom(Math.min(1, Math.max(0, (settings.fov - camera.fov) / (settings.fov - ZOOM_FOV))))
   effects.applyShake(camera)
 
   // nape lock indicator + crosshair prompt while a strike is on offer
