@@ -40,14 +40,8 @@ export function buildCartTitan(t: TitanState): BossBodyVisual {
   const hair = mats.make({ map: '/textures/bark.jpg', tint: 0x6b4c33, repeat: 2, roughness: 0.8 })
   // FaceDark (0.07, 0.03, 0.02): mouth slit and eye sockets
   const dark = mats.make({ map: '/textures/bark.jpg', tint: 0x2a1710, roughness: 0.6 })
-  // Eye (0.55, 0.4, 0.18), emission 0.5: dark amber
-  const eye = mats.make({
-    map: '/textures/skin.jpg',
-    tint: 0xd6a145,
-    roughness: 0.25,
-    emissive: 0x8a6420,
-    emissiveIntensity: 0.6,
-  })
+  // dilated amber stare (CC0 photo, README credits)
+  const eye = mats.decal('/textures/eye-amber.jpg', { feather: true })
 
   const group = new Group()
   const scale = (t.height * NAPE_UP) / NAPE_Z
@@ -76,11 +70,11 @@ export function buildCartTitan(t: TitanState): BossBodyVisual {
   // big fleshy lips wrapping the muzzle end; between them, rotten human teeth
   // and diseased gums (CDC PHIL #19466, public domain — see README credits)
   head.ball(lip, 0, -3.98, 2.05, 0.3, { scale: [1.1, 0.55, 0.75] })
-  head.plane(mats.decal('/textures/teeth-rot.jpg', { feather: true }), 0, -4.21, 2.03, 0.4, 0.26)
+  head.plane(mats.decal('/textures/teeth-rot.jpg', { feather: true }), 0, -4.22, 2.03, 0.62, 0.42)
   // eyes high on the skull (skull-front depth hardcoded in build.py), ears
   for (const s of [1, -1]) {
-    head.ball(dark, s * 0.24, -3.14, 2.58, 0.09, { scale: [1.1, 0.3, 0.8] })
-    head.ball(eye, s * 0.24, -3.15, 2.58, 0.038)
+    head.ball(dark, s * 0.24, -3.14, 2.58, 0.12, { scale: [1.1, 0.3, 0.8] })
+    head.plane(eye, s * 0.24, -3.2, 2.58, 0.3, 0.25)
     head.ball(skin, s * 0.5, -2.55, 2.58, 0.15, { scale: [0.35, 0.6, 1.0], rot: [0.2, s * 0.4, 0] })
   }
   // brown shaggy crown: the particle-hair mass becomes an oversize shell plus seeded

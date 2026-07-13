@@ -122,12 +122,12 @@ export function buildArmoredTitan(t: TitanState): BossBodyVisual {
   plateInto(head, [[0.36, eyeFront + 0.18, 14.0, 0.3, [0.75, 0.4, 1.1], [0, 0, -0.15]]], true)
   plateInto(head, [[0.0, mouthFront + 0.18, 13.45, 0.3, [0.85, 0.5, 0.5], [-0.25, 0, 0]]], false)
   for (const s of [1, -1]) {
-    head.ball(dark, s * 0.27, eyeFront + 0.18, 14.22, 0.11, { scale: [1.0, 0.3, 0.85] })
-    head.ball(eye, s * 0.27, eyeFront + 0.12, 14.22, 0.042)
+    head.ball(dark, s * 0.27, eyeFront + 0.18, 14.22, 0.17, { scale: [1.0, 0.3, 0.85] })
+    head.ball(eye, s * 0.27, eyeFront + 0.12, 14.22, 0.085)
   }
-  head.box(dark, 0, mouthFront + 0.03, 13.75, [0.78, 0.14, 0.22])
+  head.box(dark, 0, mouthFront + 0.03, 13.75, [1.05, 0.16, 0.32])
   for (let i = 0; i < 7; i++) {
-    head.box(tooth, -0.3 + i * 0.1, mouthFront - 0.04, 13.76, [0.082, 0.1, 0.14])
+    head.box(tooth, -0.42 + i * 0.14, mouthFront - 0.05, 13.76, [0.115, 0.12, 0.22])
   }
   head.ball(hair, 0, 0.25, 14.95, 0.6, { scale: [1.05, 1.15, 0.5] })
 

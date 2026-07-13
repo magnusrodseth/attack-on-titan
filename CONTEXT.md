@@ -30,6 +30,9 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
   with an Upgrade between fights; past the Founding the ladder hardens and laps.
 - **Focus** — the slow-motion meter (Q).
 - **Seed** — the string that determines the whole city and every random stream; same seed, same world.
+- **Commendation** — a permanent mark on a soldier's record, awarded once ever the first time
+  its feat is performed; announced in-run, listed in the menu.
+  _Avoid_: achievement (genre word, breaks the military voice), medal.
 
 ## Time trials
 

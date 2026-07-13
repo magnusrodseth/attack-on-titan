@@ -38,7 +38,8 @@ export function buildBeastTitan(t: TitanState): BossBodyVisual {
     normalScale: 0.3,
   })
   const dark = mats.make({ map: '/textures/bark.jpg', tint: 0x120a07, roughness: 0.55 })
-  const eye = mats.make({ map: '/textures/bark.jpg', tint: 0x0a0605, roughness: 0.2 })
+  // heavy-lidded clouded stare (CC0 photo, README credits): the ape watches, tired
+  const eye = mats.decal('/textures/eye-dead.jpg', { feather: true })
 
   const group = new Group()
   group.scale.setScalar(t.height / NATIVE_H)
@@ -90,11 +91,14 @@ export function buildBeastTitan(t: TitanState): BossBodyVisual {
     head.ball(skin, s * 0.3, -0.9, 15.98, 0.22)
     head.ball(skin, s * 0.72, -0.2, 15.95, 0.22)
     head.ball(fur, s * 0.45, -0.8, 14.95, 0.38)
-    // deep-set near-black eyes and nostrils against the raw sphere fronts
-    head.ball(dark, s * 0.27, -1.32, 15.8, 0.085)
-    head.ball(eye, s * 0.27, -1.39, 15.8, 0.035)
+    // deep-set clouded eyes and dark nostrils against the raw sphere fronts
+    head.ball(dark, s * 0.27, -1.32, 15.8, 0.13)
+    head.plane(eye, s * 0.27, -1.44, 15.8, 0.3, 0.25)
     head.ball(dark, s * 0.1, -1.44, 15.5, 0.04)
   }
+  // the beard parts over a bared bone grin (1844 dental lithograph, PD, README);
+  // sits proud of the beard mass, which bulges to y -1.46 at this height
+  head.plane(mats.decal('/textures/teeth-bone.jpg', { feather: true }), 0, -1.52, 15.12, 0.7, 0.42)
   // beard tufts trailing off the chin
   for (let i = 0; i < 6; i++) {
     const s = i % 2 ? 1 : -1

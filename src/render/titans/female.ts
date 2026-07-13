@@ -41,14 +41,8 @@ export function buildFemaleTitan(t: TitanState): BossBodyVisual {
   // ChainRed (0.35, 0.1, 0.07): belly links and cheek patches
   const link = mats.make({ map: '/textures/bark.jpg', tint: new Color('#b03626').multiplyScalar(1.2), repeat: 2, roughness: 0.6 })
   const dark = mats.make({ map: '/textures/bark.jpg', tint: 0x2a1713, roughness: 0.6 })
-  // Eye (0.25, 0.45, 0.75): blue, faint glow
-  const eye = mats.make({
-    map: '/textures/skin.jpg',
-    tint: 0x4a7fd0,
-    roughness: 0.25,
-    emissive: 0x2d5db3,
-    emissiveIntensity: 0.6,
-  })
+  // icy unblinking stare (CC0 photo, README credits)
+  const eye = mats.decal('/textures/eye-ice.jpg', { feather: true })
 
   const group = new Group()
   group.scale.setScalar(t.height / NATIVE_H)
@@ -102,14 +96,14 @@ export function buildFemaleTitan(t: TitanState): BossBodyVisual {
   head.ball(pale, 0, -0.28, 12.73, 0.36)
   const eyeFront = -0.72
   for (const s of [1, -1]) {
-    head.ball(dark, s * 0.2, eyeFront + 0.08, 13.05, 0.08, { scale: [1.1, 0.35, 0.9] })
-    head.ball(eye, s * 0.2, eyeFront + 0.05, 13.05, 0.038)
+    head.ball(dark, s * 0.2, eyeFront + 0.08, 13.05, 0.12, { scale: [1.1, 0.35, 0.9] })
+    head.plane(eye, s * 0.2, eyeFront - 0.02, 13.05, 0.44, 0.36)
     head.ball(link, s * 0.27, eyeFront + 0.14, 12.83, 0.1, { scale: [0.85, 0.15, 1.25] })
   }
-  head.box(dark, 0, -0.6, 12.65, [0.3, 0.06, 0.05])
+  head.box(dark, 0, -0.6, 12.65, [0.5, 0.08, 0.08])
   // a ghost grin under the skin: 1910 dental X-ray (public domain, README credits)
   // additive-blended so only the double row of teeth glows through the pale face
-  head.plane(mats.decal('/textures/teeth-xray.jpg', { additive: true, tint: 0x8a8f99 }), 0, -0.66, 12.62, 0.5, 0.5)
+  head.plane(mats.decal('/textures/teeth-xray.jpg', { additive: true, tint: 0x9aa0ab }), 0, -0.66, 12.6, 0.85, 0.85)
   head.ball(pale, 0, -0.63, 12.85, 0.06, { scale: [0.55, 0.5, 0.8] })
   // blonde bob: crown, back, side curtains over the ears, side-swept fringe
   head.ball(hair, 0, 0.15, 13.4, 0.58, { scale: [1.1, 1.15, 0.7] })

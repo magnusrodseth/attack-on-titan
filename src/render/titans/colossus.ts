@@ -30,13 +30,8 @@ export function buildColossusTitan(t: TitanState): BossBodyVisual {
   const sinew = mats.make({ map: '/textures/skin.jpg', tint: new Color(1.35, 1.15, 1.0), repeat: 2, roughness: 0.5 })
   const dark = mats.make({ map: '/textures/bark.jpg', tint: 0x24130c, roughness: 0.6 })
   const tooth = mats.make({ map: '/textures/plaster.jpg', tint: new Color(1.5, 1.46, 1.36), roughness: 0.35 })
-  const eye = mats.make({
-    map: '/textures/skin.jpg',
-    tint: 0xe8e2cf,
-    roughness: 0.3,
-    emissive: 0xcfc7a8,
-    emissiveIntensity: 0.5,
-  })
+  // wide blank lidless stare (PD photo, README credits), washed pale
+  const eye = mats.decal('/textures/eye-stare.jpg', { feather: true, tint: 0xd8d2c2 })
 
   const group = new Group()
   group.scale.setScalar(t.height / NATIVE_H)
@@ -70,8 +65,8 @@ export function buildColossusTitan(t: TitanState): BossBodyVisual {
   for (const s of [1, -1]) {
     head.ball(muscle, s * 1.35, 0.2, 57.0, 1.8)
     head.ball(muscle, s * 1.4, -0.3, 55.8, 0.75)
-    head.ball(dark, s * 1.05, -2.5, 56.6, 0.5, { scale: [1.2, 0.3, 0.9] })
-    head.ball(eye, s * 1.05, -2.62, 56.6, 0.17)
+    head.ball(dark, s * 1.05, -2.5, 56.6, 0.68, { scale: [1.2, 0.3, 0.9] })
+    head.plane(eye, s * 1.05, -2.72, 56.6, 1.1, 0.88)
     head.ball(muscle, s * 2.55, 0.3, 56.4, 0.55, { scale: [0.3, 0.6, 1.0], rot: [0.3, s * 0.4, 0] })
   }
   head.ball(muscle, 0, -2.0, 57.4, 1.3, { scale: [1.6, 0.45, 0.35] })
@@ -79,10 +74,10 @@ export function buildColossusTitan(t: TitanState): BossBodyVisual {
   // the skeletal grin: teeth on a parabolic arc, dark gaps recessed behind
   const grinFront = -2.5
   for (let i = 0; i < 11; i++) {
-    const tx = -1.5 + i * 0.3
-    const ty = grinFront + 0.15 + 0.3 * (tx / 1.5) ** 2
-    head.box(tooth, tx, ty, 54.8, [0.28, 0.42, 0.7])
-    if (i < 10) head.box(dark, tx + 0.15, ty + 0.08, 54.8, [0.07, 0.36, 0.76])
+    const tx = -1.9 + i * 0.38
+    const ty = grinFront + 0.15 + 0.38 * (tx / 1.9) ** 2
+    head.box(tooth, tx, ty, 54.8, [0.36, 0.44, 0.95])
+    if (i < 10) head.box(dark, tx + 0.19, ty + 0.1, 54.8, [0.09, 0.38, 1.0])
   }
 
   // arms: long, big hands; chains overshoot the elbow like the build does

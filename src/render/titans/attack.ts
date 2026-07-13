@@ -34,14 +34,8 @@ export function buildAttackTitan(t: TitanState): BossBodyVisual {
   const dark = mats.make({ map: '/textures/bark.jpg', tint: 0x24140e, roughness: 0.6 })
   // Tooth (0.92, 0.9, 0.85): the grin band
   const tooth = mats.make({ map: '/textures/plaster.jpg', tint: new Color(1.5, 1.45, 1.35), roughness: 0.35 })
-  // Eye (0.15, 0.35, 0.25): green-grey, deep set, faint glow
-  const eye = mats.make({
-    map: '/textures/skin.jpg',
-    tint: 0x3f8a63,
-    roughness: 0.25,
-    emissive: 0x2a5c42,
-    emissiveIntensity: 0.4,
-  })
+  // manic bloodshot stare (PD photo, README credits), feathered into the sockets
+  const eye = mats.decal('/textures/eye-bloodshot.jpg', { feather: true })
 
   const group = new Group()
   group.scale.setScalar(t.height / NATIVE_H)
@@ -76,8 +70,8 @@ export function buildAttackTitan(t: TitanState): BossBodyVisual {
   // surface; here the sphere front at each z is computed from the ball itself)
   for (const s of [1, -1]) {
     head.ball(muscle, s * 0.38, -0.08, 13.65, 0.16)
-    head.ball(dark, s * 0.24, -0.6, 14.0, 0.11, { scale: [1.1, 0.4, 0.9] })
-    head.ball(eye, s * 0.24, -0.65, 14.0, 0.045)
+    head.ball(dark, s * 0.24, -0.6, 14.0, 0.15, { scale: [1.1, 0.4, 0.9] })
+    head.plane(eye, s * 0.24, -0.7, 14.0, 0.5, 0.4)
     head.ball(muscle, s * 0.62, -0.05, 13.85, 0.16, { scale: [0.3, 0.5, 1.0], rot: [0.35, s * 0.5, 0] })
   }
   head.ball(muscle, 0, -0.5, 14.23, 0.3, { scale: [1.5, 0.5, 0.35] })
@@ -85,10 +79,10 @@ export function buildAttackTitan(t: TitanState): BossBodyVisual {
   // the ear-to-ear grin: 10 teeth arcing back toward the cheeks with dark gaps,
   // deep boxes so the band stays proud of the blended jaw surface
   for (let i = 0; i < 10; i++) {
-    const tx = -0.52 + i * 0.115
-    const surf = -0.66 + (Math.abs(tx) / 0.52) ** 2 * 0.3
-    head.box(tooth, tx, surf + 0.06, 13.4, [0.1, 0.26, 0.18])
-    if (i < 9) head.box(dark, tx + 0.057, surf + 0.12, 13.4, [0.024, 0.26, 0.19])
+    const tx = -0.62 + i * 0.138
+    const surf = -0.66 + (Math.abs(tx) / 0.62) ** 2 * 0.32
+    head.box(tooth, tx, surf + 0.06, 13.4, [0.125, 0.28, 0.3])
+    if (i < 9) head.box(dark, tx + 0.069, surf + 0.12, 13.4, [0.03, 0.28, 0.31])
   }
   // long black hair: crown cap, back flap, shoulder-length side curtains + tufts
   head.ball(hair, 0, 0.2, 14.55, 0.68, { scale: [1.08, 1.12, 0.72] })

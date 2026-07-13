@@ -72,12 +72,12 @@ export function buildWarhammerTitan(t: TitanState): BossBodyVisual {
   head.ball(dome, 0, -0.05, 13.3, 0.4)
   const eyeFront = -0.68 // proud of the raw dome sphere (blender probed the fatter blend)
   for (const s of [1, -1]) {
-    head.ball(dark, s * 0.22, eyeFront + 0.05, 14.1, 0.11, { scale: [1.2, 0.35, 0.45] })
+    head.ball(dark, s * 0.24, eyeFront + 0.05, 14.1, 0.17, { scale: [1.2, 0.35, 0.45] })
   }
   const mouthFront = -0.62
-  head.ball(white, 0, mouthFront + 0.16, 13.5, 0.34, { scale: [0.85, 0.35, 0.8] })
+  head.ball(white, 0, mouthFront + 0.14, 13.5, 0.44, { scale: [0.85, 0.35, 0.8] })
   for (let i = 0; i < 7; i++) {
-    head.box(red, -0.24 + i * 0.08, mouthFront + 0.02, 13.48, [0.03, 0.1, 0.45])
+    head.box(red, -0.33 + i * 0.11, mouthFront - 0.02, 13.48, [0.045, 0.12, 0.6])
   }
 
   // arms: the +x hand carries the hammer (the sim's Hammer Wrist side)

@@ -39,13 +39,8 @@ export function buildJawTitan(t: TitanState): BossBodyVisual {
   // RED_COLOR (0.4, 0.1, 0.07): exposed muscle at wrists and ankles
   const red = mats.make({ map: '/textures/skin.jpg', tint: 0x99271c, roughness: 0.6 })
   const dark = mats.make({ map: '/textures/bark.jpg', tint: 0x2a1710, roughness: 0.6 })
-  const eye = mats.make({
-    map: '/textures/skin.jpg',
-    tint: 0xea9a35,
-    roughness: 0.25,
-    emissive: 0xa96f1e,
-    emissiveIntensity: 0.7,
-  })
+  // feral yellow-green stare (CC0 photo, README credits) behind the bone mask
+  const eye = mats.decal('/textures/eye-feral.jpg', { feather: true })
 
   const group = new Group()
   group.scale.setScalar(t.height / NATIVE_H)
@@ -75,17 +70,17 @@ export function buildJawTitan(t: TitanState): BossBodyVisual {
   head.ball(skin, 0, 0.05, 4.75, 0.24)
   head.ball(skin, 0, -0.06, 4.45, 0.17)
   const maskFront = -0.25 // build.py probes the metaball surface; the jaw ball front
-  head.ball(bone, 0, maskFront + 0.06, 4.45, 0.17, { scale: [1.1, 0.5, 0.85] })
-  head.box(dark, 0, maskFront, 4.38, [0.26, 0.05, 0.05])
+  head.ball(bone, 0, maskFront + 0.06, 4.45, 0.21, { scale: [1.1, 0.5, 0.85] })
+  head.box(dark, 0, maskFront - 0.02, 4.38, [0.4, 0.07, 0.09])
   for (let i = 0; i < 7; i++) {
-    const tx = -0.12 + i * 0.04
-    head.box(bone, tx, maskFront - 0.01, 4.38, [0.028, 0.05, 0.07], [0, i % 2 ? 0.35 : -0.35, 0])
+    const tx = -0.18 + i * 0.06
+    head.box(bone, tx, maskFront - 0.04, 4.38, [0.045, 0.07, 0.12], [0, i % 2 ? 0.35 : -0.35, 0])
   }
   const eyeFront = -0.25
   for (const s of [1, -1]) {
-    head.ball(red, s * 0.1, eyeFront + 0.045, 4.66, 0.05, { scale: [1.1, 0.35, 1.0] })
-    head.ball(dark, s * 0.1, eyeFront + 0.03, 4.66, 0.038, { scale: [1.1, 0.4, 0.95] })
-    head.ball(eye, s * 0.1, eyeFront + 0.02, 4.66, 0.02)
+    head.ball(red, s * 0.11, eyeFront + 0.045, 4.66, 0.07, { scale: [1.1, 0.35, 1.0] })
+    head.ball(dark, s * 0.11, eyeFront + 0.03, 4.66, 0.055, { scale: [1.1, 0.4, 0.95] })
+    head.plane(eye, s * 0.11, eyeFront - 0.02, 4.66, 0.2, 0.17)
   }
   // huge blonde mane: crown, top, the long back mass to the chest, side falls;
   // the particle halo becomes an enlarged shell plus seeded spikes radiating out
