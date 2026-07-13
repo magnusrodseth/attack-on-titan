@@ -4,6 +4,7 @@ import { buildCartTitan } from './cart'
 import { buildFemaleTitan } from './female'
 import { buildJawTitan } from './jaw'
 import type { BossBodyBuilder } from './lib'
+import { buildWarhammerTitan } from './warhammer'
 
 /**
  * Procedural Shifter bodies, keyed by BossSpec.id. BossFxView prefers a registered
@@ -17,4 +18,5 @@ export const BOSS_BODY_BUILDERS: Record<string, BossBodyBuilder> = {
   'cart-titan': buildCartTitan,
   'female-titan': buildFemaleTitan,
   'jaw-titan': buildJawTitan,
+  'warhammer-titan': buildWarhammerTitan,
 }
