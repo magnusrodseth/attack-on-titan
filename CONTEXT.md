@@ -26,6 +26,8 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 - **Shifter** — one of the Nine named boss titans (Beast, Cart, Jaw, Female, Armored,
   War Hammer, Attack, Colossus, Founding), fought as the milestone event every 5th wave of
   Wave Survival, in a fixed ladder ending with the Founding.
+- **The Nine** — the boss-rush mode: the Shifter ladder back to back, one boss per wave
+  with an Upgrade between fights; past the Founding the ladder hardens and laps.
 - **Focus** — the slow-motion meter (Q).
 - **Seed** — the string that determines the whole city and every random stream; same seed, same world.
 

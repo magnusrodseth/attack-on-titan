@@ -1004,3 +1004,20 @@ describe('the shifter fight through the game loop', () => {
     expect(game.player.hp).toBe(hpBefore - 1)
   })
 })
+
+describe('cardinal resupply stations', () => {
+  it('refills at a corner station, far from the plaza', () => {
+    const game = playingGame('stations-run')
+    expect(game.arena.stations.length).toBeGreaterThanOrEqual(5)
+    const corner = game.arena.stations[1]!
+    game.player.pos.set(corner.x, 1.7, corner.z)
+    game.player.gas = 0
+    game.player.blades = 1
+    const input = neutralInput()
+    input.resupply = true
+    stepGame(game, input, DT)
+    expect(game.player.gas).toBe(game.player.config.maxGas)
+    expect(game.player.blades).toBe(game.player.config.bladePairs)
+    expect(game.events.some((e) => e.type === 'resupply')).toBe(true)
+  })
+})

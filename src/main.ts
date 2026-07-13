@@ -18,8 +18,8 @@ import { SoldierPool } from './render/soldiers'
 import { SpearsView } from './render/spears'
 import { TitanPool } from './render/titanPool'
 import { BossFxView } from './render/bosses'
-import { bossForWave, bossPartCenter, isBossWave } from './sim/boss'
-import { raycastHookTarget } from './sim/city'
+import { bossForMilestone, bossPartCenter } from './sim/boss'
+import { nearestStationDist, raycastHookTarget } from './sim/city'
 import { SIM_DT } from './sim/constants'
 import { clockFraction } from './sim/daynight'
 import { LAMP_BATTERY_SECONDS, lampGlow, lampOn } from './sim/flashlight'
@@ -282,7 +282,10 @@ function beginRun(): void {
 }
 
 const waveBased = () =>
-  game.mode.id === 'waves' || game.mode.id === 'matchday' || game.mode.id === 'hunt'
+  game.mode.id === 'waves' ||
+  game.mode.id === 'matchday' ||
+  game.mode.id === 'bossrush' ||
+  game.mode.id === 'hunt'
 
 /** Every 3rd wave the footballers walk; in Matchday mode, every wave is theirs. */
 function announceWave(wave: number): void {
@@ -290,9 +293,9 @@ function announceWave(wave: number): void {
     // The Culling speaks in levels; the matchday duo still gets its drum
     hud.showBanner(`Level ${wave}`, 2400)
     if (isMatchday(wave)) audio.boom()
-  } else if (isBossWave(wave, game.mode.id)) {
+  } else if (bossForMilestone(wave, game.mode.id)) {
     // the milestone outranks even matchday: the Shifter gets the whole drum roll
-    hud.showBanner(`${bossForWave(wave).spec.name} Approaches`, 3400)
+    hud.showBanner(`${bossForMilestone(wave, game.mode.id)!.spec.name} Approaches`, 3400)
     audio.boom()
   } else if (game.mode.id === 'matchday' || isMatchday(wave)) {
     hud.showBanner(`Matchday · Wave ${wave}`, 3000)
@@ -1530,8 +1533,7 @@ renderer.setAnimationLoop(() => {
   const hookInRange =
     game.phase === 'playing' &&
     raycastHookTarget(game.arena, game.player.pos, lookDir, game.player.config.hookRange) !== null
-  const nearStation =
-    Math.hypot(game.player.pos.x - game.arena.station.x, game.player.pos.z - game.arena.station.z) <= 10
+  const nearStation = nearestStationDist(game.arena, game.player.pos.x, game.player.pos.z) <= 10
   const lamp =
     lampOn(clock) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
   hud.update(game, { speed, nearStation, hookInRange, lamp })

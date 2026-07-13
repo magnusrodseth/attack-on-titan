@@ -6,6 +6,7 @@ import {
   BOSS_LADDER,
   BOSS_WAVE_INTERVAL,
   type BossFight,
+  bossForMilestone,
   bossForWave,
   bossPartCenter,
   bossPartRadius,
@@ -52,8 +53,19 @@ describe('the ladder', () => {
     expect(spec.id).toBe('beast-titan')
     expect(lap).toBe(1)
     const first = fightFor('beast-titan', 5)
-    const second = createBossFight(1, spec, 50, 'test-seed', 0, 0)
+    const second = createBossFight(1, spec, 50, 'test-seed', 0, 0, lap)
     expect(second.state.parts[0]!.maxHp).toBeGreaterThan(first.state.parts[0]!.maxHp)
+  })
+
+  it('the boss rush walks the ladder one wave at a time', () => {
+    expect(bossForMilestone(1, 'bossrush')!.spec.id).toBe('beast-titan')
+    expect(bossForMilestone(9, 'bossrush')!.spec.id).toBe('founding-titan')
+    expect(bossForMilestone(10, 'bossrush')).toEqual({
+      spec: BOSS_LADDER[0],
+      lap: 1,
+    })
+    expect(bossForMilestone(3, 'waves')).toBeNull()
+    expect(bossForMilestone(5, 'waves')!.spec.id).toBe('beast-titan')
   })
 
   it('only fires every 5th wave, and only in the waves mode', () => {

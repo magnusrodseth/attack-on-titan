@@ -62,15 +62,17 @@ export class Minimap {
     }
     bg.strokeStyle = 'rgba(63, 191, 114, 0.95)'
     bg.lineWidth = 1.8
-    bg.beginPath()
-    bg.arc(
-      CENTER + arena.station.x * this.scale,
-      CENTER + arena.station.z * this.scale,
-      10 * this.scale + 3,
-      0,
-      Math.PI * 2,
-    )
-    bg.stroke()
+    for (const station of arena.stations) {
+      bg.beginPath()
+      bg.arc(
+        CENTER + station.x * this.scale,
+        CENTER + station.z * this.scale,
+        10 * this.scale + 3,
+        0,
+        Math.PI * 2,
+      )
+      bg.stroke()
+    }
   }
 
   update(game: GameState, yaw: number): void {

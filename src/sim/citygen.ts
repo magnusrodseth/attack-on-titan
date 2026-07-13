@@ -1,5 +1,6 @@
+import { Vector3 } from 'three'
 import type { Arena, Building } from './city'
-import { emptyArena, ensureIndex } from './city'
+import { emptyArena, ensureIndex, insideBuildingXZ } from './city'
 import { shuffle } from './rng'
 
 /**
@@ -176,6 +177,7 @@ export function generateCity(rng: () => number): Arena {
   addPlazaMarket(push, arena, rng)
 
   ensureIndex(arena)
+  placeStations(arena)
   return arena
 }
 
@@ -451,6 +453,44 @@ function flagpoleAt(x: number, z: number, baseTop: number, rng: () => number): B
     ridgeAxis: 'x',
     tint: rng(),
   }
+}
+
+/**
+ * Resupply stations: the plaza one at the center plus one per cardinal, each snapped to
+ * the nearest patch of open street out toward the wall. The scan is deterministic and
+ * consumes NO rng — cities generated before stations existed keep their exact layout.
+ */
+function placeStations(arena: Arena): void {
+  arena.stations = [new Vector3(0, 0, 0)]
+  for (const cardinal of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+    arena.stations.push(findOpenGround(arena, cardinal))
+  }
+}
+
+function findOpenGround(arena: Arena, angle: number): Vector3 {
+  // sweep the quadrant: preferred radius first, drifting inward, with growing angular
+  // jitter — the first clear pad wins, so the result is stable per city
+  for (const radiusFrac of [0.62, 0.56, 0.68, 0.5, 0.74, 0.44]) {
+    const radius = arena.wallRadius * radiusFrac
+    for (const jitter of [0, 0.06, -0.06, 0.12, -0.12, 0.2, -0.2, 0.3, -0.3]) {
+      const x = Math.cos(angle + jitter) * radius
+      const z = Math.sin(angle + jitter) * radius
+      if (clearPad(arena, x, z)) return new Vector3(x, 0, z)
+    }
+  }
+  // no pad found (should not happen in practice): the boulevard is always open
+  return new Vector3(Math.cos(angle) * arena.plazaRadius * 1.6, 0, Math.sin(angle) * arena.plazaRadius * 1.6)
+}
+
+/** A station pad needs a building-free circle and dry ground clear of the canal. */
+function clearPad(arena: Arena, x: number, z: number): boolean {
+  if (arena.canal && Math.abs(x - arena.canal.x) < arena.canal.halfWidth + 4) return false
+  if (insideBuildingXZ(arena, x, z, 2)) return false
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    if (insideBuildingXZ(arena, x + Math.cos(a) * 4, z + Math.sin(a) * 4, 1)) return false
+  }
+  return true
 }
 
 /** Stone bridges over the canal: hop up the stair blocks or swing under the deck. */

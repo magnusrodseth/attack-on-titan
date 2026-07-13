@@ -2,7 +2,7 @@ import { Vector3 } from 'three'
 import type { BossFight } from './boss'
 import { steamRadius, stepBoss } from './boss'
 import type { Arena } from './city'
-import { baseGroundY, raycastHookTarget } from './city'
+import { baseGroundY, nearestStationDist, raycastHookTarget } from './city'
 import { generateCity } from './citygen'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
@@ -514,8 +514,7 @@ function stepPlayerActions(g: GameState, input: InputState, dt: number): void {
   }
 
   if (input.resupply && !g.prevInput.resupply) {
-    const dist = Math.hypot(p.pos.x - g.arena.station.x, p.pos.z - g.arena.station.z)
-    if (dist <= RESUPPLY_RADIUS) {
+    if (nearestStationDist(g.arena, p.pos.x, p.pos.z) <= RESUPPLY_RADIUS) {
       p.gas = p.config.maxGas
       p.canisters = p.config.gasCanisters
       p.blades = p.config.bladePairs

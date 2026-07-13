@@ -90,7 +90,7 @@ describe('stepCoopClient', () => {
 
   it('emits a resupply intent only near the station and never activates focus', () => {
     const g = createGame('coop-test', null)
-    g.player.pos.set(g.arena.station.x + 100, 2, g.arena.station.z)
+    g.player.pos.set(g.arena.stations[0]!.x + 100, 2, g.arena.stations[0]!.z)
     const input = neutralInput()
     input.resupply = true
     input.focus = true
@@ -99,7 +99,7 @@ describe('stepCoopClient', () => {
     expect(g.focusActive).toBe(false)
 
     const g2 = createGame('coop-test', null)
-    g2.player.pos.set(g2.arena.station.x, 2, g2.arena.station.z)
+    g2.player.pos.set(g2.arena.stations[0]!.x, 2, g2.arena.stations[0]!.z)
     const input2 = neutralInput()
     input2.resupply = true
     stepCoopClient(g2, input2, SIM_DT)

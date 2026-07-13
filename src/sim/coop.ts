@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
+import { nearestStationDist } from './city'
 import { generateCity } from './citygen'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
@@ -636,8 +637,7 @@ export function coopResupply(w: CoopWorld, playerId: string): CoopEvent[] {
   if (w.phase === 'ended') return []
   const p = w.players.get(playerId)
   if (!p || !p.connected || !p.alive) return []
-  const dist = Math.hypot(p.body.pos.x - w.arena.station.x, p.body.pos.z - w.arena.station.z)
-  if (dist > RESUPPLY_RADIUS) return []
+  if (nearestStationDist(w.arena, p.body.pos.x, p.body.pos.z) > RESUPPLY_RADIUS) return []
   p.body.gas = p.body.config.maxGas
   p.body.canisters = p.body.config.gasCanisters
   p.body.blades = p.body.config.bladePairs

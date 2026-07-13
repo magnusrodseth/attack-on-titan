@@ -789,37 +789,36 @@ function addWall(scene: Scene, arena: Arena): void {
 }
 
 function addStation(scene: Scene, arena: Arena): void {
-  const pole = new Mesh(
-    new CylinderGeometry(0.35, 0.35, 16, 8),
-    new MeshStandardMaterial({ map: tex('/textures/bark.jpg', 1, 4), roughness: 0.9 }),
-  )
-  pole.position.set(arena.station.x, 8, arena.station.z)
-  pole.castShadow = true
+  // one shared material set; the plaza pole and its cardinal siblings all read alike
+  const poleMat = new MeshStandardMaterial({ map: tex('/textures/bark.jpg', 1, 4), roughness: 0.9 })
+  const bannerMat = new MeshStandardMaterial({
+    map: tex('/textures/linen.jpg', 1.4, 1),
+    color: 0x53b06e,
+    emissive: 0x1d5c38,
+    emissiveIntensity: 0.12,
+    side: DoubleSide,
+  })
+  const ringMat = new MeshStandardMaterial({
+    color: 0x2fa35f,
+    emissive: 0x2fa35f,
+    emissiveIntensity: 0.8,
+    transparent: true,
+    opacity: 0.55,
+  })
+  for (const station of arena.stations) {
+    const pole = new Mesh(new CylinderGeometry(0.35, 0.35, 16, 8), poleMat)
+    pole.position.set(station.x, 8, station.z)
+    pole.castShadow = true
 
-  const banner = new Mesh(
-    new BoxGeometry(4.5, 3, 0.15),
-    new MeshStandardMaterial({
-      map: tex('/textures/linen.jpg', 1.4, 1),
-      color: 0x53b06e,
-      emissive: 0x1d5c38,
-      emissiveIntensity: 0.12,
-      side: DoubleSide,
-    }),
-  )
-  banner.position.set(arena.station.x, 13.5, arena.station.z)
+    const banner = new Mesh(new BoxGeometry(4.5, 3, 0.15), bannerMat)
+    banner.position.set(station.x, 13.5, station.z)
+    // cardinal banners face the plaza so the green reads on approach from the center
+    banner.rotation.y = Math.atan2(station.x, station.z) + Math.PI
 
-  const ring = new Mesh(
-    new RingGeometry(8.6, 10, 48).rotateX(-Math.PI / 2),
-    new MeshStandardMaterial({
-      color: 0x2fa35f,
-      emissive: 0x2fa35f,
-      emissiveIntensity: 0.8,
-      transparent: true,
-      opacity: 0.55,
-    }),
-  )
-  ring.position.set(arena.station.x, 0.08, arena.station.z)
-  scene.add(pole, banner, ring)
+    const ring = new Mesh(new RingGeometry(8.6, 10, 48).rotateX(-Math.PI / 2), ringMat)
+    ring.position.set(station.x, 0.08, station.z)
+    scene.add(pole, banner, ring)
+  }
 }
 
 /** Clouds, birds, trees and a mountain ring: motion and depth beyond the gameplay set. */

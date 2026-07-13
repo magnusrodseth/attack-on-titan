@@ -1,4 +1,4 @@
-import { bossForWave, bossSpawnPoint, createBossFight, isBossWave } from './boss'
+import { bossForMilestone, bossSpawnPoint, createBossFight } from './boss'
 import type { GameState } from './game'
 import { saveBest } from './game'
 import { createHuntMode } from './hunt'
@@ -40,13 +40,13 @@ type Composition = (
 ) => TitanSpawn[]
 
 function spawnWave(g: GameState, composition: Composition): void {
-  if (isBossWave(g.wave, g.mode.id)) {
+  const milestone = bossForMilestone(g.wave, g.mode.id)
+  if (milestone) {
     // the milestone: one Shifter through the gate, outranking even the matchday duo.
     // Solo-only by construction — the co-op server spawns via waveComposition directly.
-    const { spec } = bossForWave(g.wave)
     const [gx, gz] = bossSpawnPoint(g.arena)
     const [x, z] = nearestWalkable(g.nav, gx, gz)
-    const fight = createBossFight(g.nextTitanId++, spec, g.wave, g.seed, x, z)
+    const fight = createBossFight(g.nextTitanId++, milestone.spec, g.wave, g.seed, x, z, milestone.lap)
     g.boss = fight
     g.titans = [fight.titan]
   } else {
@@ -109,10 +109,21 @@ const matchdayMode: GameMode = {
   ...waveLoop(matchdayComposition),
 }
 
+/**
+ * The Nine: nothing but the Shifter ladder, one boss per wave, upgrades between fights.
+ * spawnWave treats every wave as a milestone here, so the composition never fires.
+ */
+const bossRushMode: GameMode = {
+  id: 'bossrush',
+  name: 'The Nine',
+  desc: 'The Shifter gauntlet: the Nine walk one after another through the gate, Beast to Founding, then the ladder hardens and laps. Break every Weak Point or die trying.',
+  ...waveLoop(waveComposition),
+}
+
 /** The Culling rides the same wave skeleton; the countdown and relentless rule wrap it. */
 const huntMode: GameMode = createHuntMode(waveLoop(waveComposition))
 
-export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode, raceMode, huntMode]
+export const GAME_MODES: GameMode[] = [wavesMode, matchdayMode, bossRushMode, raceMode, huntMode]
 
 export const DEFAULT_MODE_ID = 'waves'
 

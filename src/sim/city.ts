@@ -95,7 +95,8 @@ export interface Arena {
   wallRadius: number
   wallHeight: number
   plazaRadius: number
-  station: Vector3
+  /** Resupply stations: the plaza one first, then one per cardinal on open ground. */
+  stations: Vector3[]
   canal: CanalSpec | null
   /** Wall angle (radians, +X = 0) of the sealed main gate; bastions hold the other cardinals. */
   gateAngle: number
@@ -109,10 +110,20 @@ export function emptyArena(): Arena {
     wallRadius: 260,
     wallHeight: 50,
     plazaRadius: 22,
-    station: new Vector3(0, 0, 0),
+    stations: [new Vector3(0, 0, 0)],
     canal: null,
     gateAngle: 0,
   }
+}
+
+/** Horizontal distance to the closest resupply station; every consumer resupplies there. */
+export function nearestStationDist(arena: Arena, x: number, z: number): number {
+  let best = Infinity
+  for (const s of arena.stations) {
+    const dist = Math.hypot(x - s.x, z - s.z)
+    if (dist < best) best = dist
+  }
+  return best
 }
 
 /** Terrain height ignoring buildings: 0 everywhere except the canal bed. */

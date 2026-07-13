@@ -71,6 +71,19 @@ graduating it is a one-line allowlist add. Rebuild recipe per titan:
 `blender/titans/<slug>/build.py` + `blender/export_titan.py` (see the models handoff
 and the vault Blender loop note).
 
+## Addendum: The Nine (boss rush) + cardinal stations (user request, 2026-07-13)
+
+- **The Nine** (`bossrush` in GAME_MODES): nothing but the Shifter ladder, one boss per
+  wave with upgrades between, lapping HP-scaled past the Founding. boss.ts grew the
+  mode-aware `bossSlot`/`bossForMilestone` (Wave Survival = every 5th wave, The Nine =
+  every wave); `createBossFight` takes its lap explicitly. Solo like all boss content.
+- **Cardinal resupply stations**: `Arena.stations` (plaza first, then one per cardinal on
+  open street, ~0.62 wallRadius). Placement is a deterministic post-pass in citygen that
+  consumes NO rng, so existing cities keep their exact layouts. `nearestStationDist`
+  drives resupply/prompt in solo, co-op server AND co-op client — **the Worker needs
+  `pnpm server:deploy` before co-op players can resupply at the new corners** (the stale
+  server would reject the distance check).
+
 ## Follow-ups (not in v1)
 
 - Texture/bake pass per model → graduate ids into `TEXTURED_GLBS`.

@@ -1,4 +1,5 @@
 import { Vector3 } from 'three'
+import { nearestStationDist } from './city'
 import type { CoopSnapshot, HookAnchor } from './coop'
 import type { GameState } from './game'
 import { copyInput, handleHookEdge, stepLamp, syncTitanHooks } from './game'
@@ -57,8 +58,9 @@ export function stepCoopClient(g: GameState, input: InputState, dt: number): voi
   }
 
   if (input.resupply && !g.prevInput.resupply) {
-    const dist = Math.hypot(p.pos.x - g.arena.station.x, p.pos.z - g.arena.station.z)
-    if (dist <= RESUPPLY_PROMPT_RADIUS) g.events.push({ type: 'coopResupply' })
+    if (nearestStationDist(g.arena, p.pos.x, p.pos.z) <= RESUPPLY_PROMPT_RADIUS) {
+      g.events.push({ type: 'coopResupply' })
+    }
   }
 
   syncTitanHooks(g)

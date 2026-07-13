@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Building } from './city'
-import { eaveHeight } from './city'
+import { eaveHeight, insideBuildingXZ } from './city'
 import {
   BOULEVARD_HALF,
   CANAL_HALF_WIDTH,
@@ -165,5 +165,40 @@ describe('generateCity — district variety (procgen audit 2026-07-10)', () => {
   it('has an AoT-scale 50m wall around a bigger district', () => {
     expect(arena.wallHeight).toBe(50)
     expect(arena.wallRadius).toBeGreaterThanOrEqual(240)
+  })
+})
+
+describe('resupply stations', () => {
+  it('keeps the plaza station and adds one per cardinal quadrant', () => {
+    expect(arena.stations).toHaveLength(5)
+    expect(arena.stations[0]!.x).toBe(0)
+    expect(arena.stations[0]!.z).toBe(0)
+    for (const cardinal of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+      const found = arena.stations.slice(1).some((s) => {
+        let delta = Math.atan2(s.z, s.x) - cardinal
+        while (delta > Math.PI) delta -= Math.PI * 2
+        while (delta < -Math.PI) delta += Math.PI * 2
+        return Math.abs(delta) < Math.PI / 4
+      })
+      expect(found).toBe(true)
+    }
+  })
+
+  it('puts every station on open ground: outside buildings, out of the canal, in the wall', () => {
+    for (const s of arena.stations.slice(1)) {
+      const radius = Math.hypot(s.x, s.z)
+      expect(radius).toBeGreaterThan(arena.wallRadius * 0.3)
+      expect(radius).toBeLessThan(arena.wallRadius * 0.9)
+      expect(insideBuildingXZ(arena, s.x, s.z, 1.5)).toBe(false)
+      if (arena.canal) {
+        expect(Math.abs(s.x - arena.canal.x)).toBeGreaterThan(arena.canal.halfWidth + 2)
+      }
+    }
+  })
+
+  it('is deterministic: same seed, same stations', () => {
+    const a = generateCity(createRng(31))
+    const b = generateCity(createRng(31))
+    expect(a.stations.map((s) => s.toArray())).toEqual(b.stations.map((s) => s.toArray()))
   })
 })

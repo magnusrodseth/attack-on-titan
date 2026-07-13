@@ -189,3 +189,50 @@ describe('shifter waves', () => {
     expect(game.phase).toBe('upgrading')
   })
 })
+
+describe('the nine (boss rush)', () => {
+  it('is registered and fields the ladder one shifter per wave', () => {
+    expect(getMode('bossrush').id).toBe('bossrush')
+    const game = createGame('gauntlet', null, 'bossrush')
+    startGame(game)
+    expect(game.wave).toBe(1)
+    expect(game.titans).toHaveLength(1)
+    expect(game.titans[0]!.kind).toBe('shifter')
+    expect(game.boss!.spec.id).toBe('beast-titan')
+
+    game.boss!.titan.hp = 0
+    game.boss!.titan.state = 'dead'
+    stepGame(game, neutralInput(), DT)
+    expect(game.phase).toBe('upgrading')
+    expect(game.offers.length).toBe(3)
+    chooseUpgrade(game, game.offers[0]!.id)
+    expect(game.wave).toBe(2)
+    expect(game.boss!.spec.id).toBe('cart-titan')
+    expect(game.titans).toHaveLength(1)
+  })
+
+  it('laps the ladder after nine waves with hardened pools', () => {
+    const game = createGame('gauntlet-lap', null, 'bossrush')
+    startGame(game)
+    const firstBeastHp = game.boss!.state.parts[0]!.maxHp
+    while (game.wave < 10) {
+      for (const t of game.titans) {
+        t.hp = 0
+        t.state = 'dead'
+      }
+      stepGame(game, neutralInput(), DT)
+      chooseUpgrade(game, game.offers[0]!.id)
+    }
+    expect(game.boss!.spec.id).toBe('beast-titan')
+    expect(game.boss!.state.parts[0]!.maxHp).toBeGreaterThan(firstBeastHp)
+  })
+
+  it('stays deterministic per seed', () => {
+    const run = () => {
+      const game = createGame('gauntlet-det', null, 'bossrush')
+      startGame(game)
+      return `${game.boss!.spec.id}:${game.boss!.titan.pos.x.toFixed(2)}:${game.boss!.state.rngState}`
+    }
+    expect(run()).toBe(run())
+  })
+})

@@ -401,7 +401,7 @@ describe('leaving and housekeeping', () => {
     applyPlayerUpdate(w, 'erwin', { pos: new Vector3(120, 2, 0), vel: new Vector3(), onGround: true })
     expect(coopResupply(w, 'erwin')).toHaveLength(0)
     applyPlayerUpdate(w, 'erwin', {
-      pos: new Vector3(w.arena.station.x, 2, w.arena.station.z),
+      pos: new Vector3(w.arena.stations[0]!.x, 2, w.arena.stations[0]!.z),
       vel: new Vector3(),
       onGround: true,
     })

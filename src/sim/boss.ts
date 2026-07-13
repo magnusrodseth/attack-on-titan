@@ -210,16 +210,37 @@ export const BOSS_LADDER: BossSpec[] = [
 
 export const BOSS_WAVE_INTERVAL = 5
 
-/** Shifter waves are Wave Survival's milestone, solo only; other modes keep their identity. */
-export function isBossWave(wave: number, modeId: string): boolean {
-  return modeId === 'waves' && wave > 0 && wave % BOSS_WAVE_INTERVAL === 0
+/**
+ * Which ladder slot (0-based) a wave holds, per mode: Wave Survival meets a Shifter
+ * every 5th wave; The Nine (boss rush) is nothing but the ladder, one per wave.
+ * Null = an ordinary wave.
+ */
+export function bossSlot(wave: number, modeId: string): number | null {
+  if (wave <= 0) return null
+  if (modeId === 'waves') return wave % BOSS_WAVE_INTERVAL === 0 ? wave / BOSS_WAVE_INTERVAL - 1 : null
+  if (modeId === 'bossrush') return wave - 1
+  return null
 }
 
-/** Ladder lookup: wave 5 → first spec … wave 45 → last, then the ladder laps, HP-scaled. */
-export function bossForWave(wave: number): { spec: BossSpec; lap: number } {
-  const slot = Math.round(wave / BOSS_WAVE_INTERVAL) - 1
+export function isBossWave(wave: number, modeId: string): boolean {
+  return bossSlot(wave, modeId) !== null
+}
+
+/** A slot walks the ladder in order; past the Founding it laps, HP-scaled. */
+export function bossForSlot(slot: number): { spec: BossSpec; lap: number } {
   const spec = BOSS_LADDER[slot % BOSS_LADDER.length]!
   return { spec, lap: Math.floor(slot / BOSS_LADDER.length) }
+}
+
+/** The Shifter a wave fields in the given mode, or null on ordinary waves. */
+export function bossForMilestone(wave: number, modeId: string): { spec: BossSpec; lap: number } | null {
+  const slot = bossSlot(wave, modeId)
+  return slot === null ? null : bossForSlot(slot)
+}
+
+/** Wave Survival's ladder view (slot every 5th wave); tests and docs speak in waves. */
+export function bossForWave(wave: number): { spec: BossSpec; lap: number } {
+  return bossForSlot(Math.round(wave / BOSS_WAVE_INTERVAL) - 1)
 }
 
 /** Each full lap of the Nine hardens the pools; the killSpeed bar never moves. */
@@ -316,9 +337,10 @@ export function createBossFight(
   seed: string,
   x: number,
   z: number,
+  lap = 0,
 ): BossFight {
   const titan = createTitan({ id: titanId, kind: 'shifter', height: spec.height, x, z })
-  const scale = partHpScale(bossForWave(wave).lap)
+  const scale = partHpScale(lap)
   const parts: BossPartState[] = spec.parts.map((p) => ({
     hp: Math.round(p.hp * scale),
     maxHp: Math.round(p.hp * scale),
