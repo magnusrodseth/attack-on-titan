@@ -67,6 +67,22 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 - **Content hash** — the fingerprint of the mode/map/kind/boss/upgrade registries, carried in the
   room handshake. Same hash, same game; a mismatch is refused rather than fudged.
 
+## The district's people
+
+- **Civilian** — one of the townsfolk: a person in the streets who cannot fight. They walk, they
+  panic, and when they panic they run **toward the nearest soldier**, because a soldier is safety.
+  _Avoid_: NPC, villager (they are the population of a walled city, not set dressing).
+- **The window** — the few seconds between a titan lifting a civilian to its mouth and the bite.
+  The titan stands still throughout, which makes it the easiest nape in the game. Kill or stagger
+  it and they drop, saved; miss and they are gone for the rest of the run.
+- **The headcount** — a run's second scoreboard: how many of the district's people are still
+  alive. It only ever goes down. Rescues pay **no points**, ever.
+- **Station stock** — what a resupply station has left to give. Blades and spears run out; gas,
+  hearts and the lamp never do. Survivors who reach a station restock it, so the supply line is
+  fed by rescues and by nothing else.
+- **Dull blades** — worn steel raises the one-cut bar: a fresh pair kills at killSpeed, a spent
+  pair needs about 21.5 m/s. This is why you need a station, which is why stock matters.
+
 ## Multiplayer
 
 - **Soldier** — a player's in-world character: first-person for its owner, a visible body to teammates.
