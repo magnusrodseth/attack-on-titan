@@ -21,10 +21,11 @@ and becomes a record.
 
 - **This effort carries execution in-map** (like the solo, multiplayer and time-trials maps):
   the decisions are ticketed HITL; the build slices graduate out of the fog once they land.
-- **State, 2026-07-14**: every design decision except the UI shape is settled (de-001 → de-004,
-  all closed in one HITL session). The frontier is **de-005** (prototype the daily's UI) and
-  **de-006** (build the roll module + sim), which are independent and can run in parallel;
-  de-007 (worker) waits on de-006, and de-008 (client + ship) waits on both de-005 and de-007.
+- **State, 2026-07-14**: every design decision except the UI shape is settled (de-001 → de-004),
+  and **de-006 is built** (`src/sim/daily.ts`, branch `worktree-daily-roll`). The frontier is now
+  **de-007** (the Worker: schema, claim, submit, board, standings — unblocked, and the module it
+  needs is proven to compile under `tsc -p server`) and **de-005** (prototype the daily's UI,
+  which needs a human to react to it). de-008 (client + ship) waits on both.
 - Workflow: one worktree branch off main; `pnpm test` + `pnpm typecheck` before commits;
   playwriter + `window.__aot` for render/HUD verification; merge only after a prod-shape E2E.
 - Skills in play: tdd (sim seams first), grilling for any ticket carrying a real user decision,
@@ -68,6 +69,15 @@ and becomes a record.
   earns one (results are retained so it can be backfilled). **Sealed orders**: the seed is issued
   only by the claim, so the course cannot be rehearsed — and the Hall of the Fallen leads with the
   daily, showing per-arena boards only on a *contested* course.
+
+- [The roll module and the sim](tickets/de-006-roll-module-and-sim.md) — `src/sim/daily.ts` built
+  and tested (12 tests): the closed-form walk, **no per-cycle shuffle** (it broke the no-repeat
+  guarantee across cycle boundaries — de-002 amended), the module deliberately does not import the
+  registries so the Worker can take it without dragging the arena generators in, and the
+  registries are held to it by a guard test instead. The **UTC bug is fixed**: `dailySeed()` was
+  building its date from local getters, so a soldier in New Zealand was on a different city and a
+  different board at the same instant. The free-play random seed and the daily run-save flag were
+  **moved to de-008** — shipping either before the daily exists would do harm.
 
 ## Not yet specified
 

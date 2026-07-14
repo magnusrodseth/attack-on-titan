@@ -56,6 +56,23 @@ How is the day's expedition rolled, and what does that do to free play?
    rehearsed, which is what makes the single attempt mean anything. `?seed=` URLs keep working
    (sharing a course is still a share), and the run save still resumes.
 
+## Amendment (2026-07-14, found while building de-006): no per-cycle shuffle
+
+Point 3 said to shuffle the index → id mapping once per 9-day cycle "so the schedule is not
+trivially predictable months out". **That is wrong, and it is now dropped.** Reshuffling the ids
+per cycle means the *index* still advances correctly across a cycle boundary while the *id*
+behind that index changes — so the mode or map can repeat across the seam, breaking the one
+guarantee the walk exists to provide. Proven, not argued: adding the shuffle turns the
+year-long no-repeat test red (`expected 'waves' not to be 'waves'`).
+
+Dropping it costs nothing. Predictability was only ever worth buying because a knowable course
+could be rehearsed — and **the course is sealed now** (see below), so the seed is the secret and
+the schedule is not. Knowing that next Tuesday is The Culling in the Forest is harmless, and
+arguably a feature: it is something to look forward to.
+
+The roll is therefore the pure closed form, ids in registry order. Consecutive days differ in
+both mode and map, every pairing comes up once per cycle, and no two implementations can drift.
+
 ## Amendment (2026-07-14, from de-004's "sealed orders" decision)
 
 Point 3's `hashSeed('daily:' + date)` is **not** the course seed. A seed anyone can derive is a
