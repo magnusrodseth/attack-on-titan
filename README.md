@@ -90,11 +90,18 @@ The multiplayer backend lives in `server/` (Cloudflare Worker: Hono routing, par
 rooms, Drizzle over D1):
 
 ```bash
-pnpm server:dev     # wrangler dev on localhost:8787 (local D1 included, no env needed)
-pnpm server:deploy  # deploy to Cloudflare
-pnpm db:generate    # emit SQL migrations from server/db/schema.ts
-pnpm db:migrate     # apply migrations to the remote D1 (wrangler d1 migrations apply)
+pnpm server:dev      # wrangler dev on localhost:8787 (local D1 included, no env needed)
+pnpm server:deploy   # deploy to Cloudflare by hand (CI does this on every push to main)
+pnpm test:deployed   # ask the live Worker which world it is serving, and assert it is this one
+pnpm db:generate     # emit SQL migrations from server/db/schema.ts
+pnpm db:migrate      # apply migrations to the remote D1 (wrangler d1 migrations apply)
 ```
+
+The Worker ships with the client: pushing to `main` deploys the client (Vercel) and the Worker
+(`.github/workflows/deploy-worker.yml`) from the same commit, and CI then asserts the deployed
+Worker's content hash matches the commit's. Client and Worker that know different worlds refuse
+each other at the handshake, so they are never allowed to drift apart in the first place. The
+workflow needs a `CLOUDFLARE_API_TOKEN` repo secret (Edit Cloudflare Workers template).
 
 The client reaches the Worker through `VITE_PARTY_HOST` (defaults to `localhost:8787`; set it in
 Vercel for production).

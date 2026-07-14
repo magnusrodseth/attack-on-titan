@@ -9,6 +9,7 @@ import { createSession, validateSessionToken } from './db/sessions'
 import { readTrialBoards, writeTrial } from './db/trials'
 import type { Env } from './env'
 import { MAX_SEED_LENGTH, parseTrialPost } from './trials'
+import { CONTENT_HASH } from '../src/sim/content'
 
 /** Origins allowed to call the API and open rooms: prod, previews, local dev. */
 export function isAllowedOrigin(origin: string): boolean {
@@ -42,7 +43,14 @@ api.use(
   }),
 )
 
-api.get('/health', (c) => c.json({ ok: true }))
+/**
+ * Health, and the one fact you cannot otherwise see from outside: which world this Worker is
+ * running. The room refuses a mismatched client (4009) but says nothing about what it *does*
+ * hold, so a skewed deploy could only be diagnosed by guessing hashes at the handshake until
+ * one got past the gate. Publishing it turns that into a GET — `deployed.test.ts` asserts on it
+ * after every deploy, and a human can curl it when the lobby starts refusing people.
+ */
+api.get('/health', (c) => c.json({ ok: true, content: CONTENT_HASH }))
 
 api.post('/register', async (c) => {
   const db = createDb(c.env.DB)

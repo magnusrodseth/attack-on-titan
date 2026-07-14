@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit && tsc -p server --noEmit",
     "server:dev": "wrangler dev -c server/wrangler.jsonc --port 8787",
     "server:deploy": "wrangler deploy -c server/wrangler.jsonc",
+    "test:deployed": "DEPLOYED_HOST=${DEPLOYED_HOST:-aot-party.magnus-rodseth.workers.dev} vitest run server/deployed.test.ts",
     "server:tail": "wrangler tail -c server/wrangler.jsonc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"

@@ -1,0 +1,53 @@
+# The other half of the deploy contract.
+#
+# The client ships itself: push to main, Vercel builds it, players have it. The Worker did not —
+# it went out by hand, when someone remembered, and on 2026-07-14 nobody did: a revert dropped the
+# Evacuation mode, Vercel published the client that had never heard of it, and the Worker stayed an
+# hour behind still holding the civilians. The content hash on the handshake caught the skew and
+# refused every lobby (4009), which is the guard working. But it only spoke when a player tried to
+# muster, and by then multiplayer had been down for hours.
+#
+# So the Worker now ships on the same push as the client, and then has to prove it: the deploy step
+# is not the assertion — `server/deployed.test.ts` fetches /api/health off the live Worker and
+# compares the world it is actually serving against the one in this commit.
+name: Deploy Worker
+
+on:
+  push:
+    branches: [main]
+  # for redeploying a skewed Worker without an empty commit
+  workflow_dispatch:
+
+# never let two deploys race onto the same Worker; a superseded push should lose, not interleave
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # a broken Worker is worse than a stale one: gate the deploy on the same checks
+      # CLAUDE.md asks for before a commit
+      - run: pnpm test
+      - run: pnpm typecheck
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          packageManager: pnpm
+          command: deploy -c server/wrangler.jsonc
+
+      # the deploy said it worked; this asks the live Worker whether it agrees
+      - name: Verify the deployed world matches this commit
+        run: pnpm test:deployed
