@@ -1,7 +1,7 @@
 ---
 type: wayfinder:task
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-townsfolk, 2026-07-14)
 blocked-by: [tf-001]
 ---
 
@@ -26,3 +26,15 @@ singleplayer and multiplayer alike (ADR 0003). Declare their co-op stance: `shar
   seed, and they never spawn inside a building.
 
 No titan interaction yet: that is tf-005. This ticket is a living district and nothing else.
+
+## Resolution
+
+`src/sim/folk.ts` + the crowd in `world.ts`, so it exists in singleplayer and multiplayer alike
+(ADR 0003, stance `shared`). Civilians walk the nav grid, panic inside `FOLK_PANIC_RADIUS`, run at
+the nearest soldier, and — once cut loose or once the street goes quiet — carry their supply to the
+nearest station and shelter there.
+
+They are **slower than a titan's stride** (2.1 m/s fleeing vs ~4 m/s for a 15 m pure), deliberately:
+a crowd that could outrun a titan would save itself, and a soldier who is not needed is not in a
+game about being needed. Seeded from `hashSeed(citySeed + ':folk')`, so the same seed populates the
+same streets with the same people, and a replay kills the same people.

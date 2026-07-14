@@ -1,7 +1,7 @@
 ---
 type: wayfinder:task
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-townsfolk, 2026-07-14)
 blocked-by: [tf-001, tf-004]
 ---
 
@@ -32,3 +32,17 @@ attack and swat — none of that is new).
 Tests: an untokened titan finds and reaches a civilian; a grab opens a window of the agreed length;
 each interrupt frees the victim; an uninterrupted window devours them; a feeding titan holds its
 token; the chaser pool for soldiers is unchanged (the existing tests must still pass untouched).
+
+## Resolution
+
+Every titan without a chase token hunts the nearest civilian it can see; catch one and it lifts
+them to its mouth and **stands still** for 3.6 seconds. The easiest nape in the game is attached to
+someone you are failing, and nothing in the code resolves that for the player.
+
+The load-bearing bug: `pickChasers` counted ANY chase state as "engaged with a soldier", so a titan
+that started stalking someone in the street was immediately handed a soldier chase-token and turned
+around — **nobody would ever have been eaten**. `TitanState.prey` now says who a titan is actually
+hunting, which also rides the run save for free (the persist regression caught exactly this).
+
+Interrupt = kill or stagger the holder. Credit goes to whoever broke the grip (blade via
+`slashOutcome`, blast via the spear's owner).

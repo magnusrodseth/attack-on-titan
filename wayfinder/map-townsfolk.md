@@ -48,7 +48,38 @@ scoreboard, and an emptied district is a soft, atmospheric fail state that is no
 
 ## Decisions so far
 
-<!-- one line per closed ticket -->
+- [tf-001 · The crowd's rules](tickets/tf-001-the-crowds-rules.md) — they flee TOWARD the nearest
+  soldier (so every rescue drags the crowd, and the titans, onto you); a save is the moment the
+  grip breaks, but the supply only lands if they reach a station; losses are permanent for the run;
+  64 people in the district, 40 underground, 0 in the Forest; people exist in Wave Survival and
+  boss rush only, declared per mode.
+- [tf-002 · Dull blades](tickets/tf-002-dull-blades.md) — the one-cut bar rises with the edge in
+  hand (17 → ~21.5 m/s); only the bar moves. Plus the gasLow/bladesLow warnings the user asked for,
+  which say what worn steel will actually cost you.
+- [tf-004 · The crowd itself](tickets/tf-004-townsfolk-sim.md) — `src/sim/folk.ts` in the one world;
+  they are slower than a titan's stride, deliberately, because a crowd that could save itself would
+  make the soldier decorative.
+- [tf-005 · Titan appetite](tickets/tf-005-titan-appetite.md) — every titan without a chase token
+  hunts the crowd, and a feeding titan STANDS STILL. The load-bearing bug: the soldier chase-token
+  pool was stealing titans mid-hunt, so nobody would ever have been eaten (`TitanState.prey`).
+- [tf-003 · Station stock](tickets/tf-003-station-stock.md) — blades and spears run out and
+  survivors carry them in; gas and hearts stay free. Merged with the Field Kit that landed on main
+  in parallel: a kit carries its own steel, so it is what answers a district you have let empty.
+- [tf-007 · Render the crowd](tickets/tf-007-render-the-crowd.md) — four InstancedMeshes for the
+  whole district, on sourced CC0 human skin and neutral fabrics (NOT the titans' cursed leather).
+  The dead lie where they fell.
+- [tf-006 · The window's feel](tickets/tf-006-the-window-feel.md) — the scream (three CC0 samples,
+  pitched apart so a crowd is not one person), the red minimap pulse, and a body held ALOFT and
+  kicking rather than inverted in the titan's face.
+- [tf-008 · The crowd on the wire](tickets/tf-008-coop-on-the-wire.md) — civilians, stock and the
+  headcount on the snapshot; four new events; the content hash now covers `crowd`/`population`,
+  because a mode that grew a crowd is a different game even though no id changed.
+- [tf-009 · The second scoreboard](tickets/tf-009-the-second-scoreboard.md) — CIVILIANS SAVED /
+  LOST on the death card, a quiet live headcount, two hard commendations, and no points for rescues,
+  ever.
+- [tf-010 · Tune, verify, ship](tickets/tf-010-tuning-verify-ship.md) — **destination reached
+  2026-07-14**: AFK loses ~15 a wave and saves nobody; spending every window saves everyone and
+  costs you the wave. The bargain holds. Live in production, solo and co-op.
 
 ## Not yet specified
 

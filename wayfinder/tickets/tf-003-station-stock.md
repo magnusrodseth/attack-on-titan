@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-townsfolk, 2026-07-14)
 blocked-by: [tf-001, tf-002]
 ---
 
@@ -30,3 +30,18 @@ This ticket gives a station **stock**, which is the change that makes the whole 
 
 Depends on tf-001 (what a save is, whether saves are permanent) and tf-002 (what the demand actually
 is, once blades dull).
+
+## Resolution
+
+Stations gained stock: **blades and spears run out, gas and hearts and the lamp never do** (free
+swinging is sacred to the feel; the kill-refund economy already pays for hearts). Three charges of
+each to start, six max, one spent per resupply, one added per civilian who makes it home.
+
+A bare rack gives you gas and hearts and nothing to cut with — which is exactly what dull blades
+made painful, and it is the moment the two halves of the economy meet.
+
+**Field Kits** (shipped in parallel by another session, merged here): a kit is a station you carry,
+and it carries its own steel. So a kit is what answers a district you have let empty, and the fewer
+people you save, the more a run depends on what you brought with you. The HUD prompt now prints
+what a station has left, so the decision to fly in is made on the way in rather than discovered on
+arrival.

@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-townsfolk, 2026-07-14)
 blocked-by: []
 ---
 
@@ -35,3 +35,25 @@ sharp enough that every later ticket is a build. Grill it one question at a time
   legitimate one — but under ADR 0003 it has to be *declared*, not omitted.
 - **The bargain, checked.** For each answer above: does it make letting a titan eat someone
   *comfortable*? If yes, it is the wrong answer.
+
+## Resolution (user-confirmed, 2026-07-14)
+
+- **Flight: they run TOWARD the nearest soldier.** A soldier is safety, so every rescue drags a
+  screaming crowd onto your position and the titans follow them in. The safest place to stand is
+  wherever nobody needs you. This is the choice that makes the crowd a hazard as well as a
+  resource, and it is the reason the feature bites.
+- **A save is the moment the grip breaks** (kill or stagger the holder). They drop, counted,
+  credited to whoever broke it (`world.lastHitBy`). But the SUPPLY only lands if they reach a
+  station on their own feet, and they can be caught again on the way: the rescue is an instant,
+  the delivery is an escort.
+- **Permanence: the dead stay dead for the run.** The district only ever thins. An emptied one
+  goes quiet (bare stations, silent streets) and stays that way.
+- **Population: 64 (district), 40 (underground), 0 (Forest).** Declared in the map registry, so
+  a new arena cannot forget to answer.
+- **Modes: Wave Survival and boss rush have people; The Culling and Signal Run do not** (declared
+  in `GameMode.crowd`: relentless leaves nobody free to eat, and a race has no titans at all).
+  The Nine walk into a living city and their summons eat like anything else.
+- **The window: 3.6 s**, interrupted by killing OR staggering the holder (so a spear counts).
+- **Tuning discovered in play, not designed at a desk**: titans only hunt prey they can SEE
+  (`FOLK_HUNT_RADIUS` 75 m) and go quiet for 25 s after a meal (`SATIATED_SECONDS`). Without both,
+  the first probe emptied the district by wave three: predation was a conveyor, not a rhythm.

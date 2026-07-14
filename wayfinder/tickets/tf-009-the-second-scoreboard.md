@@ -1,7 +1,7 @@
 ---
 type: wayfinder:task
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-townsfolk, 2026-07-14)
 blocked-by: [tf-003, tf-005]
 ---
 
@@ -26,3 +26,14 @@ What the district's losses add up to, and what they leave behind.
   here without asking.
 - Analytics: the headcount is the single best signal of whether the tension is landing (are players
   spending the window, or farming feeding titans?). One PostHog property, no more.
+
+## Resolution
+
+- The death card ends on **CIVILIANS SAVED / LOST** — a fact about the city you failed to hold, not
+  a score, and the last thing you read.
+- A quiet live headcount in the HUD (`CIVILIANS 64`, with the losses in red). Deliberately not a
+  prize meter: we refuse to pay points for rescues, so this only ever goes down.
+- Two commendations, deliberately few and hard: **From the Jaws** (break a grip with someone
+  already in the fist) and **Not One Soul** (clear a wave in a living district without losing
+  anyone).
+- The emptied district announces itself once (`districtEmpty`) and then goes quiet.
