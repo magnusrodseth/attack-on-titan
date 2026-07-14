@@ -21,7 +21,7 @@ import { STATION_MAX, STATION_START_BLADES } from './world'
 
 const DT = SIM_DT
 
-function running(map = 'district', mode = 'waves'): GameState {
+function running(map = 'district', mode = 'evacuation'): GameState {
   const g = createGame('folk-seed', null, mode, map)
   startGame(g)
   return g
@@ -58,16 +58,26 @@ describe('the district has people in it', () => {
   it('every mode declares whether the streets are populated', () => {
     for (const mode of GAME_MODES) expect(typeof mode.crowd).toBe('boolean')
     for (const map of GAME_MAPS) expect(typeof map.population).toBe('number')
-    // relentless leaves nobody free to eat, and a race has no titans at all
+    // The people live in exactly one mode: the one that is about them. Wave Survival is you
+    // against the roster on empty streets; The Nine is a duel; The Culling leaves nobody free
+    // to eat; and a race has no titans at all.
+    expect(GAME_MODES.find((m) => m.id === 'evacuation')!.crowd).toBe(true)
+    expect(GAME_MODES.find((m) => m.id === 'waves')!.crowd).toBe(false)
+    expect(GAME_MODES.find((m) => m.id === 'bossrush')!.crowd).toBe(false)
     expect(GAME_MODES.find((m) => m.id === 'hunt')!.crowd).toBe(false)
     expect(GAME_MODES.find((m) => m.id === 'race')!.crowd).toBe(false)
-    expect(GAME_MODES.find((m) => m.id === 'waves')!.crowd).toBe(true)
-    expect(GAME_MODES.find((m) => m.id === 'bossrush')!.crowd).toBe(true)
   })
 
   it('a mode with no crowd has an empty district even on a populated map', () => {
-    const g = running('district', 'hunt')
-    expect(g.folk).toHaveLength(0)
+    for (const mode of ['waves', 'bossrush', 'hunt']) {
+      const g = running('district', mode)
+      expect(g.folk).toHaveLength(0)
+    }
+  })
+
+  it('the Forest cannot host The Evacuation: nobody lives there to evacuate', () => {
+    expect(getMap('forest').modes).not.toContain('evacuation')
+    expect(getMap('district').modes).toContain('evacuation')
   })
 })
 
@@ -252,6 +262,32 @@ describe('an emptied district', () => {
     expect(g.events.filter((e) => e.type === 'districtEmpty')).toHaveLength(1)
     stepGame(g, neutralInput(), DT)
     expect(g.events.filter((e) => e.type === 'districtEmpty')).toHaveLength(0)
+  })
+
+  it('ends the run in The Evacuation, at full health, because the headcount IS the life bar', () => {
+    const g = running()
+    expect(g.player.hp).toBe(g.player.config.maxHp)
+    for (const c of g.folk) c.state = 'dead'
+    stepGame(g, neutralInput(), DT)
+    expect(g.events.some((e) => e.type === 'districtLost')).toBe(true)
+    expect(g.phase).toBe('dead') // five hearts, and nothing left worth defending
+  })
+
+  it('stations are bottomless where nobody lives: no crowd, no scarcity', () => {
+    const g = running('district', 'waves')
+    const p = g.player
+    const station = g.arena.stations[0]!
+    p.pos.set(station.x, 1.7, station.z)
+    const input = neutralInput()
+    input.resupply = true
+    for (let i = 0; i < 8; i++) {
+      p.blades = 1
+      p.bladeHp = 1
+      stepGame(g, input, DT)
+      stepGame(g, neutralInput(), DT)
+      expect(p.blades).toBe(p.config.bladePairs) // it never runs dry
+    }
+    expect(g.events.some((e) => e.type === 'stationBare')).toBe(false)
   })
 
   it('panic radius is a real distance, not a whole-map leash', () => {

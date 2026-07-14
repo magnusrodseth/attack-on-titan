@@ -1308,6 +1308,13 @@ function handleEvents(events: GameEvent[]): void {
       case 'districtEmpty':
         hud.showBanner('The Streets Are Empty', 3200)
         break
+      case 'districtLost':
+        // the run is over, and not because you died: there is nothing left in this district
+        // worth standing in
+        hud.showBanner('The District Is Lost', 4000)
+        audio.boom()
+        effects.addShake(1)
+        break
       case 'stationBare':
         hud.showBanner(
           event.kind === 'blades' ? 'No Blades Left Here' : 'No Spears Left Here',

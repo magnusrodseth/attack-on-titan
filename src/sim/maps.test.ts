@@ -12,10 +12,21 @@ import { createRng, hashSeed } from './rng'
  * trunks; once they were, the gate had nothing left to protect.
  */
 describe('map/mode parity', () => {
-  it('offers every mode on every map', () => {
+  it('offers every mode on every map that can host it', () => {
     for (const mode of GAME_MODES) {
       const maps = mapsForMode(mode.id)
-      expect(maps.map((m) => m.id).sort()).toEqual(GAME_MAPS.map((m) => m.id).sort())
+      // the one exception, and it is a fact about the fiction rather than a gap: The Evacuation
+      // is about the people in the streets, and nobody lives in the Forest of Giant Trees
+      const canHost = GAME_MAPS.filter((m) => !mode.crowd || m.population > 0)
+      expect(maps.map((m) => m.id).sort()).toEqual(canHost.map((m) => m.id).sort())
+    }
+  })
+
+  it('a mode with a crowd is never offered on a map with nobody in it', () => {
+    for (const mode of GAME_MODES.filter((m) => m.crowd)) {
+      for (const map of mapsForMode(mode.id)) {
+        expect(map.population).toBeGreaterThan(0)
+      }
     }
   })
 

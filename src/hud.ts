@@ -1274,7 +1274,10 @@ export class Hud {
         .filter(Boolean)
         .join('<br />')
     } else {
-      title.textContent = 'Devoured'
+      // in The Evacuation a run can end with every heart intact, because the district is the
+      // life bar. That deserves its own word: you were not devoured, you were outlasted.
+      const districtGone = game.mode.crowd && game.folk.length > 0 && !game.folk.some((c) => c.state !== 'dead' && c.state !== 'safe')
+      title.textContent = districtGone ? 'The District Is Lost' : 'Devoured'
       // the civilian line goes LAST and it is not a score: "Civilians lost: 61" is a fact
       // about the city you failed to hold, and it should be the last thing you read.
       const toll =

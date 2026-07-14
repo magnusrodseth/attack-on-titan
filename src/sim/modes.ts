@@ -67,7 +67,35 @@ const wavesMode: GameMode = {
     kind: 'shared',
     note: 'The roster scales with the squad; every soldier picks their own upgrade.',
   },
-  crowd: true, // the home case: a living district, and titans eating it
+  // Wave Survival is about the roster and nothing else: an empty district, and you against
+  // what walks in. The people live in their own mode (The Evacuation), where protecting them
+  // IS the game rather than a distraction from it.
+  crowd: false,
+  ...waveLoop(),
+}
+
+/**
+ * The Evacuation: the district is full of people and the titans are already inside.
+ *
+ * Mechanically it is the wave skeleton, but the objective is inverted: the roster is not the
+ * thing you are clearing, it is the thing eating the thing you are protecting. Every titan
+ * without a chase token is hunting someone who cannot fight back, and a titan that catches one
+ * stands still to eat — which makes it the easiest nape in the game, attached to someone you
+ * are failing. Letting it feed is tactically correct and morally awful, and the mode never
+ * resolves that for you.
+ *
+ * The headcount is the life bar. Lose the last civilian and the run is over, even at full
+ * health, because there is nothing left in the district worth standing in.
+ */
+const evacuationMode: GameMode = {
+  id: 'evacuation',
+  name: 'The Evacuation',
+  desc: 'The district is full of people and the titans are in the streets. Every titan that is not hunting you is eating someone. Cut them out of the fists, get them to the stations, and hold the district — the run ends when the last civilian does, however many hearts you have left.',
+  coop: {
+    kind: 'shared',
+    note: 'A squad is BETTER at this, not merely compatible with it: you cannot be everywhere, and now there are four of you deciding where to be. Rescue credit goes to whoever breaks the grip; a restocked station belongs to everyone.',
+  },
+  crowd: true,
   ...waveLoop(),
 }
 
@@ -83,16 +111,28 @@ const bossRushMode: GameMode = {
     kind: 'adapted',
     note: 'Part HP pools scale with the squad (rosterHpScale), so a four-hand Shifter fight lasts a fight. The ladder itself never changes.',
   },
-  // the Nine walk into a living city, and their summons eat like anything else. A Colossal
-  // stepping over a crowd is the image the whole show is built on.
-  crowd: true,
+  // the Nine get a cleared district: a Shifter duel is a duel, and a crowd underfoot would be
+  // a second game played badly on top of the first one. (The Colossal stepping over a living
+  // city is a hell of an image, and it belongs to The Evacuation if it ever wants a boss wave.)
+  crowd: false,
   ...waveLoop(),
 }
 
 /** The Culling rides the same wave skeleton; the countdown and relentless rule wrap it. */
 const huntMode: GameMode = createHuntMode(waveLoop())
 
-export const GAME_MODES: GameMode[] = [wavesMode, bossRushMode, raceMode, huntMode]
+export const GAME_MODES: GameMode[] = [
+  wavesMode,
+  evacuationMode,
+  bossRushMode,
+  raceMode,
+  huntMode,
+]
+
+/** Modes where the district is populated; a map with no people cannot host them. */
+export function crowdModes(): GameMode[] {
+  return GAME_MODES.filter((mode) => mode.crowd)
+}
 
 export const DEFAULT_MODE_ID = 'waves'
 

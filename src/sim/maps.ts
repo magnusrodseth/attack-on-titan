@@ -39,7 +39,9 @@ export const DEFAULT_MAP_ID = 'district'
  * Those are fixed at the source (see city.ts headroom, titan.ts leap, Arena.bossEntry), so
  * the roster is no longer a per-map question.
  */
-const ALL_MODES = ['waves', 'bossrush', 'race', 'hunt']
+const ALL_MODES = ['waves', 'evacuation', 'bossrush', 'race', 'hunt']
+/** The Forest has nobody living in it, so it cannot host the mode that is about them. */
+const UNPEOPLED_MODES = ALL_MODES.filter((id) => id !== 'evacuation')
 
 export const GAME_MAPS: GameMap[] = [
   {
@@ -73,9 +75,11 @@ export const GAME_MAPS: GameMap[] = [
     id: 'forest',
     name: 'The Forest of Giant Trees',
     desc: 'Eighty metres of bark in every direction — swing the giants, rest on their limbs, and run the crown line. The definitive ODM playground.',
-    modes: ALL_MODES,
+    // nobody lives in the forest, and its silence is the point — so it does not offer the mode
+    // that is entirely about the people who do
+    modes: UNPEOPLED_MODES,
     coop: { kind: 'shared' },
-    population: 0, // nobody lives in the forest. the silence out here is the point.
+    population: 0,
     clockFraction: null,
     generate: generateForest,
   },

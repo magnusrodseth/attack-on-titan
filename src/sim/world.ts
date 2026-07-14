@@ -279,6 +279,8 @@ export type WorldEvent =
   | { type: 'civilianDelivered'; civilianId: number; station: number }
   /** The last person in the district is gone. The streets are quiet now. */
   | { type: 'districtEmpty' }
+  /** ...and in The Evacuation that ends the run, whatever is left of your hearts. */
+  | { type: 'districtLost'; wave: number; saved: number }
   /** A station has nothing left to give: the rack is bare until someone makes it home. */
   | { type: 'stationBare'; station: number; kind: 'blades' | 'spears' }
   | { type: 'boost' }
@@ -706,6 +708,13 @@ function stepCrowd(w: World, dt: number): void {
   if (w.folk.length > 0 && !w.folk.some(isAlive) && !w.folkQuiet) {
     w.folkQuiet = true
     w.events.push({ type: 'districtEmpty' }) // nobody left to save. the streets go quiet.
+    // In The Evacuation the headcount IS the life bar: there is nothing left in this district
+    // worth standing in, however many hearts you have. The run is over.
+    if (w.mode.crowd) {
+      w.events.push({ type: 'districtLost', wave: w.wave, saved: w.folkStats.saved })
+      if (w.coop) endMatch(w)
+      else w.phase = 'dead'
+    }
   }
 }
 
@@ -1059,7 +1068,11 @@ export function worldResupply(w: World, s: Soldier): boolean {
   const atStation = index >= 0
   if (!atStation && p.kits <= 0) return false
   if (!atStation) p.kits -= 1
-  const stock = atStation ? w.stations[index] : undefined
+  // A station only runs out where somebody can refill it. In a mode with no people in the
+  // streets (Wave Survival, The Nine) the racks are bottomless, exactly as they always were —
+  // finite stock with nobody alive to carry more in would be a slow death with no counterplay,
+  // which is a punishment, not a decision.
+  const stock = atStation && w.mode.crowd ? w.stations[index] : undefined
 
   // always free
   p.gas = p.config.maxGas

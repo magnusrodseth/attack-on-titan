@@ -287,8 +287,8 @@ describe('the wire carries everything the fight needs', () => {
 
 describe('the crowd is shared, and has to prove it with a squad', () => {
   it('a co-op district is populated, and the same seed puts the same people in it', () => {
-    const a = createCoopWorld('crowd', COOP_ROSTER, 'city', 'district', 'waves')
-    const b = createCoopWorld('crowd', COOP_ROSTER, 'city', 'district', 'waves')
+    const a = createCoopWorld('crowd', COOP_ROSTER, 'city', 'district', 'evacuation')
+    const b = createCoopWorld('crowd', COOP_ROSTER, 'city', 'district', 'evacuation')
     expect(a.folk.length).toBe(getMap('district').population)
     expect(a.folk.map((c) => [Math.round(c.pos.x), Math.round(c.pos.z)])).toEqual(
       b.folk.map((c) => [Math.round(c.pos.x), Math.round(c.pos.z)]),
@@ -296,14 +296,14 @@ describe('the crowd is shared, and has to prove it with a squad', () => {
   })
 
   it('titans without a chase token hunt the crowd, with four soldiers exactly as with one', () => {
-    const w = createCoopWorld('crowd-hunt', COOP_ROSTER, 'city', 'district', 'waves')
+    const w = createCoopWorld('crowd-hunt', COOP_ROSTER, 'city', 'district', 'evacuation')
     run(w, 6)
     // somebody, somewhere, is being hunted: that is the whole feature
     expect(w.titans.some((t) => t.prey !== null)).toBe(true)
   })
 
   it('the fist, the window and the rescue all cross the wire', () => {
-    const w = createCoopWorld('crowd-wire', ['levi'], 'city', 'district', 'waves')
+    const w = createCoopWorld('crowd-wire', ['levi'], 'city', 'district', 'evacuation')
     const titan = w.titans[0]!
     const c = w.folk[0]!
     // stage a meal: the sim seizes on the titan's own swat, so put it on top of them
@@ -316,7 +316,7 @@ describe('the crowd is shared, and has to prove it with a squad', () => {
     expect(snap.stations.length).toBe(w.arena.stations.length)
 
     // and a client draws exactly what the server holds
-    const g = createGame('crowd-wire', null, 'waves', 'district')
+    const g = createGame('crowd-wire', null, 'evacuation', 'district')
     startGame(g)
     const buf = createSnapshotBuffer()
     pushSnapshot(buf, snap, 0)
@@ -335,7 +335,7 @@ describe('the crowd is shared, and has to prove it with a squad', () => {
   })
 
   it('a squad drains a station and the district refills it', () => {
-    const w = createCoopWorld('crowd-stock', COOP_ROSTER, 'city', 'district', 'waves')
+    const w = createCoopWorld('crowd-stock', COOP_ROSTER, 'city', 'district', 'evacuation')
     const before = w.stations[0]!.blades
     const s = w.soldiers[0]!
     const station = w.arena.stations[0]!
