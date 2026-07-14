@@ -7,7 +7,11 @@ import type { CoopEvent, CoopSnapshot, HookAnchor, MatchResults } from '../sim/c
  * room name; the session token rides in the query string), so there is no join message.
  */
 
-export const PROTOCOL_VERSION = 1
+/**
+ * Bumped to 2 for the unified world (ADR 0003): the lobby now carries the map and the mode,
+ * matchStart names the world it starts, and a mash intent exists because the grab QTE does.
+ */
+export const PROTOCOL_VERSION = 2
 
 export type RoomPhase = 'lobby' | 'match' | 'results'
 
@@ -48,6 +52,10 @@ export type ClientMsg =
   | { v: typeof PROTOCOL_VERSION; type: 'fire'; look: { x: number; y: number; z: number } }
   | { v: typeof PROTOCOL_VERSION; type: 'pick'; upgradeId: string }
   | { v: typeof PROTOCOL_VERSION; type: 'resupply' }
+  // one press of the escape bar while a titan's fist has you (the grab QTE, coop-adapted)
+  | { v: typeof PROTOCOL_VERSION; type: 'mash' }
+  // creator only, in the lobby: which arena and which mode this room fights
+  | { v: typeof PROTOCOL_VERSION; type: 'setWorld'; mapId: string; modeId: string }
   | { v: typeof PROTOCOL_VERSION; type: 'rematch' } // creator only, from results
 
 // ---------------------------------------------------------------------------
@@ -63,11 +71,22 @@ export interface LobbyMsg {
   phase: RoomPhase
   players: RoomPlayer[]
   maxPlayers: number
+  /** The world this room will fight in; the creator picks it, everyone builds it. */
+  mapId: string
+  modeId: string
 }
 
 export type ServerMsg =
   | LobbyMsg
-  | { v: typeof PROTOCOL_VERSION; type: 'matchStart'; seed: string; roster: string[] }
+  | {
+      v: typeof PROTOCOL_VERSION
+      type: 'matchStart'
+      seed: string
+      roster: string[]
+      /** The world the server is actually running: never inferred, always named. */
+      mapId: string
+      modeId: string
+    }
   | { v: typeof PROTOCOL_VERSION; type: 'snapshot'; snap: CoopSnapshot }
   | { v: typeof PROTOCOL_VERSION; type: 'events'; events: CoopEvent[] }
   | { v: typeof PROTOCOL_VERSION; type: 'results'; results: MatchResults }
@@ -78,6 +97,9 @@ export type ErrorCode =
   | 'room-full' // 4 soldiers already mustered
   | 'not-creator' // start/rematch from someone else
   | 'bad-message' // unparseable or wrong version
+  // the client's content registries differ from the server's (see sim/content.ts): it would
+  // be fighting a world nobody else is in, so it is turned away and told to reload
+  | 'outdated'
 
 // ---------------------------------------------------------------------------
 // HTTP API shapes (register/login/leaderboard)

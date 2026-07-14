@@ -598,6 +598,24 @@
       #lobby-copy.copied { color: #7fe08f !important; animation: copy-pop 0.35s ease; }
       @keyframes copy-pop { 40% { transform: scale(1.07); } }
 
+      /* the squad leader picks the ground: arena + mission, before anyone readies up */
+      .lobby-world { display: flex; gap: 18px; justify-content: center; margin: 6px 0 2px; }
+      .lobby-world.hidden { display: none; }
+      .lw-field { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+      .lw-field > span {
+        font-family: var(--label-font); font-size: 11px; letter-spacing: 3px;
+        text-transform: uppercase; color: var(--parchment-dim);
+      }
+      .lw-field select {
+        font-family: var(--label-font); font-size: 14px; letter-spacing: 1px;
+        color: var(--parchment); background: #14161acc; padding: 9px 14px; min-width: 210px;
+        border: 1px solid #6b7280aa; border-radius: 2px; cursor: pointer;
+      }
+      .lw-field select:hover { border-color: var(--blood); }
+      .lw-field select:disabled { opacity: 0.55; cursor: default; }
+      .lobby-world-read { letter-spacing: 2px; }
+      .lobby-world-read.hidden { display: none; }
+
       /* branded toast: slides up, holds, slides away */
       #toast {
         position: fixed; left: 50%; bottom: 9%; z-index: 20;
@@ -800,6 +818,17 @@
         <div id="lobby-title" class="lobby-code"></div>
         <div class="sub" id="lobby-share"></div>
         <button id="lobby-copy">Copy Squad Link</button>
+        <div class="lobby-world" id="lobby-world">
+          <label class="lw-field">
+            <span>Arena</span>
+            <select id="lobby-map"></select>
+          </label>
+          <label class="lw-field">
+            <span>Mission</span>
+            <select id="lobby-mode"></select>
+          </label>
+        </div>
+        <div class="sub lobby-world-read hidden" id="lobby-world-read"></div>
         <div class="roster" id="lobby-roster"></div>
         <div class="coop-error" id="lobby-status"></div>
         <div class="menu-col">

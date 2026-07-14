@@ -1,4 +1,5 @@
 import type { Arena } from './city'
+import type { CoopStance } from './stance'
 import { generateCity } from './citygen'
 import { createRng, hashSeed } from './rng'
 import { generateForest } from './forestgen'
@@ -17,6 +18,8 @@ export interface GameMap {
   desc: string
   /** Mode ids this map can host; the selector only appears where there is a choice. */
   modes: string[]
+  /** What this arena does in multiplayer. Required, like every other piece of content. */
+  coop: CoopStance
   /** Pinned day/night clock fraction (0 = midnight), or null for the seeded cycle. */
   clockFraction: number | null
   generate(seed: string): Arena
@@ -39,6 +42,7 @@ export const GAME_MAPS: GameMap[] = [
     name: 'The District',
     desc: 'The walled surface district — rooftops, boulevards and the canal under an open sky.',
     modes: ALL_MODES,
+    coop: { kind: 'shared' },
     clockFraction: null,
     // the exact pre-maps rng stream: existing ?seed= URLs must replay unchanged
     generate: (seed) => generateCity(createRng(hashSeed(`${seed}:city`))),
@@ -48,6 +52,10 @@ export const GAME_MAPS: GameMap[] = [
     name: 'The Underground',
     desc: 'The cavern city beneath the capital — torchlit streets, rock pillars, and a ceiling to swing from. Daylight falls through holes worn in the rock.',
     modes: ALL_MODES,
+    coop: {
+      kind: 'shared',
+      note: 'The world ducks every spawn under the rock it stands beneath (maxTitanHeightAt), and the Colossal is dropped from the cavern ladder rather than shrunk to fit.',
+    },
     // the shafts are open to the surface, so the cavern keeps the seeded day/night cycle:
     // sun through the holes by day, stars by night, torches burning through both
     clockFraction: null,
@@ -58,6 +66,7 @@ export const GAME_MAPS: GameMap[] = [
     name: 'The Forest of Giant Trees',
     desc: 'Eighty metres of bark in every direction — swing the giants, rest on their limbs, and run the crown line. The definitive ODM playground.',
     modes: ALL_MODES,
+    coop: { kind: 'shared' },
     clockFraction: null,
     generate: generateForest,
   },
@@ -70,6 +79,11 @@ export function getMap(id: string | null | undefined): GameMap {
 /** Maps offered for a mode; the picker only shows when there is more than one. */
 export function mapsForMode(modeId: string): GameMap[] {
   return GAME_MAPS.filter((m) => m.modes.includes(modeId))
+}
+
+/** The arenas a co-op lobby may pick: the ones whose stance says they hold a squad. */
+export function coopMaps(): GameMap[] {
+  return GAME_MAPS.filter((m) => m.coop.kind !== 'soloOnly')
 }
 
 /**

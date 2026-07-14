@@ -11,6 +11,7 @@ import {
 import { GRAVITY } from './constants'
 import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
+import type { CoopStance } from './stance'
 
 export type TitanKind = 'normal' | 'abnormal' | 'shifter'
 
@@ -54,14 +55,44 @@ export interface KindStats {
 }
 
 /**
- * Behavior profile per kind. The shifter entry is a baseline — each boss passes its own
- * stats into stepTitan.
+ * The titan kinds, as a registry rather than a bare table: a kind is content, so it must
+ * say what it does in multiplayer like every other piece of content (stance.ts, ADR 0003).
+ * The shifter entry's stats are a baseline — each boss passes its own into stepTitan.
  */
-const KIND_STATS: Record<TitanKind, KindStats> = {
-  normal: { aggro: 55, turn: 1.4, walk: 0.2, swatRest: 2.2, leaps: false, leapY: 13 },
-  abnormal: { aggro: 130, turn: 2.2, walk: 0.38, swatRest: 1.2, leaps: true, leapY: 13 },
-  shifter: { aggro: 10000, turn: 1.8, walk: 0.24, swatRest: 1.8, leaps: false, leapY: 13 },
+export interface TitanKindSpec {
+  id: TitanKind
+  name: string
+  stats: KindStats
+  coop: CoopStance
 }
+
+export const TITAN_KINDS: TitanKindSpec[] = [
+  {
+    id: 'normal',
+    name: 'Pure Titan',
+    stats: { aggro: 55, turn: 1.4, walk: 0.2, swatRest: 2.2, leaps: false, leapY: 13 },
+    coop: { kind: 'shared', note: 'Hunts its nearest soldier; chase tokens are per-soldier.' },
+  },
+  {
+    id: 'abnormal',
+    name: 'Aberrant',
+    stats: { aggro: 130, turn: 2.2, walk: 0.38, swatRest: 1.2, leaps: true, leapY: 13 },
+    coop: { kind: 'shared', note: 'Same, with the longer aggro leash and the leap.' },
+  },
+  {
+    id: 'shifter',
+    name: 'Shifter',
+    stats: { aggro: 10000, turn: 1.8, walk: 0.24, swatRest: 1.8, leaps: false, leapY: 13 },
+    coop: {
+      kind: 'adapted',
+      note: 'A Shifter never yields its chase token, and its part pools scale with the squad (rosterHpScale) so a four-hand fight lasts a fight. Its abilities target the nearest soldier and wound every soldier in the radius.',
+    },
+  },
+]
+
+export const KIND_STATS: Record<TitanKind, KindStats> = Object.fromEntries(
+  TITAN_KINDS.map((k) => [k.id, k.stats]),
+) as Record<TitanKind, KindStats>
 
 export function aggroRange(kind: TitanKind): number {
   return KIND_STATS[kind].aggro

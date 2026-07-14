@@ -7,6 +7,7 @@ import {
   applySelfSnapshot,
   createSnapshotBuffer,
   pushSnapshot,
+  syncBossMirror,
   syncSoldierMirror,
   syncSpearMirror,
   syncTitanMirror,
@@ -15,7 +16,7 @@ import type { GameState } from './sim/game'
 
 export interface CoopHooks {
   onLobby(lobby: LobbyMsg): void
-  onMatchStart(roster: string[]): void
+  onMatchStart(roster: string[], mapId: string, modeId: string): void
   onEvents(events: CoopEvent[]): void
   onResults(results: MatchResults): void
   /** Unrecoverable for this room (bad session, full squad, connection lost). */
@@ -74,7 +75,7 @@ export class CoopSession {
         this.results = null
         this.soldiers.clear()
         this.buf.a = this.buf.b = null
-        this.hooks.onMatchStart(msg.roster)
+        this.hooks.onMatchStart(msg.roster, msg.mapId, msg.modeId)
         return
       }
       case 'snapshot': {
@@ -100,7 +101,11 @@ export class CoopSession {
         return
       }
       case 'error': {
-        if (msg.code === 'unauthorized' || msg.code === 'room-full') this.fatal(msg.message)
+        // 'outdated' means this build knows a different game than the Worker does; there is
+        // nothing to do in-page but reload into the build the server is expecting
+        if (msg.code === 'unauthorized' || msg.code === 'room-full' || msg.code === 'outdated') {
+          this.fatal(msg.message)
+        }
         return
       }
     }
@@ -129,6 +134,7 @@ export class CoopSession {
   syncFrame(g: GameState, now: number, frameDt: number): void {
     if (this.phase !== 'match') return
     syncTitanMirror(g, this.buf, now, frameDt)
+    syncBossMirror(g, this.buf) // after the titans: the fight hangs off its titan
     syncSoldierMirror(this.soldiers, this.buf, this.me, now)
     syncSpearMirror(g, this.buf, now)
     if (this.playing) applySelfSnapshot(g, this.buf, this.me)
@@ -207,6 +213,16 @@ export class CoopSession {
 
   sendResupply(): void {
     this.socket?.send(clientMsg({ type: 'resupply' }))
+  }
+
+  /** One press against the fist that has me (the grab QTE; the world spends it). */
+  sendMash(): void {
+    this.socket?.send(clientMsg({ type: 'mash' }))
+  }
+
+  /** Creator only: the arena and the mode this room fights. */
+  sendSetWorld(mapId: string, modeId: string): void {
+    this.socket?.send(clientMsg({ type: 'setWorld', mapId, modeId }))
   }
 
   sendRematch(): void {

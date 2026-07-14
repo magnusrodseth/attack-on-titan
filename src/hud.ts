@@ -5,7 +5,8 @@ import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
 import { GRAB_ESCAPE_PRESSES } from './sim/grab'
 import { loadHuntBest, HUNT_URGENCY_FRACTION } from './sim/hunt'
-import { DEFAULT_MAP_ID, mapScopedSeed } from './sim/maps'
+import { DEFAULT_MAP_ID, coopMaps, mapScopedSeed } from './sim/maps'
+import { coopModes } from './sim/modes'
 import { loadRaceBest } from './sim/race'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
@@ -242,6 +243,8 @@ export class Hud {
   onCreateLobby: () => void = () => {}
   onJoinLobby: (code: string) => void = () => {}
   onReadyToggle: () => void = () => {}
+  /** Creator only: the arena and mission this room fights. */
+  onSetWorld: (mapId: string, modeId: string) => void = () => {}
   onStartMatch: () => void = () => {}
   onLeaveLobby: () => void = () => {}
   onRematch: () => void = () => {}
@@ -289,6 +292,14 @@ export class Hud {
       if (e.key === 'Enter') this.onJoinLobby(el<HTMLInputElement>('coop-join-code').value)
     })
     el<HTMLButtonElement>('lobby-copy').addEventListener('click', () => void this.copyJoinLink())
+    // the pickers are populated from the registries themselves, filtered by co-op stance:
+    // a map or mode that says it is solo-only never appears as an option for a squad
+    const mapSel = el<HTMLSelectElement>('lobby-map')
+    const modeSel = el<HTMLSelectElement>('lobby-mode')
+    for (const map of coopMaps()) mapSel.appendChild(new Option(map.name, map.id))
+    for (const mode of coopModes()) modeSel.appendChild(new Option(mode.name, mode.id))
+    mapSel.addEventListener('change', () => this.onSetWorld(mapSel.value, modeSel.value))
+    modeSel.addEventListener('change', () => this.onSetWorld(mapSel.value, modeSel.value))
     el<HTMLButtonElement>('lobby-ready').addEventListener('click', () => this.onReadyToggle())
     el<HTMLButtonElement>('lobby-start').addEventListener('click', () => this.onStartMatch())
     el<HTMLButtonElement>('lobby-leave').addEventListener('click', () => this.onLeaveLobby())
@@ -976,6 +987,22 @@ export class Hud {
     }
     const me = lobby.players.find((p) => p.id === lobby.you)
     const isCreator = lobby.creator === lobby.you
+    // the world: the leader chooses it, everyone else reads it
+    const mapSel = el<HTMLSelectElement>('lobby-map')
+    const modeSel = el<HTMLSelectElement>('lobby-mode')
+    mapSel.value = lobby.mapId
+    modeSel.value = lobby.modeId
+    const picking = isCreator && lobby.phase === 'lobby'
+    mapSel.disabled = !picking
+    modeSel.disabled = !picking
+    el('lobby-world').classList.toggle('hidden', !picking)
+    const read = el('lobby-world-read')
+    read.classList.toggle('hidden', picking)
+    if (!picking) {
+      const map = coopMaps().find((m) => m.id === lobby.mapId)
+      const mode = coopModes().find((m) => m.id === lobby.modeId)
+      read.textContent = `${map?.name ?? lobby.mapId} · ${mode?.name ?? lobby.modeId}`
+    }
     el<HTMLButtonElement>('lobby-ready').textContent = me?.ready ? 'Not Ready' : 'Ready'
     el<HTMLButtonElement>('lobby-ready').classList.toggle('hidden', isCreator)
     const allReady = lobby.players.every((p) => p.ready)

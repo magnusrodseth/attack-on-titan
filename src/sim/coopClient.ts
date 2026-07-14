@@ -1,5 +1,8 @@
 import { Vector3 } from 'three'
+import type { BossState } from './boss'
+import { BOSS_LADDER } from './boss'
 import { nearestStationDist } from './city'
+import { grabHoldPoint } from './grab'
 import type { CoopSnapshot, HookAnchor } from './coop'
 import type { GameState } from './game'
 import { copyInput, handleHookEdge, stepLamp, syncTitanHooks } from './game'
@@ -26,6 +29,15 @@ export function stepCoopClient(g: GameState, input: InputState, dt: number): voi
   g.focusActive = false // a shared world cannot slow down for one soldier
   stepLamp(g, dt) // the flashlight is personal: drained locally, refilled by the server's resupply ack
   const p = g.player
+
+  // a fist has me: my client owns no movement at all until it lets go. Every press is a
+  // mash intent the server spends on the escape bar (the grab is `adapted` for co-op —
+  // you mash your own way out, nobody can cut you free).
+  if (g.grab) {
+    if (input.jump && !g.prevInput.jump) g.events.push({ type: 'coopMash' })
+    copyInput(g.prevInput, input)
+    return
+  }
 
   const canistersBefore = p.canisters
   if (input.gas && !g.prevInput.gas) {
@@ -299,4 +311,79 @@ export function applySelfSnapshot(g: GameState, buf: SnapshotBuffer, me: string)
   g.score.score = snap.score
   g.score.kills = snap.kills
   g.score.combo = snap.combo
+  // the fist: while it holds me the server owns my position, so the mirror puts me where
+  // the hand is instead of letting my client keep flying (the HUD reads presses/timeLeft)
+  if (snap.grab) {
+    g.grab = { titanId: snap.grab.titanId, presses: snap.grab.presses, timeLeft: snap.grab.timeLeft }
+    const holder = g.titans.find((t) => t.id === snap.grab!.titanId)
+    if (holder) {
+      g.player.pos.copy(grabHoldPoint(holder))
+      g.player.vel.set(0, 0, 0)
+      g.player.onGround = false
+    }
+  } else {
+    g.grab = null
+  }
+}
+
+/**
+ * Rebuilds the live Shifter from the snapshot so the renderer, the boss bar and the
+ * weak-point glow read it exactly as they do in solo. The client never simulates the
+ * fight — it draws the server's — but everything downstream of `g.boss` is the same code.
+ */
+export function syncBossMirror(g: GameState, buf: SnapshotBuffer): void {
+  const snap = buf.b?.boss
+  if (!snap) {
+    g.boss = null
+    return
+  }
+  const spec = BOSS_LADDER.find((b) => b.id === snap.specId)
+  const titan = g.titans.find((t) => t.id === snap.titanId)
+  // an unknown Shifter id means this build is older than the server's: the content guard
+  // refuses that connection at the handshake, so reaching here means the titan just has
+  // not arrived in the mirror yet
+  if (!spec || !titan) {
+    g.boss = null
+    return
+  }
+  const existing = g.boss && g.boss.spec.id === spec.id ? g.boss : null
+  const state: BossState = existing?.state ?? {
+    titanId: snap.titanId,
+    specId: snap.specId,
+    phase: 0,
+    parts: [],
+    engaged: false,
+    announced: false,
+    cooldowns: { throw: 0, summon: 0, roar: 0, spike: 0 },
+    windup: null,
+    projectiles: [],
+    pendingSpikes: [],
+    steamOn: false,
+    steamTimer: 0,
+    regenTimer: 0,
+    summonIds: [],
+    nextProjectileId: 1,
+    rngState: 0,
+  }
+  state.titanId = snap.titanId
+  state.phase = snap.phase
+  state.engaged = snap.engaged
+  state.steamOn = snap.steamOn
+  // the windup is a pose, not a clock, on this side: any non-null value reads as "winding"
+  state.windup = snap.windup ? 1 : null
+  state.parts = snap.parts.map((p, i) => ({
+    hp: p.hp,
+    maxHp: p.maxHp,
+    broken: p.broken,
+    plated: p.plated,
+    hits: state.parts[i]?.hits ?? 0,
+    chipped: state.parts[i]?.chipped ?? false,
+  }))
+  state.projectiles = snap.projectiles.map((p) => ({
+    id: p.id,
+    pos: new Vector3(p.x, p.y, p.z),
+    vel: new Vector3(),
+  }))
+  state.pendingSpikes = snap.spikes.map((s) => ({ x: s.x, z: s.z, timer: s.timer }))
+  g.boss = { spec, state, titan }
 }

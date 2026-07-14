@@ -1,6 +1,7 @@
 import { PartySocket } from 'partysocket'
 import type { ClientMsg, Leaderboard, ServerMsg, TrialBoards } from './protocol'
 import { PROTOCOL_VERSION, parseServerMsg } from './protocol'
+import { CONTENT_HASH } from '../sim/content'
 
 /**
  * Thin transport layer: account storage, the HTTP API, and the room websocket.
@@ -134,7 +135,9 @@ export function connectRoom(
     host: PARTY_HOST,
     party: 'match-room', // kebab-cased Durable Object binding name (MatchRoom)
     room: code.toLowerCase(),
-    query: { token },
+    // the content hash rides the handshake: the client and the Worker deploy separately, so
+    // "same protocol" is not the same as "same game". A mismatch is refused, not fudged.
+    query: { token, content: CONTENT_HASH },
   })
   socket.addEventListener('message', (event) => {
     const msg = parseServerMsg(event.data as unknown)

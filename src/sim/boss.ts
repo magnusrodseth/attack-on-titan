@@ -3,6 +3,7 @@ import type { Arena } from './city'
 import { maxTitanHeightAt } from './city'
 import { GRAVITY } from './constants'
 import { createRng, hashSeed, resumeRng } from './rng'
+import type { CoopStance } from './stance'
 import type { KindStats, TitanState } from './titan'
 import { createTitan, forwardOf, staggerTitan } from './titan'
 
@@ -43,6 +44,12 @@ export interface BossSpec {
   /** Also the body-builder key in src/render/titans/registry.ts. */
   id: string
   name: string
+  /**
+   * What this Shifter does in multiplayer. Required, like every other piece of content
+   * (stance.ts, ADR 0003). Bosses are where a solo assumption hides best: an ability that
+   * reads "the player" has to answer *which* one before it can be shared.
+   */
+  coop: CoopStance
   /** Ladder slot: the first wave this shifter walks. */
   wave: number
   height: number
@@ -78,6 +85,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'beast-titan',
     name: 'Beast Titan',
+    coop: { kind: 'shared', note: 'Throws at the nearest soldier; the boulder wounds everyone in its impact radius.' },
     wave: 5,
     height: 17,
     staggerSeconds: 5,
@@ -92,6 +100,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'cart-titan',
     name: 'Cart Titan',
+    coop: { kind: 'shared', note: 'The quadruped chases the nearest soldier and swats whoever is in reach.' },
     wave: 10,
     height: 10,
     staggerSeconds: 4.5,
@@ -107,6 +116,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'jaw-titan',
     name: 'Jaw Titan',
+    coop: { kind: 'shared', note: 'Fast and close-range: it hunts the nearest soldier and re-picks every tick.' },
     wave: 15,
     height: 9,
     staggerSeconds: 3.5,
@@ -121,6 +131,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'female-titan',
     name: 'Female Titan',
+    coop: { kind: 'shared', note: 'Hardened parts and the roar shove every soldier in the shockwave, not just one.' },
     wave: 20,
     height: 14,
     staggerSeconds: 4.5,
@@ -136,6 +147,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'armored-titan',
     name: 'Armored Titan',
+    coop: { kind: 'shared', note: 'The charge tracks the nearest soldier; plated parts need a blast from anyone.' },
     wave: 25,
     height: 15,
     staggerSeconds: 5,
@@ -150,6 +162,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'warhammer-titan',
     name: 'War Hammer Titan',
+    coop: { kind: 'shared', note: 'Spikes telegraph under the nearest soldier and skewer anyone standing low in the radius.' },
     wave: 30,
     height: 15,
     staggerSeconds: 4.5,
@@ -164,6 +177,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'attack-titan',
     name: 'Attack Titan',
+    coop: { kind: 'shared' },
     wave: 35,
     height: 15,
     staggerSeconds: 4,
@@ -179,6 +193,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'colossus-titan',
     name: 'Colossus Titan',
+    coop: { kind: 'adapted', note: 'The steam aura scalds every soldier inside it, so a squad cannot surround it for free. Dropped from the cavern ladder entirely (60 m under a 44 m dome) rather than shrunk — see bossLadderFor.' },
     wave: 40,
     height: 60,
     staggerSeconds: 6,
@@ -194,6 +209,7 @@ export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'founding-titan',
     name: 'Founding Titan',
+    coop: { kind: 'shared', note: 'The apex: summons chase whoever is nearest, and the pools scale with the squad like every Shifter.' },
     wave: 45,
     height: 20,
     staggerSeconds: 4.5,

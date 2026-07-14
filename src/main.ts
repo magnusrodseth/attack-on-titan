@@ -6,7 +6,7 @@ import type { SettingsValues, ThreatPing, TrialSection } from './hud'
 import { formatRaceTime, Hud } from './hud'
 import type { Account } from './net/client'
 import { clearAccount, fetchLeaderboard, fetchTrials, loadAccount, login, postTrial, register } from './net/client'
-import type { Leaderboard } from './net/protocol'
+import type { Leaderboard, LobbyMsg } from './net/protocol'
 import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
@@ -99,8 +99,11 @@ const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 // the arena archetype resolves like the mode (URL → saved run → sticky choice), then
 // falls back to the district anywhere the chosen map cannot host the chosen mode
+// in co-op the world is the lobby's, and it reaches this page in the URL: the lobby
+// announces its map/mode, the client reloads into them, and the arena is built before the
+// match ever starts (see syncWorldToLobby)
 const requestedMapId = coopMode
-  ? DEFAULT_MAP_ID
+  ? (urlParams.get('map') ?? DEFAULT_MAP_ID)
   : (urlParams.get('map') ?? runSave?.mapId ?? storedMapId() ?? DEFAULT_MAP_ID)
 const mapId = getMap(requestedMapId).modes.includes(modeId) ? getMap(requestedMapId).id : DEFAULT_MAP_ID
 initAnalytics()
@@ -629,12 +632,29 @@ function gotoLobby(code: string | null): void {
   location.search = params.toString()
 }
 
+/**
+ * The lobby names the world; this page may have been built for a different one. The arena
+ * and the whole three.js scene are built at page load from (seed, map), so the honest way
+ * to change the ground under a lobby is to reload into it — which costs nothing here,
+ * because nobody is fighting yet. Returns true when a reload is on its way.
+ */
+function syncWorldToLobby(lobby: LobbyMsg): boolean {
+  if (lobby.mapId === mapId && lobby.modeId === modeId) return false
+  const params = new URLSearchParams(location.search)
+  params.set('lobby', lobby.code)
+  params.set('map', lobby.mapId)
+  params.set('mode', lobby.modeId)
+  location.search = params.toString()
+  return true
+}
+
 function connectCoop(account: Account): void {
   if (!lobbyCode) return
   hud.hideCoop()
   hud.setCoopUi(true)
   coop = new CoopSession(lobbyCode, account, {
     onLobby(lobby) {
+      if (syncWorldToLobby(lobby)) return // reloading into the squad's chosen ground
       // the lobby overlay belongs to the lobby phase only; spectators watch the fight
       if (lobby.phase === 'lobby') {
         hud.showLobby(lobby, coopJoinUrl(lobby.code))
@@ -648,7 +668,16 @@ function connectCoop(account: Account): void {
         hud.showBanner('Battle Under Way · You Muster Next Match', 3200)
       }
     },
-    onMatchStart(roster) {
+    onMatchStart(roster, startMapId, startModeId) {
+      // a late joiner can arrive on the wrong ground (the room changed maps before they
+      // opened the link): reload into the real one rather than fight a mirage
+      if (startMapId !== mapId || startModeId !== modeId) {
+        const params = new URLSearchParams(location.search)
+        params.set('map', startMapId)
+        params.set('mode', startModeId)
+        location.search = params.toString()
+        return
+      }
       startCoopMatch(roster)
     },
     onEvents(events) {
@@ -714,6 +743,8 @@ function handleCoopIntents(events: GameEvent[]): void {
       coop?.sendFire({ x: look.x, y: look.y, z: look.z })
     } else if (event.type === 'coopResupply') {
       coop?.sendResupply()
+    } else if (event.type === 'coopMash') {
+      coop?.sendMash()
     } else {
       passthrough.push(event)
     }
@@ -902,6 +933,32 @@ function handleCoopEvents(events: CoopEvent[]): void {
         audio.boom()
         track('run_ended', { mode: game.mode.id, coop: true, wave: game.wave })
         break
+      // the Shifter fight looks the same from either driver: the boss bar, the plate
+      // clinks, the breaks, the fall. The mirrored g.boss is what these read.
+      case 'bossEngaged':
+      case 'bossPlated':
+      case 'bossPlateCracked':
+      case 'bossPartBroken':
+      case 'bossKilled':
+      case 'bossThrowWindup':
+      case 'bossProjectileImpact':
+      case 'bossSummon':
+      case 'bossSteam':
+      case 'bossRoar':
+      case 'bossSpikeTelegraph':
+      case 'bossSpike':
+      case 'spearCachesRestocked':
+        handleEvents([event])
+        break
+      // the fist: mine is a QTE, a teammate's is a line in the feed
+      case 'grabbed':
+      case 'grabEscaped':
+      case 'grabFailed':
+      case 'grabReleased':
+        if (event.playerId === me) handleEvents([event])
+        else if (event.type === 'grabbed') hud.addFeedLine(`<b>${event.playerId}</b> is in a fist`)
+        else if (event.type === 'grabEscaped') hud.addFeedLine(`<b>${event.playerId}</b> broke free`)
+        break
     }
   }
 }
@@ -964,6 +1021,7 @@ hud.onReadyToggle = () => {
   coop?.sendReady(!(meNow?.ready ?? false))
 }
 hud.onStartMatch = () => coop?.sendStart()
+hud.onSetWorld = (pickedMap, pickedMode) => coop?.sendSetWorld(pickedMap, pickedMode)
 hud.onLeaveLobby = () => {
   coop?.leave()
   gotoLobby(null)

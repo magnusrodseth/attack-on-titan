@@ -13,6 +13,7 @@ import { SIM_DT } from '../src/sim/constants'
 import {
   applyPlayerUpdate,
   coopFire,
+  coopMash,
   coopPickUpgrade,
   coopResupply,
   coopSlash,
@@ -23,6 +24,9 @@ import {
   type CoopEvent,
   type CoopWorld,
 } from '../src/sim/coop'
+import { CONTENT_HASH } from '../src/sim/content'
+import { DEFAULT_MAP_ID, coopMaps } from '../src/sim/maps'
+import { DEFAULT_MODE_ID, coopModes } from '../src/sim/modes'
 import { createDb } from './db/client'
 import { writeMatch } from './db/matches'
 import { validateSessionToken } from './db/sessions'
@@ -54,6 +58,9 @@ export class MatchRoom extends Server<Env> {
   private creator: string | null = null
   private world: CoopWorld | null = null
   private seed = ''
+  // the world this room fights in: the creator picks it in the lobby, everyone builds it
+  private mapId: string = DEFAULT_MAP_ID
+  private modeId: string = DEFAULT_MODE_ID
   private rosterIds = new Map<string, string>() // handle → userId, frozen at match start
   private interval: ReturnType<typeof setInterval> | null = null
   private lastTick = 0
@@ -63,7 +70,15 @@ export class MatchRoom extends Server<Env> {
   private matchIndex = 0
 
   async onConnect(conn: Connection, ctx: ConnectionContext): Promise<void> {
-    const token = new URL(ctx.request.url).searchParams.get('token') ?? ''
+    const url = new URL(ctx.request.url)
+    const token = url.searchParams.get('token') ?? ''
+    // content check before anything else: a client whose registries differ from ours knows a
+    // different game (a titan kind we never spawn, a map we cannot generate, a Shifter it
+    // cannot draw). Letting it in means letting it fight a world nobody else is in.
+    const content = url.searchParams.get('content') ?? ''
+    if (content !== CONTENT_HASH) {
+      return this.refuse(conn, 'outdated', 4009, 'The battlefield has changed. Reload to muster.')
+    }
     const session = token ? await validateSessionToken(createDb(this.env.DB), token) : null
     if (!session) return this.refuse(conn, 'unauthorized', 4001, 'Sign in to muster')
     // same soldier again (wifi blip, tab reload): the new connection replaces the old one,
@@ -88,7 +103,14 @@ export class MatchRoom extends Server<Env> {
     if (!this.creator) this.creator = session.username
     this.broadcastLobby()
     if (midMatch && this.world) {
-      this.send(conn, { v: PROTOCOL_VERSION, type: 'matchStart', seed: this.seed, roster: [...this.world.players.keys()] })
+      this.send(conn, {
+        v: PROTOCOL_VERSION,
+        type: 'matchStart',
+        seed: this.seed,
+        roster: [...this.world.players.keys()],
+        mapId: this.mapId,
+        modeId: this.modeId,
+      })
     }
   }
 
@@ -104,6 +126,27 @@ export class MatchRoom extends Server<Env> {
         if (msg.ready) this.ready.add(member.handle)
         else this.ready.delete(member.handle)
         this.broadcastLobby()
+        return
+      }
+      case 'setWorld': {
+        if (this.phase !== 'lobby') return
+        if (member.handle !== this.creator) {
+          return this.sendError(conn, 'not-creator', 'Only the squad leader picks the ground')
+        }
+        // the registries are the authority, and their co-op stance is the gate: a mode or a
+        // map that says it is solo-only is refused here rather than half-run for a squad
+        const map = coopMaps().find((m) => m.id === msg.mapId)
+        const mode = coopModes().find((m) => m.id === msg.modeId)
+        if (!map || !mode || !map.modes.includes(mode.id)) return
+        this.mapId = map.id
+        this.modeId = mode.id
+        this.ready.clear() // a new battlefield: everyone musters again
+        this.broadcastLobby()
+        return
+      }
+      case 'mash': {
+        if (!this.world || this.phase !== 'match' || member.spectator) return
+        coopMash(this.world, member.handle)
         return
       }
       case 'start': {
@@ -184,11 +227,18 @@ export class MatchRoom extends Server<Env> {
     this.matchIndex += 1
     const citySeed = `coop-${this.name.toLowerCase()}`
     this.seed = `${citySeed}#${this.matchIndex}`
-    this.world = createCoopWorld(this.seed, roster, citySeed)
+    this.world = createCoopWorld(this.seed, roster, citySeed, this.mapId, this.modeId)
     for (const member of this.members.values()) member.spectator = false
     this.phase = 'match'
     this.matchWritten = false
-    this.broadcastMsg({ v: PROTOCOL_VERSION, type: 'matchStart', seed: this.seed, roster })
+    this.broadcastMsg({
+      v: PROTOCOL_VERSION,
+      type: 'matchStart',
+      seed: this.seed,
+      roster,
+      mapId: this.mapId,
+      modeId: this.modeId,
+    })
     this.broadcastLobby()
     this.lastTick = Date.now()
     this.acc = 0
@@ -282,6 +332,8 @@ export class MatchRoom extends Server<Env> {
         phase: this.phase,
         players,
         maxPlayers: MAX_ROOM_PLAYERS,
+        mapId: this.mapId,
+        modeId: this.modeId,
       })
     }
   }
