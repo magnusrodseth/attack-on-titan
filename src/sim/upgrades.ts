@@ -27,6 +27,17 @@ export const UPGRADE_POOL: Upgrade[] = [
     },
   },
   {
+    id: 'hair-trigger',
+    name: 'Hair-Trigger Rig',
+    desc: '-30% swing recovery, so the next cut comes back sooner',
+    apply(p) {
+      // Stacks multiplicatively and unbounded, like Ultrahard Steel — deliberately safe here:
+      // the swing is edge-triggered on a press, not held, so past a few tenths of a second the
+      // limiter stops being this timer and becomes the finger. Blade wear pays for the rest.
+      p.config.slashCooldown *= 0.7
+    },
+  },
+  {
     id: 'long-cables',
     name: 'Extended Cables',
     desc: '+25% hook range',

@@ -108,6 +108,17 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
   racks run out, a kill driven through `stepGame`), never a `p.config.x` read — asserting a config
   number moved is exactly what let the placebos ship green. SAVE_VERSION 3 → 4 (the config shape
   changed; old runs are discarded).
+- Hair-Trigger Rig, the twelfth upgrade (user request, 2026-07-14, shipped): `slashCooldown` was a
+  0.45 s wall nothing in the pool could touch — and because the swing is edge-triggered
+  (`input.slash && !g.prevInput.slash`) while `trySlash` returns early whenever `slashTimer > 0`, a
+  press inside that window is swallowed whole: no swing, no buffer, no feedback. So the pick that
+  players kept reaching for did not exist. It does now: `-30% swing recovery`, stacking
+  multiplicatively like Ultrahard Steel, and deliberately unbounded — past a couple of tenths of a
+  second the limiter stops being the timer and becomes the finger, with blade wear paying for the
+  rest (which is exactly the tension dull blades will lean on). Pinned by a cadence probe in
+  `upgrades.test.ts` (cuts landed in one real second, 3 → 4), swept into co-op for free by
+  `parity.test.ts`, and the derived `CONTENT_HASH` moved on its own — so this one shipped under the
+  deploy contract: Vercel on push, `pnpm server:deploy` alongside it.
 
 ## Not yet specified
 

@@ -118,6 +118,26 @@ function cutsUntilBladesGone(p: PlayerState): number {
   return cuts
 }
 
+/** Cuts landed in one second of working a nape as fast as the rig will let the blade come back. */
+function cutsInOneSecond(p: PlayerState, arena: Arena): number {
+  const titan = createTitan({ id: 9000, kind: 'normal', height: 15, x: 0, z: 0 })
+  titan.facing = 0
+  let cuts = 0
+  for (let i = 0; i < 120; i++) {
+    // this probe is about cadence, so nothing else may end the run early: the titan is healed,
+    // the racks are refilled, and the speed stays under killSpeed so every cut only chips
+    titan.hp = titan.maxHp
+    p.blades = p.config.bladePairs
+    p.bladeHp = p.config.bladeDurability
+    p.pos.copy(napeCenter(titan))
+    p.vel.set(2, 0, 0)
+    p.onGround = false
+    if (trySlash(p, [titan], aimAt(p, napeCenter(titan))).hit) cuts++
+    stepPlayer(p, neutralInput(), DT, arena) // the real tick that runs slashTimer back down
+  }
+  return cuts
+}
+
 /** Spears the rack fires before it clicks empty. */
 function spearsUntilEmpty(p: PlayerState): number {
   let fired = 0
@@ -173,6 +193,7 @@ const PROBES: Record<string, Probe> = {
   'fast-reel': { probe: (p, g) => reeledInOneSecond(p, g.arena), wants: 'up' },
   'long-cables': { probe: (p, g) => anchorsInReach(p, g.arena), wants: 'up' },
   'extra-blades': { probe: (p) => cutsUntilBladesGone(p), wants: 'up' },
+  'hair-trigger': { probe: (p, g) => cutsInOneSecond(p, g.arena), wants: 'up' },
   'spear-racks': { probe: (p) => spearsUntilEmpty(p), wants: 'up' },
   // a cut at 15.5 m/s chips at the stock threshold (17) and kills at the sharpened one (14.45)
   'sharp-blades': { probe: (p) => oneCutsAt(p, 15.5), wants: 'up' },
