@@ -81,6 +81,20 @@ scoreboard, and an emptied district is a soft, atmospheric fail state that is no
   2026-07-14**: AFK loses ~15 a wave and saves nobody; spending every window saves everyone and
   costs you the wave. The bargain holds. Live in production, solo and co-op.
 
+## After the destination (2026-07-14, same day)
+
+The user played it and made two calls, both shipped:
+
+- **The crowd became its own mode, The Evacuation.** Wave Survival went back to empty streets and
+  The Nine got a cleared district (a Shifter duel is a duel). The people live in exactly one mode
+  now — the one that is about them — and its headcount is the life bar: lose the last civilian and
+  the run ends at full health. This also fixed a half-honest thing: station stock only bites where
+  a crowd can refill it, so Wave Survival's racks are bottomless again.
+- **Real bodies.** The civilians were boxes standing next to procedural titans. `CivilianPool` is
+  rebuilt on the Shifters' own `chain()` toolkit (tapered cylinders with sphere caps, the metaball
+  stand-in), merged per part and instanced: seven draw calls for the whole district, 116 fps with
+  sixty-four people.
+
 ## Not yet specified
 
 - **Modes other than Wave Survival.** The Culling is relentless (every titan hunts the soldiers, so

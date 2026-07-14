@@ -69,6 +69,10 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 
 ## The district's people
 
+- **The Evacuation** — the mode the people live in: the district is full of civilians and every
+  titan that is not hunting a soldier is eating one. The headcount is the life bar, so the run
+  ends when the last civilian does, whatever hearts you have left. Wave Survival, The Nine, The
+  Culling and Signal Run all run on empty streets.
 - **Civilian** — one of the townsfolk: a person in the streets who cannot fight. They walk, they
   panic, and when they panic they run **toward the nearest soldier**, because a soldier is safety.
   _Avoid_: NPC, villager (they are the population of a walled city, not set dressing).
