@@ -12,6 +12,7 @@ import {
   GRAB_LINGER_SECONDS,
 } from './grab'
 import { isWalkable } from './nav'
+import { SOLO_ID } from './world'
 import { neutralInput } from './player'
 import type { SpearState } from './spear'
 import { anklePos, createTitan, napeCenter } from './titan'
@@ -618,7 +619,7 @@ describe('thunder spears', () => {
     stepGame(game, fireInput(), DT)
     expect(game.spears).toHaveLength(1)
     expect(game.player.spears).toBe(game.player.config.spearCapacity - 1)
-    expect(game.events).toContainEqual({ type: 'spearFired', remaining: game.player.spears })
+    expect(game.events).toContainEqual({ type: 'spearFired', playerId: SOLO_ID, remaining: game.player.spears })
 
     // held, not re-pressed: no second launch
     stepGame(game, fireInput(), DT)
@@ -687,7 +688,7 @@ describe('thunder spears', () => {
     stepGame(game, neutralInput(), DT)
     expect(game.player.spears).toBe(1)
     expect(pickup.taken).toBe(true)
-    expect(game.events).toContainEqual({ type: 'spearPickup', remaining: 1 })
+    expect(game.events).toContainEqual({ type: 'spearPickup', playerId: SOLO_ID, remaining: 1 })
   })
 
   it('each wave replaces the caches and sheds spears stuck in last wave corpses', () => {
@@ -744,7 +745,7 @@ describe('titan grabs', () => {
     const events = stepUntilGrabbed(game)
     expect(game.grab).not.toBeNull()
     expect(game.grab!.titanId).toBe(titan.id)
-    expect(events).toContainEqual({ type: 'grabbed', titanId: titan.id })
+    expect(events).toContainEqual({ type: 'grabbed', playerId: SOLO_ID, titanId: titan.id })
     // pinned to the hold point, not standing on the street anymore
     expect(game.player.pos.y).toBeCloseTo(titan.pos.y + titan.height * 0.62, 1)
     expect(game.player.hp).toBe(game.player.config.maxHp)
@@ -758,7 +759,7 @@ describe('titan grabs', () => {
     titan.facing = Math.atan2(game.player.pos.x - titan.pos.x, game.player.pos.z - titan.pos.z)
     const events = stepUntilGrabbed(game)
     expect(game.grab).not.toBeNull()
-    expect(events).toContainEqual({ type: 'grabbed', titanId: titan.id })
+    expect(events).toContainEqual({ type: 'grabbed', playerId: SOLO_ID, titanId: titan.id })
     // the held swing never landed: no hit, no fling, full hearts at the moment of the grab
     expect(events.filter((e) => e.type === 'playerHit')).toHaveLength(0)
     expect(game.player.hp).toBe(game.player.config.maxHp)
@@ -809,7 +810,7 @@ describe('titan grabs', () => {
       stepGame(game, input, DT)
       seen.push(...game.events)
     }
-    expect(seen).toContainEqual({ type: 'grabEscaped', titanId: titan.id })
+    expect(seen).toContainEqual({ type: 'grabEscaped', playerId: SOLO_ID, titanId: titan.id })
     expect(game.grab).toBeNull()
     expect(game.player.hp).toBe(game.player.config.maxHp)
     expect(game.player.vel.length()).toBeGreaterThan(5)
@@ -825,8 +826,8 @@ describe('titan grabs', () => {
       seen.push(...game.events)
     }
     const maxHp = game.player.config.maxHp
-    expect(seen).toContainEqual({ type: 'grabFailed', titanId: titan.id, hp: maxHp - GRAB_HP_COST })
-    expect(seen).toContainEqual({ type: 'playerHit', hp: maxHp - GRAB_HP_COST })
+    expect(seen).toContainEqual({ type: 'grabFailed', playerId: SOLO_ID, titanId: titan.id, hp: maxHp - GRAB_HP_COST })
+    expect(seen).toContainEqual({ type: 'playerHit', playerId: SOLO_ID, hp: maxHp - GRAB_HP_COST })
     expect(game.player.hp).toBe(maxHp - GRAB_HP_COST)
     expect(game.phase).toBe('playing')
     expect(game.grab).toBeNull()
@@ -851,7 +852,7 @@ describe('titan grabs', () => {
     titan.hp = 0
     stepGame(game, neutralInput(), DT)
     expect(game.grab).toBeNull()
-    expect(game.events).toContainEqual({ type: 'grabReleased', titanId: titan.id })
+    expect(game.events).toContainEqual({ type: 'grabReleased', playerId: SOLO_ID, titanId: titan.id })
     expect(game.player.hp).toBe(game.player.config.maxHp)
   })
 

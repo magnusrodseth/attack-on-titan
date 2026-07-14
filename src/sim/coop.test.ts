@@ -95,7 +95,7 @@ function byType(events: CoopEvent[], type: CoopEvent['type']) {
 }
 
 describe('thunder spears in the shared world', () => {
-  it('a fire intent launches a server spear and spends the rack; a dry rack fires nothing', () => {
+  it('a fire intent launches a server spear and spends the rack; a dry rack says so', () => {
     const w = createCoopWorld('spear-coop', ['levi'])
     const p = w.players.get('levi')!
     expect(p.body.spears).toBe(2)
@@ -106,7 +106,10 @@ describe('thunder spears in the shared world', () => {
 
     p.body.spears = 0
     p.body.fireTimer = 0
-    expect(coopFire(w, 'levi', new Vector3(1, 0, 0))).toHaveLength(0)
+    // the world speaks the same way to both drivers: an empty rack jams out loud, in co-op
+    // exactly as in solo, instead of the wire swallowing the press
+    const dry = coopFire(w, 'levi', new Vector3(1, 0, 0))
+    expect(dry).toEqual([{ type: 'empty', kind: 'spears' }])
     expect(w.spears).toHaveLength(1)
   })
 

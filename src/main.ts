@@ -788,9 +788,12 @@ function handleCoopEvents(events: CoopEvent[]): void {
         break
       case 'playerHit': {
         if (event.playerId !== me) break
-        game.player.vel.x += event.knockback.x
-        game.player.vel.y += event.knockback.y
-        game.player.vel.z += event.knockback.z
+        // the world ships the shove with the wound; a squeeze (grabFailed) carries none
+        if (event.knockback) {
+          game.player.vel.x += event.knockback.x
+          game.player.vel.y += event.knockback.y
+          game.player.vel.z += event.knockback.z
+        }
         game.player.invulnTimer = 1.2
         hud.showHit()
         effects.addShake(0.6)

@@ -350,6 +350,16 @@ export function steamRadius(t: TitanState): number {
   return t.height * 0.42
 }
 
+/**
+ * How much thicker a Shifter's part pools get with each extra soldier on it. Four blades
+ * cut four times as fast, so without this a co-op Shifter would fall in a quarter of the
+ * time and the fight would lose its shape. The pools grow, the killSpeed bar never moves,
+ * and the ladder is unchanged: a four-hand Beast is the same fight, four-handed.
+ */
+export function rosterHpScale(squad: number): number {
+  return Math.max(1, squad)
+}
+
 export function createBossFight(
   titanId: number,
   spec: BossSpec,
@@ -358,11 +368,12 @@ export function createBossFight(
   x: number,
   z: number,
   lap = 0,
+  squad = 1,
 ): BossFight {
   // no height clamp here on purpose: a Shifter fights at its true scale, and any that
   // cannot stand up on this map was never on its ladder (see bossLadderFor)
   const titan = createTitan({ id: titanId, kind: 'shifter', height: spec.height, x, z })
-  const scale = partHpScale(lap)
+  const scale = partHpScale(lap) * rosterHpScale(squad)
   const parts: BossPartState[] = spec.parts.map((p) => ({
     hp: Math.round(p.hp * scale),
     maxHp: Math.round(p.hp * scale),

@@ -1,12 +1,12 @@
 import { EYE_HEIGHT } from './constants'
 import type { Course } from './course'
 import { generateCourse } from './course'
-import type { GameState, StorageLike } from './game'
 import { mapScopedSeed } from './maps'
 import type { GameMode } from './modes'
 import type { InputState } from './player'
 import { createPlayer } from './player'
 import { createScore } from './score'
+import type { StorageLike, World } from './world'
 
 /**
  * Signal Run (wayfinder tt-003): the parkour time trial. An empty city, a seeded course
@@ -70,46 +70,58 @@ function inputActive(input: InputState): boolean {
   )
 }
 
+/** The lone soldier a solo-only mode speaks to. */
+function runner(w: World) {
+  return w.soldiers[0]!
+}
+
 export const raceMode: GameMode = {
   id: 'race',
   name: 'Signal Run',
   desc: 'The parkour time trial: chase the green flare across empty ground, ring to ring. Every gate refills your gas, only the clock judges you, and R relights the same line instantly.',
 
-  start(g) {
-    const course = generateCourse(g.seed, g.arena, g.nav)
-    g.race = {
+  coop: {
+    kind: 'soloOnly',
+    reason:
+      'A race needs a clock, and a shared world has only one. Whose clock arms on whose first input, whether teammates race the same line or relay it, and what a gate means when someone else already passed it are game design questions, not wiring — they need their own effort with a redrawn destination (wayfinder map-timetrials already ruled co-op racing out of scope).',
+  },
+
+  start(w) {
+    const course = generateCourse(w.seed, w.arena, w.nav)
+    w.race = {
       course,
       nextGate: 0,
       armed: false,
       time: 0,
       splits: [],
-      best: loadRaceBest(g.storage, mapScopedSeed(g.map.id, g.seed)),
+      best: loadRaceBest(w.storage, mapScopedSeed(w.map.id, w.seed)),
     }
-    g.player.pos.set(course.start.x, EYE_HEIGHT, course.start.z)
+    runner(w).body.pos.set(course.start.x, EYE_HEIGHT, course.start.z)
   },
 
-  step(g, dt, input) {
-    if (!g.race) {
+  step(w, dt, input) {
+    if (!w.race) {
       // a restored save carries no mode state; a timed run must not resume mid-flight,
       // so refresh means the same thing as R: the same line, relit
-      raceMode.start(g)
+      raceMode.start(w)
       return
     }
-    const race = g.race
-    if (input.resupply && !g.prevInput.resupply) {
-      restartRace(g)
+    const race = w.race
+    if (input.resupply && !w.prevInput.resupply) {
+      restartRace(w)
       return
     }
     if (!race.armed) {
       if (!inputActive(input)) return
       race.armed = true
-      g.events.push({ type: 'raceArmed' })
+      w.events.push({ type: 'raceArmed' })
     }
     race.time += dt
 
     const gate = race.course.gates[race.nextGate]
     if (!gate) return
-    const p = g.player.pos
+    const body = runner(w).body
+    const p = body.pos
     const dx = p.x - gate.x
     const dy = p.y - gate.y
     const dz = p.z - gate.z
@@ -117,43 +129,45 @@ export const raceMode: GameMode = {
 
     // through the ring: bank the split, breathe gas, light the next flare
     race.splits.push(race.time)
-    g.player.gas = g.player.config.maxGas
+    body.gas = body.config.maxGas
     const index = race.nextGate
     race.nextGate += 1
     const bestSplit = race.best?.splits[index]
-    g.events.push({
+    w.events.push({
       type: 'gatePass',
       index,
       total: race.course.gates.length,
       split: race.time,
       delta: bestSplit === undefined ? null : race.time - bestSplit,
     })
-    if (race.nextGate >= race.course.gates.length) finishRace(g, race)
+    if (race.nextGate >= race.course.gates.length) finishRace(w, race)
   },
 }
 
-function finishRace(g: GameState, race: RaceState): void {
+function finishRace(w: World, race: RaceState): void {
   const pb = race.best === null || race.time < race.best.time
   const delta = race.best === null ? null : race.time - race.best.time
   if (pb) {
     race.best = { time: race.time, splits: [...race.splits] }
-    saveRaceBest(g.storage, mapScopedSeed(g.map.id, g.seed), race.best)
+    saveRaceBest(w.storage, mapScopedSeed(w.map.id, w.seed), race.best)
   }
-  g.phase = 'finished'
-  g.events.push({ type: 'raceFinished', time: race.time, splits: [...race.splits], pb, delta })
+  w.phase = 'finished'
+  w.events.push({ type: 'raceFinished', time: race.time, splits: [...race.splits], pb, delta })
 }
 
 /** Same course, fresh soldier, timer rearmed — R mid-run or from the finish screen. */
-export function restartRace(g: GameState): void {
-  const race = g.race
+export function restartRace(w: World): void {
+  const race = w.race
   if (!race) return
-  g.player = createPlayer()
-  g.player.pos.set(race.course.start.x, EYE_HEIGHT, race.course.start.z)
-  g.score = createScore()
+  const soldier = runner(w)
+  soldier.body = createPlayer()
+  soldier.body.pos.set(race.course.start.x, EYE_HEIGHT, race.course.start.z)
+  soldier.score = createScore()
+  soldier.grab = null
   race.nextGate = 0
   race.armed = false
   race.time = 0
   race.splits = []
-  g.phase = 'playing'
-  g.events.push({ type: 'raceRestart' })
+  w.phase = 'playing'
+  w.events.push({ type: 'raceRestart' })
 }

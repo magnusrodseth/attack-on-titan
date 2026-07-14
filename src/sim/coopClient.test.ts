@@ -40,6 +40,7 @@ function snapPlayer(id: string, over: Partial<CoopSnapshot['players'][number]> =
     bladeHp: 6,
     spears: 2,
     picked: false,
+    grab: null,
     ...over,
   }
 }
@@ -62,7 +63,18 @@ function snapTitan(id: number, over: Partial<CoopSnapshot['titans'][number]> = {
 }
 
 function makeSnap(tick: number, titans: CoopSnapshot['titans'], players: CoopSnapshot['players']): CoopSnapshot {
-  return { tick, phase: 'playing', wave: 1, pickTimer: 0, titans, players, spears: [], pickups: [], results: null }
+  return {
+    tick,
+    phase: 'playing',
+    wave: 1,
+    pickTimer: 0,
+    titans,
+    boss: null,
+    players,
+    spears: [],
+    pickups: [],
+    results: null,
+  }
 }
 
 describe('stepCoopClient', () => {

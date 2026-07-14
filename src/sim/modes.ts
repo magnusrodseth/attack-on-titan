@@ -1,100 +1,51 @@
-import { bossForMilestone, bossSpawnPoint, createBossFight } from './boss'
-import { maxTitanHeightAt } from './city'
-import type { GameState } from './game'
-import { saveBest } from './game'
 import { createHuntMode } from './hunt'
-import { nearestWalkable } from './nav'
 import type { InputState } from './player'
 import { raceMode } from './race'
-import { createRng, hashSeed } from './rng'
-import { spawnPickups } from './spear'
-import { createTitan } from './titan'
-import { applyUpgrade, offerUpgrades } from './upgrades'
-import type { TitanSpawn } from './waves'
-import { waveComposition } from './waves'
+import type { CoopStance } from './stance'
+import type { World } from './world'
+import { clearWave, pickUpgrade, spawnWave } from './world'
 
 /**
  * A game mode owns a run's objective: what a fresh run spawns, how it progresses each
  * tick, and how intermissions (like the upgrade screen) resolve. Core systems — movement,
- * hooks, combat, titan AI, scoring, resupply — stay in game.ts and are shared by every
- * mode. To add a mode (time trial, parkour rings, ...): implement this interface with its
- * own seeded rng streams (`hashSeed(seed + ':<purpose>:N')` so runs stay replayable) and
- * append it to GAME_MODES; the menu picks it up from the registry.
+ * hooks, combat, titan AI, bosses, scoring, resupply — live in world.ts and are shared by
+ * every mode, on every map, in singleplayer and multiplayer alike.
+ *
+ * To add a mode: implement this interface with its own seeded rng streams
+ * (`hashSeed(seed + ':<purpose>:N')` so runs stay replayable), declare its `coop` stance,
+ * and append it to GAME_MODES. The menu and the co-op lobby both read the registry, so a
+ * new mode appears in singleplayer and multiplayer at once — or is honestly refused in one
+ * of them, if that is what its stance says. There is no third option: `coop` is required,
+ * and a mode without it does not compile (ADR 0003).
  */
 export interface GameMode {
   id: string
   name: string
   desc: string
-  /** Seeds the mode's objectives on a fresh run (startGame resets player/score first). */
-  start(g: GameState): void
+  /** What this mode does in multiplayer. Required: silence is what we are fixing. */
+  coop: CoopStance
+  /** Seeds the mode's objectives on a fresh run (the driver resets soldiers/score first). */
+  start(w: World): void
   /** Runs at the end of every playing tick; drives progression, phases and win/lose. */
-  step(g: GameState, dt: number, input: InputState): void
+  step(w: World, dt: number, input: InputState): void
   /** Resolves an upgrade pick if this mode uses the 'upgrading' intermission. */
-  chooseUpgrade?(g: GameState, id: string): void
-}
-
-type Composition = (
-  wave: number,
-  rng: () => number,
-  countScale?: number,
-  wallRadius?: number,
-) => TitanSpawn[]
-
-function spawnWave(g: GameState, composition: Composition): void {
-  // the arena picks the ladder: the Colossal does not walk into a cavern it cannot stand in
-  const milestone = bossForMilestone(g.wave, g.mode.id, g.arena)
-  if (milestone) {
-    // the milestone: one Shifter through the gate.
-    // Solo-only by construction — the co-op server spawns via waveComposition directly.
-    const [gx, gz] = bossSpawnPoint(g.arena)
-    const [x, z] = nearestWalkable(g.nav, gx, gz)
-    const fight = createBossFight(g.nextTitanId++, milestone.spec, g.wave, g.seed, x, z, milestone.lap)
-    g.boss = fight
-    g.titans = [fight.titan]
-  } else {
-    g.boss = null
-    const rng = createRng(hashSeed(`${g.seed}:wave:${g.wave}`))
-    g.titans = composition(g.wave, rng, 1, g.arena.wallRadius).map((s) => {
-      // snap spawns onto walkable streets so no titan starts its life inside a house
-      const [x, z] = nearestWalkable(g.nav, s.x, s.z)
-      // ...and duck it under the roof it stands beneath, so nothing spawns head-in-rock
-      const height = Math.min(s.height, maxTitanHeightAt(g.arena, x, z))
-      return createTitan({ id: g.nextTitanId++, kind: s.kind, height, x, z })
-    })
-  }
-  // fresh spear caches each wave; spears riding last wave's corpses go with them
-  g.pickups = spawnPickups(g.seed, g.wave, g.nav)
-  g.pickupRound = 0
-  g.pickupRespawnTimer = 0
-  g.spears = g.spears.filter((s) => s.titanId === null)
+  chooseUpgrade?(w: World, soldierId: string, id: string): void
 }
 
 /** The wave-loop skeleton shared by every wave-based mode; only the roster differs. */
-function waveLoop(composition: Composition): Pick<GameMode, 'start' | 'step' | 'chooseUpgrade'> {
+export function waveLoop(): Pick<GameMode, 'start' | 'step' | 'chooseUpgrade'> {
   return {
-    start(g) {
-      g.wave = 1
-      spawnWave(g, composition)
+    start(w) {
+      w.wave = 1
+      spawnWave(w)
     },
 
-    step(g) {
-      if (g.titans.length > 0 && g.titans.every((t) => t.hp <= 0)) {
-        const bonus = 250 * g.wave
-        g.score.score += bonus
-        g.offers = offerUpgrades(createRng(hashSeed(`${g.seed}:offers:${g.wave}`)))
-        g.phase = 'upgrading'
-        saveBest(g)
-        g.events.push({ type: 'waveClear', wave: g.wave, bonus })
-      }
+    step(w) {
+      if (w.titans.length > 0 && w.titans.every((t) => t.hp <= 0)) clearWave(w)
     },
 
-    chooseUpgrade(g, id) {
-      applyUpgrade(g.player, id)
-      g.player.hp = g.player.config.maxHp // a fresh wave starts at full health
-      g.offers = []
-      g.wave += 1
-      spawnWave(g, composition)
-      g.phase = 'playing'
+    chooseUpgrade(w, soldierId, id) {
+      pickUpgrade(w, soldierId, id)
     },
   }
 }
@@ -104,7 +55,11 @@ const wavesMode: GameMode = {
   id: 'waves',
   name: 'Wave Survival',
   desc: 'Endless escalating waves. Clear the ground, pick a field modification, and hold out as the titans grow bigger, faster and stranger.',
-  ...waveLoop(waveComposition),
+  coop: {
+    kind: 'shared',
+    note: 'The roster scales with the squad; every soldier picks their own upgrade.',
+  },
+  ...waveLoop(),
 }
 
 /**
@@ -115,11 +70,15 @@ const bossRushMode: GameMode = {
   id: 'bossrush',
   name: 'The Nine',
   desc: 'The Shifter gauntlet: the Nine walk one after another through the gate, Beast to Founding, then the ladder hardens and laps. Break every Weak Point or die trying.',
-  ...waveLoop(waveComposition),
+  coop: {
+    kind: 'adapted',
+    note: 'Part HP pools scale with the squad (rosterHpScale), so a four-hand Shifter fight lasts a fight. The ladder itself never changes.',
+  },
+  ...waveLoop(),
 }
 
 /** The Culling rides the same wave skeleton; the countdown and relentless rule wrap it. */
-const huntMode: GameMode = createHuntMode(waveLoop(waveComposition))
+const huntMode: GameMode = createHuntMode(waveLoop())
 
 export const GAME_MODES: GameMode[] = [wavesMode, bossRushMode, raceMode, huntMode]
 
@@ -127,4 +86,9 @@ export const DEFAULT_MODE_ID = 'waves'
 
 export function getMode(id: string): GameMode {
   return GAME_MODES.find((mode) => mode.id === id) ?? GAME_MODES[0]!
+}
+
+/** The modes a co-op lobby may pick: the ones whose stance says they work with a squad. */
+export function coopModes(): GameMode[] {
+  return GAME_MODES.filter((mode) => mode.coop.kind !== 'soloOnly')
 }

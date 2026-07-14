@@ -1,7 +1,7 @@
-import type { GameState, StorageLike } from './game'
 import { mapScopedSeed } from './maps'
 import type { GameMode } from './modes'
 import { trialKey } from './race'
+import type { StorageLike, World } from './world'
 
 /**
  * The Culling (wayfinder tt-006): eternal timed levels on the wave skeleton. Level L
@@ -60,9 +60,14 @@ function saveHuntBest(storage: StorageLike | null, seed: string, best: HuntBest)
   }
 }
 
-function freshClock(g: GameState): { timeLeft: number; budget: number } {
-  const budget = g.titans.length * huntAllowance(g.wave)
+function freshClock(w: World): { timeLeft: number; budget: number } {
+  const budget = w.titans.length * huntAllowance(w.wave)
   return { timeLeft: budget, budget }
+}
+
+/** The hunter: solo-only, so there is exactly one. */
+function hunter(w: World) {
+  return w.soldiers[0]!
 }
 
 /**
@@ -77,53 +82,60 @@ export function createHuntMode(
     name: 'The Culling',
     desc: 'Eternal timed levels: every titan on the map knows where you are and never stops coming. Cull the full roster before the countdown dies — each cleared level buys an upgrade and a tighter clock.',
 
-    start(g) {
-      g.relentless = true
-      base.start(g)
-      g.hunt = {
-        ...freshClock(g),
+    coop: {
+      kind: 'soloOnly',
+      reason:
+        'One countdown, N soldiers: does the clock end the match or bench the slow, does the roster scale with the squad, and is a level cleared when the last titan falls or when the last soldier does? Those are game design questions, not wiring. The Culling needs its own effort before it can be shared.',
+    },
+
+    start(w) {
+      w.relentless = true
+      base.start(w)
+      w.hunt = {
+        ...freshClock(w),
         urgencyFired: false,
-        best: loadHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed)),
+        best: loadHuntBest(w.storage, mapScopedSeed(w.map.id, w.seed)),
       }
     },
 
-    step(g, dt, input) {
-      if (!g.hunt) {
+    step(w, dt, input) {
+      if (!w.hunt) {
         // a save from before the hunt slice existed: rebuild a full clock for this level
-        g.hunt = {
-        ...freshClock(g),
-        urgencyFired: false,
-        best: loadHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed)),
-      }
-      }
-      base.step(g, dt, input)
-      const h = g.hunt
-      if (g.phase === 'upgrading') {
-        // level cleared with time to spare: bank the PB now, before the clock resets
-        const best = h.best
-        if (!best || g.wave > best.level || (g.wave === best.level && g.score.score > best.score)) {
-          h.best = { level: g.wave, score: g.score.score }
-          saveHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed), h.best)
+        w.hunt = {
+          ...freshClock(w),
+          urgencyFired: false,
+          best: loadHuntBest(w.storage, mapScopedSeed(w.map.id, w.seed)),
         }
       }
-      if (g.phase !== 'playing') return // the clock pauses with the sim
+      base.step(w, dt, input)
+      const h = w.hunt
+      const score = hunter(w).score
+      if (w.phase === 'upgrading') {
+        // level cleared with time to spare: bank the PB now, before the clock resets
+        const best = h.best
+        if (!best || w.wave > best.level || (w.wave === best.level && score.score > best.score)) {
+          h.best = { level: w.wave, score: score.score }
+          saveHuntBest(w.storage, mapScopedSeed(w.map.id, w.seed), h.best)
+        }
+      }
+      if (w.phase !== 'playing') return // the clock pauses with the sim
       h.timeLeft -= dt
       if (!h.urgencyFired && h.timeLeft <= h.budget * HUNT_URGENCY_FRACTION) {
         h.urgencyFired = true
-        g.events.push({ type: 'huntUrgency' })
+        w.events.push({ type: 'huntUrgency' })
       }
       if (h.timeLeft <= 0) {
         h.timeLeft = 0
-        g.phase = 'dead'
-        g.events.push({ type: 'huntTimeout', level: g.wave, cleared: g.wave - 1 })
+        w.phase = 'dead'
+        w.events.push({ type: 'huntTimeout', level: w.wave, cleared: w.wave - 1 })
       }
     },
 
-    chooseUpgrade(g, id) {
-      base.chooseUpgrade?.(g, id)
-      const h = g.hunt
+    chooseUpgrade(w, soldierId, id) {
+      base.chooseUpgrade?.(w, soldierId, id)
+      const h = w.hunt
       if (!h) return
-      Object.assign(h, freshClock(g))
+      Object.assign(h, freshClock(w))
       h.urgencyFired = false
     },
   }
