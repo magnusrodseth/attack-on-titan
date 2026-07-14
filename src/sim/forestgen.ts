@@ -25,9 +25,12 @@ export const FOREST_CANOPY_Y = 72
 export const FOREST_CLEARING_RADIUS = 30
 
 const GIANT_COUNT = 150
+/** Limbs per giant. More of them is more foliage, but it is also more places to land. */
+const BRANCHES_MIN = 4
+const BRANCHES_MAX = 8
 /** Trunks never crowd closer than this — the swing between them has to breathe. */
 const GIANT_MIN_GAP = 30
-const SAPLING_COUNT = 520
+const SAPLING_COUNT = 780
 const CABIN_COUNT = 5
 const RAY_COUNT = 7
 
@@ -105,14 +108,16 @@ function placeGiants(arena: Arena, rng: () => number): Building[] {
  */
 function placeBranches(arena: Arena, giants: Building[], rng: () => number): void {
   for (const trunk of giants) {
-    const count = 2 + Math.floor(rng() * 3) // 2-4 limbs per giant
+    const count = BRANCHES_MIN + Math.floor(rng() * (BRANCHES_MAX - BRANCHES_MIN + 1))
     for (let i = 0; i < count; i++) {
       // spread them up the trunk: the lowest are mid-story, the highest reach the crown
       const t = 0.34 + (i / Math.max(1, count - 1)) * 0.52 + (rng() - 0.5) * 0.08
       const y = trunk.h * Math.min(0.93, Math.max(0.3, t))
       const length = 15 + rng() * 13
       const thickness = 1.6 + rng() * 0.9
-      const alongX = rng() < 0.5
+      // with this many limbs, alternating the axis keeps a giant from growing them all on
+      // one side; the half-turn of jitter stops the whole stand looking like a compass rose
+      const alongX = (i + (rng() < 0.5 ? 0 : 1)) % 2 === 0
       const side = rng() < 0.5 ? 1 : -1
       const reach = trunk.w / 2 + length / 2
       const width = 2.8 + rng() * 1.8

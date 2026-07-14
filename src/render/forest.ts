@@ -46,12 +46,19 @@ function tex(path: string, repeatX = 1, repeatY = 1, srgb = true): Texture {
   return texture
 }
 
-/** Cards per crown, per umbrella pad, and per sapling: the density of the canopy. */
-const CROWN_CARDS = 13
-const PADS_PER_GIANT = 4
-const PAD_CARDS = 4
-const SAPLING_CARDS = 4
-const FERN_COUNT = 700
+/**
+ * Cards per crown, per umbrella pad, per limb spray and per sapling: the density of the
+ * canopy. These can be generous — the cards are alpha-TESTED (see leafMaterial), so they
+ * write depth like solid geometry, sort for free, and early-z caps the overdraw however
+ * many of them stack up. The old numbers left the sky showing through in holes.
+ */
+const CROWN_CARDS = 36
+const PADS_PER_GIANT = 7
+const PAD_CARDS = 7
+const SPRAY_CARDS = 8
+const SAPLING_CARDS = 6
+/** Ferns are scattered over a 300 m disc — it takes thousands before the floor reads green. */
+const FERN_COUNT = 5200
 
 /**
  * Foliage is CUT-OUT CARDS, not geometry: a photographed spray of cedar (the sugi the giants
@@ -226,17 +233,21 @@ function addGiants(scene: Scene, arena: Arena): void {
     color.setHSL(0.07, 0.2, 0.42 + g.tint * 0.14)
     buttresses.setColorAt(i, color)
 
-    // the crown: a cloud of leaf cards on random axes, densest at the top of the trunk
-    const crownR = radius * 2.4 + 6
+    // The crown: a cloud of leaf cards on random axes. It reaches wider than the giant is
+    // thick and starts well down the trunk, so a crown laps over its neighbours' — that
+    // overlap is what closes the roof. A crown that only covers its own trunk leaves a
+    // hole of open sky over every gap in the stand, which is exactly what it used to do.
+    const crownR = radius * 3.4 + 12
     for (let c = 0; c < CROWN_CARDS; c++) {
       const angle = rng() * Math.PI * 2
-      const spread = crownR * (0.15 + rng() * 0.9)
-      const card = crownR * (0.7 + rng() * 0.75)
+      // sqrt-biased outward: fill the rim of the crown, not just its middle
+      const spread = crownR * (0.12 + Math.sqrt(rng()) * 0.95)
+      const card = crownR * (0.42 + rng() * 0.5)
       euler.set(rng() * 0.9 - 0.45, rng() * Math.PI * 2, rng() * 0.7 - 0.35)
       quat.setFromEuler(euler)
       at.set(
         g.x + Math.cos(angle) * spread,
-        g.h - 4 + rng() * crownR * 0.85,
+        g.h - 12 + rng() * crownR * 0.95,
         g.z + Math.sin(angle) * spread,
       )
       scale.set(card, card, card)
@@ -347,7 +358,7 @@ function addBranches(scene: Scene, arena: Arena): void {
   const boughGeo = new CylinderGeometry(0.32, 0.5, 1, 9, 1)
   boughGeo.rotateZ(Math.PI / 2) // lie it down along x
   const boughs = new InstancedMesh(boughGeo, barkMat, limbs.length)
-  const sprays = new InstancedMesh(LEAF_CARD, leafMat, limbs.length * 3)
+  const sprays = new InstancedMesh(LEAF_CARD, leafMat, limbs.length * SPRAY_CARDS)
 
   const matrix = new Matrix4()
   const quat = new Quaternion()
@@ -372,23 +383,27 @@ function addBranches(scene: Scene, arena: Arena): void {
     color.setHSL(0.07, 0.22, 0.3 + b.tint * 0.12)
     boughs.setColorAt(i, color)
 
-    // foliage hanging off the outboard end — never over the top, which you have to stand on
+    // Foliage hanging off the limb, spread along its whole outboard half rather than
+    // bunched at the tip — a bare bough with a pom-pom on the end is the giveaway. It
+    // still never sits over the top face: that is the platform you land and stand on.
     const dir = (alongX ? b.x : b.z) > 0 ? 1 : -1
-    for (let c = 0; c < 3; c++) {
-      const out = length * (0.3 + c * 0.14)
-      const size = 6 + rng() * 5
-      euler.set(Math.PI / 2 + (rng() - 0.5) * 0.6, rng() * Math.PI * 2, (rng() - 0.5) * 0.5)
+    for (let c = 0; c < SPRAY_CARDS; c++) {
+      const out = length * (0.22 + (c / SPRAY_CARDS) * 0.32 + rng() * 0.06)
+      const size = 5 + rng() * 6
+      euler.set(Math.PI / 2 + (rng() - 0.5) * 0.7, rng() * Math.PI * 2, (rng() - 0.5) * 0.5)
       quat.setFromEuler(euler)
+      const lateral = (rng() - 0.5) * 5
       at.set(
-        b.x + (alongX ? dir * out : (rng() - 0.5) * 3),
-        b.h - 1 + (rng() - 0.5) * 2,
-        b.z + (alongX ? (rng() - 0.5) * 3 : dir * out),
+        b.x + (alongX ? dir * out : lateral),
+        // hung under and beside the bough, drooping a little further the further out it is
+        b.h - 1.5 - rng() * 3 * (out / length),
+        b.z + (alongX ? lateral : dir * out),
       )
       scale.set(size, size, size)
       matrix.compose(at, quat, scale)
-      sprays.setMatrixAt(i * 3 + c, matrix)
+      sprays.setMatrixAt(i * SPRAY_CARDS + c, matrix)
       color.setHSL(0.24 + rng() * 0.05, 0.32, 0.32 + rng() * 0.18)
-      sprays.setColorAt(i * 3 + c, color)
+      sprays.setColorAt(i * SPRAY_CARDS + c, color)
     }
   })
 
@@ -405,6 +420,7 @@ function addUnderstory(scene: Scene, arena: Arena): void {
   const quat = new Quaternion()
   const euler = new Euler()
   const color = new Color()
+  const at = new Vector3()
 
   if (saplings.length > 0) {
     const barkMat = new MeshStandardMaterial({
@@ -426,15 +442,26 @@ function addUnderstory(scene: Scene, arena: Arena): void {
       color.setHSL(0.09, 0.22, 0.3 + s.tint * 0.12)
       stems.setColorAt(i, color)
 
-      const crown = radius * 2.6 + 2 + rng() * 2
-      matrix.compose(
-        new Vector3(s.x, s.h - crown * 0.2, s.z),
-        quat,
-        new Vector3(crown, crown * 0.8, crown),
-      )
-      canopies.setMatrixAt(i, matrix)
-      color.setHSL(0.24, 0.36, 0.24 + rng() * 0.18)
-      canopies.setColorAt(i, color)
+      // A cluster of cards, not one flat billboard. This used to set a single matrix per
+      // sapling while sizing the buffer for SAPLING_CARDS of them, so three quarters of
+      // the instances were degenerate and the whole mid-story was one card thick.
+      const crown = radius * 2.6 + 3 + rng() * 2
+      for (let c = 0; c < SAPLING_CARDS; c++) {
+        const angle = rng() * Math.PI * 2
+        const off = crown * 0.34 * Math.sqrt(rng())
+        euler.set((rng() - 0.5) * 0.8, rng() * Math.PI * 2, (rng() - 0.5) * 0.6)
+        quat.setFromEuler(euler)
+        const size = crown * (0.6 + rng() * 0.5)
+        at.set(
+          s.x + Math.cos(angle) * off,
+          s.h - crown * 0.24 + (rng() - 0.5) * crown * 0.5,
+          s.z + Math.sin(angle) * off,
+        )
+        matrix.compose(at, quat, new Vector3(size, size, size))
+        canopies.setMatrixAt(i * SAPLING_CARDS + c, matrix)
+        color.setHSL(0.24 + rng() * 0.04, 0.36, 0.24 + rng() * 0.18)
+        canopies.setColorAt(i * SAPLING_CARDS + c, color)
+      }
     })
     scene.add(stems, canopies)
   }
@@ -449,7 +476,7 @@ function addUnderstory(scene: Scene, arena: Arena): void {
     const x = Math.cos(angle) * r
     const z = Math.sin(angle) * r
     if (r < arena.plazaRadius + 3) continue // the clearing keeps its grass
-    const size = 1.4 + rng() * 1.6
+    const size = 1.8 + rng() * 2.4
     euler.set((rng() - 0.5) * 0.5, rng() * Math.PI * 2, (rng() - 0.5) * 0.5)
     quat.setFromEuler(euler)
     matrix.compose(new Vector3(x, size * 0.42, z), quat, new Vector3(size, size, size))
