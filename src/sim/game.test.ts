@@ -477,7 +477,11 @@ describe('titan navigation through the game loop', () => {
     }
     game.player.pos.set(0, 1.7, 0)
     for (let i = 0; i < 60; i++) stepGame(game, neutralInput(), DT)
-    const engaged = game.titans.filter((t) => ['chase', 'attack', 'leap'].includes(t.state))
+    // a titan in a chase state is not necessarily chasing YOU: the ones that never get a
+    // token go hunting the crowd instead (titan.prey). The cap is on hunters of soldiers.
+    const engaged = game.titans.filter(
+      (t) => ['chase', 'attack', 'leap'].includes(t.state) && t.prey === null,
+    )
     expect(engaged.length).toBeGreaterThan(0)
     expect(engaged.length).toBeLessThanOrEqual(MAX_CHASERS)
     expect(engaged.map((t) => t.id).sort()).toEqual([100, 101, 102])

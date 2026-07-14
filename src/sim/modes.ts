@@ -3,7 +3,7 @@ import type { InputState } from './player'
 import { raceMode } from './race'
 import type { CoopStance } from './stance'
 import type { World } from './world'
-import { clearWave, pickUpgrade, spawnWave } from './world'
+import { clearWave, pickUpgrade, populateFolk, spawnWave } from './world'
 
 /**
  * A game mode owns a run's objective: what a fresh run spawns, how it progresses each
@@ -24,6 +24,13 @@ export interface GameMode {
   desc: string
   /** What this mode does in multiplayer. Required: silence is what we are fixing. */
   coop: CoopStance
+  /**
+   * Whether the district has people in it while this mode runs. Required, and 'false' is a
+   * legitimate answer: The Culling is relentless (every titan hunts the soldiers, so nobody
+   * is ever free to eat) and Signal Run has no titans at all. Saying so out loud is the
+   * point — the same medicine as the co-op stance (ADR 0003).
+   */
+  crowd: boolean
   /** Seeds the mode's objectives on a fresh run (the driver resets soldiers/score first). */
   start(w: World): void
   /** Runs at the end of every playing tick; drives progression, phases and win/lose. */
@@ -37,6 +44,7 @@ export function waveLoop(): Pick<GameMode, 'start' | 'step' | 'chooseUpgrade'> {
   return {
     start(w) {
       w.wave = 1
+      populateFolk(w) // the streets fill once, at the start of a run; losses are permanent
       spawnWave(w)
     },
 
@@ -59,6 +67,7 @@ const wavesMode: GameMode = {
     kind: 'shared',
     note: 'The roster scales with the squad; every soldier picks their own upgrade.',
   },
+  crowd: true, // the home case: a living district, and titans eating it
   ...waveLoop(),
 }
 
@@ -74,6 +83,9 @@ const bossRushMode: GameMode = {
     kind: 'adapted',
     note: 'Part HP pools scale with the squad (rosterHpScale), so a four-hand Shifter fight lasts a fight. The ladder itself never changes.',
   },
+  // the Nine walk into a living city, and their summons eat like anything else. A Colossal
+  // stepping over a crowd is the image the whole show is built on.
+  crowd: true,
   ...waveLoop(),
 }
 

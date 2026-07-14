@@ -80,6 +80,10 @@ export const raceMode: GameMode = {
   name: 'Signal Run',
   desc: 'The parkour time trial: chase the green flare across empty ground, ring to ring. Every gate refills your gas, only the clock judges you, and R relights the same line instantly.',
 
+  // an empty city is the mode: no titans, nothing to flee, nobody to save. The streets are
+  // cleared for the run, and that emptiness is what makes a Signal Run feel like a Signal Run.
+  crowd: false,
+
   coop: {
     kind: 'soloOnly',
     reason:

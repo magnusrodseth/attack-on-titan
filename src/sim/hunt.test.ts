@@ -110,6 +110,10 @@ describe('The Culling mode', () => {
   it('leaves Wave Survival aggro and leash untouched (regression)', () => {
     const game = createGame('trost', memStorage(), 'waves')
     startGame(game)
+    // this test is about the SOLDIER's aggro leash, so empty the streets: with people in
+    // them a far-off titan is not idle, it is eating someone, which is a different question
+    // (folk.test.ts) and would otherwise look like a leash failure here
+    game.folk = []
     const titan = game.titans[0]!
     titan.kind = 'normal' // aggro 55, leash 82.5
     titan.pos.set(game.player.pos.x + 150, 0, game.player.pos.z)

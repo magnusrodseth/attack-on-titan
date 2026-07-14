@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import type { BossState } from './boss'
 import { BOSS_LADDER } from './boss'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
+import type { Civilian } from './folk'
 import type { GamePhase, GameState } from './game'
 import { loadHuntBest } from './hunt'
 import { DEFAULT_MAP_ID, mapScopedSeed } from './maps'
@@ -81,6 +82,18 @@ interface SavedPlayer {
   config: PlayerConfig
 }
 
+export interface SavedCivilian {
+  id: number
+  pos: [number, number, number]
+  facing: number
+  state: string
+  goal: [number, number] | null
+  heldBy: number | null
+  window: number
+  calm: number
+  station: number | null
+}
+
 export interface SavedRun {
   v: number
   seed: string
@@ -103,6 +116,14 @@ export interface SavedRun {
   titans: SavedTitan[]
   spears: SavedSpear[]
   pickups: SpearPickup[]
+  /**
+   * The district's people, and what its stations have left. Absent in saves from before the
+   * townsfolk existed: an old run resumes into a city that never had anyone in it, which is
+   * sad but honest — we cannot invent a headcount that was never lost.
+   */
+  folk?: SavedCivilian[]
+  folkStats?: { saved: number; lost: number; delivered: number }
+  stations?: { blades: number; spears: number }[]
   /** Boss-wave cache restocking; absent in saves from before it existed (wave restart = round 0). */
   pickupRound?: number
   pickupRespawnTimer?: number
@@ -162,6 +183,9 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
     titans: g.titans.map((t) => ({ ...t, pos: v3(t.pos), vel: v3(t.vel), ankles: [...t.ankles] as [boolean, boolean] })),
     spears: g.spears.map((s) => ({ ...s, pos: v3(s.pos), vel: v3(s.vel), local: v3(s.local) })),
     pickups: g.pickups.map((pk) => ({ ...pk })),
+    folk: g.folk.map((c) => ({ ...c, pos: v3(c.pos), goal: c.goal ? [...c.goal] as [number, number] : null })),
+    folkStats: { ...g.folkStats },
+    stations: g.stations.map((st) => ({ ...st })),
     pickupRound: g.pickupRound,
     pickupRespawnTimer: g.pickupRespawnTimer,
     ...(g.boss
@@ -281,6 +305,23 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
     local: new Vector3(...s.local),
   }))
   g.pickups = save.pickups.map((pk) => ({ ...pk }))
+  // the district and its dead: a resumed run walks back into the same streets, with the same
+  // people missing from them
+  if (save.folk) {
+    g.folk = save.folk.map((c) => ({
+      id: c.id,
+      pos: new Vector3(c.pos[0], c.pos[1], c.pos[2]),
+      facing: c.facing,
+      state: c.state as Civilian['state'],
+      goal: c.goal ? ([c.goal[0], c.goal[1]] as [number, number]) : null,
+      heldBy: c.heldBy,
+      window: c.window,
+      calm: c.calm,
+      station: c.station,
+    }))
+  }
+  if (save.folkStats) g.folkStats = { ...save.folkStats }
+  if (save.stations) g.stations = save.stations.map((st) => ({ ...st }))
   g.pickupRound = save.pickupRound ?? 0
   g.pickupRespawnTimer = save.pickupRespawnTimer ?? 0
 

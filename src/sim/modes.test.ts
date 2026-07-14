@@ -29,6 +29,7 @@ describe('the mode seam', () => {
       name: 'Stub',
       desc: 'test double',
       coop: { kind: 'shared' },
+      crowd: false,
       start(g) {
         calls.push('start')
         g.titans = []
@@ -53,6 +54,7 @@ describe('the mode seam', () => {
       name: 'Empty',
       desc: '',
       coop: { kind: 'shared' },
+      crowd: false,
       start(g) {
         g.titans = []
       },

@@ -2,10 +2,20 @@ import { Vector3 } from 'three'
 import type { BossFight } from './boss'
 import { createBossFight, bossForMilestone, bossSpawnPoint, steamRadius, stepBoss } from './boss'
 import type { Arena } from './city'
-import { baseGroundY, clampToCeiling, maxTitanHeightAt, nearestStationDist } from './city'
+import { baseGroundY, clampToCeiling, maxTitanHeightAt } from './city'
 import type { SlashResult } from './combat'
 import { oneCutSpeed, stepSlashBuffer, trySlash } from './combat'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
+import type { Civilian } from './folk'
+import {
+  FOLK_CATCH_RADIUS,
+  isAlive,
+  isStanding,
+  populate,
+  release,
+  seize,
+  stepFolk,
+} from './folk'
 import type { GrabState, GrabWatch } from './grab'
 import {
   GRAB_HP_COST,
@@ -145,6 +155,20 @@ export interface World {
   hunt: HuntState | null
   /** The Culling's rule: every titan tracks map-wide and never abandons a chase. */
   relentless: boolean
+  /** The people in the streets. Empty in modes and on maps where nobody lives (folk.ts). */
+  folk: Civilian[]
+  /** The run's second scoreboard: what the district lost, and what it kept. */
+  folkStats: { saved: number; lost: number; delivered: number }
+  /** Latch: the district has already gone quiet, so it does not announce it twice. */
+  folkQuiet: boolean
+  /**
+   * What each station has left to give, parallel to `arena.stations`. Blades and spears run
+   * out; gas, hearts and the lamp never do (free swinging is sacred to the feel, and the
+   * kill-refund economy already covers hearts). Survivors carry the stock in.
+   */
+  stations: { blades: number; spears: number }[]
+  /** Who last wounded each titan: the soldier a rescue is credited to when its grip breaks. */
+  lastHitBy: Map<number, string>
   rngLive: Rng
   nextTitanId: number
   nextSpearId: number
@@ -246,6 +270,15 @@ export type WorldEvent =
   // the supply warnings: you should be told to go back BEFORE you are dry, not after
   | { type: 'gasLow'; fraction: number }
   | { type: 'bladesLow'; fraction: number; oneCutSpeed: number }
+  // the crowd: the fist, the window, and what the window costs when it closes
+  | { type: 'civilianSeized'; civilianId: number; titanId: number }
+  | { type: 'civilianSaved'; playerId?: string; civilianId: number; titanId: number }
+  | { type: 'civilianDevoured'; civilianId: number; titanId: number }
+  | { type: 'civilianDelivered'; civilianId: number; station: number }
+  /** The last person in the district is gone. The streets are quiet now. */
+  | { type: 'districtEmpty' }
+  /** A station has nothing left to give: the rack is bare until someone makes it home. */
+  | { type: 'stationBare'; station: number; kind: 'blades' | 'spears' }
   | { type: 'boost' }
   | { type: 'death' }
   // Signal Run: the clock arming, ordered ring passes with PB deltas, and the finish
@@ -272,6 +305,11 @@ export const RESUPPLY_RADIUS = 10
 export const RESUPPLY_REPORT_SLACK = 5
 /** Seconds an all-taken cache set sits empty during a boss fight before restocking. */
 export const SPEAR_RESTOCK_DELAY = 8
+/** What a station holds at the start of a run, per resource. A charge is one full refill. */
+export const STATION_START_BLADES = 3
+export const STATION_START_SPEARS = 3
+/** The most a station can hold, however many people make it home. */
+export const STATION_MAX = 6
 export const SOLO_ID = 'solo'
 /** The muster point every soldier spawns on; solo starts there too. */
 export const MUSTER = { x: 0, z: 8 }
@@ -351,6 +389,11 @@ export function createWorld(opts: {
     race: null,
     hunt: null,
     relentless: false,
+    folk: [],
+    folkStats: { saved: 0, lost: 0, delivered: 0 },
+    folkQuiet: false,
+    stations: arena.stations.map(() => ({ blades: STATION_START_BLADES, spears: STATION_START_SPEARS })),
+    lastHitBy: new Map(),
     rngLive: createRng(hashSeed(`${opts.seed}:live`)),
     nextTitanId: 1,
     nextSpearId: 1,
@@ -361,6 +404,40 @@ export function createWorld(opts: {
     coop: opts.coop ?? false,
     results: null,
   }
+}
+
+// ---------------------------------------------------------------------------
+// The district's people, and the stations they keep stocked.
+// ---------------------------------------------------------------------------
+
+/**
+ * Fills the streets, once, at the start of a run. Losses are permanent: nobody moves into a
+ * district that titans are eating, so the headcount only ever goes down, and an emptied city
+ * stays empty for the rest of the run.
+ *
+ * Both registries have to agree that people live here: the mode (`GameMode.crowd`) and the
+ * map (`GameMap.population`). The Forest declares zero, because nobody lives in the Forest.
+ */
+export function populateFolk(w: World): void {
+  w.folk = []
+  w.folkStats = { saved: 0, lost: 0, delivered: 0 }
+  w.folkQuiet = false
+  if (!w.mode.crowd || w.map.population <= 0) return
+  const rng = createRng(hashSeed(`${w.citySeed}:folk`))
+  w.folk = populate(w.map.population, w.arena, w.nav, rng)
+}
+
+/** What a station has left, for the HUD and the minimap to read from the air. */
+export function stationStock(w: World, index: number): { blades: number; spears: number } {
+  return w.stations[index] ?? { blades: 0, spears: 0 }
+}
+
+/** Someone made it home. Their supply goes on the thinnest rack. */
+function stockStation(w: World, index: number, amount: number): void {
+  const stock = w.stations[index]
+  if (!stock) return
+  if (stock.blades <= stock.spears) stock.blades = Math.min(STATION_MAX, stock.blades + amount)
+  else stock.spears = Math.min(STATION_MAX, stock.spears + amount)
 }
 
 // ---------------------------------------------------------------------------
@@ -517,7 +594,11 @@ function pickChasers(w: World, targets: Map<number, TitanTarget>): Set<number> {
     if (t.hp <= 0 || t.state === 'crippled' || t.state === 'staggered' || t.state === 'dead') continue
     const target = targets.get(t.id)
     if (!target) continue
-    const engaged = t.state === 'chase' || t.state === 'attack' || t.state === 'leap'
+    // "engaged" has to mean engaged WITH A SOLDIER. A titan mid-chase after someone in the
+    // street is not hunting you, and handing it a chase token would spin it around and empty
+    // the district of predators — the crowd would be perfectly safe and utterly pointless.
+    const hunting = t.state === 'chase' || t.state === 'attack' || t.state === 'leap'
+    const engaged = hunting && t.prey === null
     if (!engaged && !w.relentless && target.dist >= aggroRange(t.kind)) continue
     let group = groups.get(target.soldier.id)
     if (!group) groups.set(target.soldier.id, (group = []))
@@ -571,35 +652,123 @@ export function killSoldier(w: World, s: Soldier): void {
   }
 }
 
+/**
+ * The crowd, and the titans that eat it.
+ *
+ * Chase tokens are a fixed pool: MAX_CHASERS per soldier, and every titan without one used
+ * to wander decoratively. Now it hunts someone who cannot fight back. That single change is
+ * the whole feature: a wave stops being "kill the roster" and becomes "where do I spend
+ * myself", because you cannot be everywhere and the ones you ignore are eating people.
+ */
+function stepCrowd(w: World, dt: number): void {
+  if (w.folk.length === 0) return
+  const soldiers = activeSoldiers(w).map((s) => s.body.pos)
+  const result = stepFolk(w.folk, {
+    dt,
+    arena: w.arena,
+    nav: w.nav,
+    rng: w.rngLive,
+    titans: w.titans,
+    soldiers,
+    stations: w.arena.stations,
+  })
+  for (const gone of result.devoured) {
+    w.folkStats.lost += 1
+    w.events.push({ type: 'civilianDevoured', civilianId: gone.civilianId, titanId: gone.titanId })
+  }
+  for (const home of result.delivered) {
+    w.folkStats.delivered += 1
+    stockStation(w, home.station, 1)
+    w.events.push({ type: 'civilianDelivered', civilianId: home.civilianId, station: home.station })
+  }
+  // a fist opens when the hand that owns it dies or is knocked loose: the rescue is the
+  // window, and it is over the instant the grip breaks (user ruling, 2026-07-14)
+  for (const c of w.folk) {
+    if (c.state !== 'held' || c.heldBy === null) continue
+    const holder = w.titans.find((t) => t.id === c.heldBy)
+    const gripBroken =
+      !holder || holder.hp <= 0 || holder.state === 'staggered' || holder.state === 'dead'
+    if (!gripBroken) continue
+    const titanId = c.heldBy
+    release(c)
+    w.folkStats.saved += 1
+    w.events.push({
+      type: 'civilianSaved',
+      playerId: w.lastHitBy.get(titanId),
+      civilianId: c.id,
+      titanId,
+    })
+  }
+  if (w.folk.length > 0 && !w.folk.some(isAlive) && !w.folkQuiet) {
+    w.folkQuiet = true
+    w.events.push({ type: 'districtEmpty' }) // nobody left to save. the streets go quiet.
+  }
+}
+
+/** The nearest person this titan could still reach: its meal, if nobody stops it. */
+function preyFor(w: World, titan: TitanState): Civilian | null {
+  let best: Civilian | null = null
+  let bestDist = Infinity
+  for (const c of w.folk) {
+    if (!isStanding(c)) continue
+    const d = Math.hypot(c.pos.x - titan.pos.x, c.pos.z - titan.pos.z)
+    if (d < bestDist) {
+      best = c
+      bestDist = d
+    }
+  }
+  return best
+}
+
 function stepTitans(w: World, dt: number): void {
   const targets = pickTargets(w)
   const chasers = pickChasers(w, targets)
   for (const titan of w.titans) {
     const holding = w.soldiers.find((s) => s.grab && s.grab.titanId === titan.id)
-    if (holding) {
-      titan.vel.set(0, 0, 0) // the holder stands still and squeezes; no walking, no swats
+    const feeding = w.folk.find((c) => c.state === 'held' && c.heldBy === titan.id)
+    if (holding || feeding) {
+      // a titan mid-meal stands still and eats. This is the bargain: the easiest nape in the
+      // game is attached to someone you are failing, and the clock is theirs, not yours.
+      titan.vel.set(0, 0, 0)
       continue
     }
     const target = targets.get(titan.id)
-    if (!target) continue // nobody left alive; the wipe check ends the match
+    const hunted = chasers.has(titan.id)
     // a Shifter runs the shared state machine on its own spec stats, relentlessly
     const shifter = titan.kind === 'shifter' && w.boss?.titan.id === titan.id
+    // untokened, and there are people in the street: it goes for them instead of wandering.
+    // A soldier always outranks a meal — walk into its aggro and it will come for you — but
+    // the ones you leave alone do not stand around. They eat.
+    const prey = !hunted && !shifter ? preyFor(w, titan) : null
+    titan.prey = prey ? prey.id : null
+    const goal = prey ? prey.pos : target?.pos
+    if (!goal) continue // nobody left alive; the wipe check ends the match
     for (const event of stepTitan(
       titan,
-      target.pos,
+      goal,
       dt,
       w.rngLive,
       w.arena,
       w.nav,
-      chasers.has(titan.id),
+      hunted || prey !== null,
       w.relentless || shifter,
       shifter ? w.boss?.spec.stats : undefined,
     )) {
       if (event.type !== 'swat') continue
+      // the swing lands on whatever is under it: a soldier who strayed into the arc pays for
+      // it even when the titan was reaching for someone else
       for (const s of activeSoldiers(w)) {
         if (s.body.invulnTimer > 0) continue
         if (s.body.pos.distanceTo(event.pos) > event.radius) continue
         hurtSoldier(w, s, titan.pos, 18, 9)
+      }
+      // and if it was reaching for someone, the hand closes
+      if (prey && isStanding(prey)) {
+        const reach = Math.hypot(prey.pos.x - event.pos.x, prey.pos.z - event.pos.z)
+        if (reach <= event.radius + FOLK_CATCH_RADIUS) {
+          seize(prey, titan)
+          w.events.push({ type: 'civilianSeized', civilianId: prey.id, titanId: titan.id })
+        }
       }
     }
   }
@@ -612,6 +781,9 @@ function stepTitans(w: World, dt: number): void {
 /** Everything a connected slash owes the world: wounds, kills, boss breaks, score. */
 function slashOutcome(w: World, s: Soldier, result: SlashResult, airborne: boolean): void {
   const p = s.body
+  // whoever last put steel in a titan owns whatever falls out of it — including the person
+  // in its fist, if this is the blow that opens the hand
+  if (result.titanId !== undefined && result.hit) w.lastHitBy.set(result.titanId, s.id)
   if (result.bladeBroke) w.events.push({ type: 'bladeBroke', playerId: s.id })
   if (result.bossBody && result.titanId !== undefined) {
     w.events.push({ type: 'bossPlated', titanId: result.titanId }) // the hide clinks
@@ -767,7 +939,12 @@ function stepWorldSpears(w: World, dt: number): void {
   }
   for (const blast of result.blasts) {
     w.events.push({ type: 'spearDetonated', pos: blast.pos.clone(), radius: blast.radius })
-    for (const titanId of blast.staggered) w.events.push({ type: 'staggered', titanId })
+    for (const titanId of blast.staggered) {
+      w.events.push({ type: 'staggered', titanId })
+      // a blast that knocks a fist open is a rescue, and it belongs to whoever threw it
+      const thrower = w.spearOwners.get(blast.spearId)
+      if (thrower) w.lastHitBy.set(titanId, thrower)
+    }
     // a spear with no recorded owner still kills, it just pays nobody — except in solo,
     // where there is only one soldier it could ever have belonged to
     const ownerId = w.spearOwners.get(blast.spearId) ?? (w.coop ? undefined : w.soldiers[0]?.id)
@@ -841,27 +1018,76 @@ function stepWorldSpears(w: World, dt: number): void {
   }
 }
 
+/** The station a soldier is standing at, or -1. */
+function stationAt(w: World, s: Soldier, radius: number): number {
+  let best = -1
+  let bestDist = radius
+  for (const [i, station] of w.arena.stations.entries()) {
+    const d = Math.hypot(station.x - s.body.pos.x, station.z - s.body.pos.z)
+    if (d <= bestDist) {
+      best = i
+      bestDist = d
+    }
+  }
+  return best
+}
+
 /**
- * Refills at a station; co-op allows a little slack because the position is a report.
+ * A refill. Gas, hearts and the lamp are always free, wherever it comes from: free swinging is
+ * sacred to the feel, and the kill-refund economy already pays for hearts.
  *
- * Out of a station's reach, a soldier carrying a Field Kit spends one instead. The station is
- * still free and unlimited — the kit only buys you the walk you did not take, and it is the
- * kit that is consumed, never the station.
+ * **Blades and spears are not free.** They are the things the townsfolk carry in, so they are
+ * the things that run out. Two ways to get them:
+ *
+ *  - **A station** spends its own stock (folk.ts, tf-003). A bare rack gives you gas and hearts
+ *    and nothing to cut with, which is exactly what dull blades made painful.
+ *  - **A Field Kit** is a station you carry, and it carries its own steel — so a kit is what
+ *    answers a district you have let empty. That is the point where the two systems meet: the
+ *    fewer people you save, the more the run depends on what you brought with you.
  */
 export function worldResupply(w: World, s: Soldier): boolean {
   if (w.phase === 'ended' || w.phase === 'dead' || !s.alive || !s.connected) return false
   const p = s.body
   const radius = RESUPPLY_RADIUS + (w.coop ? RESUPPLY_REPORT_SLACK : 0)
-  const atStation = nearestStationDist(w.arena, p.pos.x, p.pos.z) <= radius
+  const index = stationAt(w, s, radius)
+  const atStation = index >= 0
   if (!atStation && p.kits <= 0) return false
   if (!atStation) p.kits -= 1
+  const stock = atStation ? w.stations[index] : undefined
+
+  // always free
   p.gas = p.config.maxGas
   p.canisters = p.config.gasCanisters
-  p.blades = p.config.bladePairs
-  p.bladeHp = p.config.bladeDurability
   p.hp = p.config.maxHp
   p.lamp = LAMP_BATTERY_SECONDS
-  w.events.push({ type: 'resupply', playerId: s.id, kit: !atStation })
+  s.warned.gas = false
+
+  if (!atStation) {
+    // the kit brought its own: this is the walk you did not have to take
+    p.blades = p.config.bladePairs
+    p.bladeHp = p.config.bladeDurability
+    p.spears = p.config.spearCapacity
+    s.warned.blades = false
+    w.events.push({ type: 'resupply', playerId: s.id, kit: true })
+    return true
+  }
+
+  // and what the district had to spare
+  if (!stock || stock.blades > 0) {
+    if (stock) stock.blades -= 1
+    p.blades = p.config.bladePairs
+    p.bladeHp = p.config.bladeDurability
+    s.warned.blades = false
+  } else {
+    w.events.push({ type: 'stationBare', station: index, kind: 'blades' })
+  }
+  if (!stock || stock.spears > 0) {
+    if (stock) stock.spears -= 1
+    p.spears = p.config.spearCapacity
+  } else {
+    w.events.push({ type: 'stationBare', station: index, kind: 'spears' })
+  }
+  w.events.push({ type: 'resupply', playerId: s.id, kit: false })
   return true
 }
 
@@ -1231,6 +1457,7 @@ export function stepWorld(w: World, dt: number, input: InputState = neutralInput
   // spears resolve before titan AI so a fresh stagger suppresses this tick's swat
   stepWorldSpears(w, dt)
   stepTitans(w, dt)
+  stepCrowd(w, dt) // after the titans: a fist that closed this tick has a hand to hang from
   stepBossFight(w, dt)
 
   // the mode drives progression (wave clears, objectives, win/lose)
