@@ -136,6 +136,34 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
   draws: tuning that changes the *shape of a shared run* is content; tuning that changes only how a
   soldier *feels* (gas, drag, slash cooldown) is not.
 
+- Five picks that answer the rig, not the run (user request, 2026-07-14, shipped): the pool went
+  12 → 17 with **Whetstone** (+3 edge per pair — the counterweight Hair-Trigger created, and the
+  one dull blades will lean on hardest), **Executioner's Reach** (+25% `slashRange`: Hair-Trigger
+  lets you swing more often, this makes a swing at speed *land*), **Heavy Ordnance** (+30% blast:
+  the pool's only crowd-clear lever), **Escape Artist** (−5 mashes out of a fist) and **Field Kit**
+  (one stationless restock per wave). Three of them needed a stat that did not exist yet, and each
+  one taught the same lesson twice:
+  - `blastRadius` could not be read off a player at detonation — co-op passes `playerPos: null`
+    and the firer is often dead by the time the fuse runs out. The **spear** carries the radius
+    it was fired with; it is the last thing that still knows whose rack it came off.
+  - `grabEscapePresses` and `fieldKits` are plain `PlayerConfig`, but both had a *client* gate in
+    front of them that would have made the pick work in solo and do nothing in co-op:
+    `stepCoopClient` only sent a resupply intent within station range (so a kit could never even
+    be *asked* for), and the HUD drew the mash dial against the stock threshold. Both now read the
+    soldier's own numbers. The rule this keeps re-teaching: a `PlayerConfig` field is not wired
+    until every gate *in front of* the sim reads it too.
+  - Field Kits are server-authoritative like blades (`kits` rides the snapshot; the client never
+    predicts spending one), so `PROTOCOL_VERSION` 2 → 3 and `SAVE_VERSION` 4 → 5 — a v4 save would
+    restore a config with no `blastRadius` and every spear from it would test `distance <=
+    undefined`, flashing and killing nothing, silently.
+  - `DEFAULT_BLAST_RADIUS` / `DEFAULT_GRAB_ESCAPE_PRESSES` moved down into `constants.ts`:
+    `player.ts` needs them for its defaults, and importing a *value* from spear.ts/grab.ts leans on
+    those two importing player.ts type-only — true today, and not a promise anyone made.
+  The probes are the point, as always: napes found from a standoff ring, titans killed by one
+  blast, mashes to tear free, gas in the tank after calling for resupply with no station in sight.
+  Two of them were green-and-worthless on the first pass (samples sat outside *both* radii, so the
+  probe read zero either way) — a placebo guard that cannot fail is just a placebo with a test.
+
 ## Not yet specified
 
 - Additional game modes on the new registry (time trial with checkpoint rings, parkour with flags/markers) and per-mode best stats.

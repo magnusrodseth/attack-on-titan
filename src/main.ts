@@ -20,7 +20,7 @@ import { TitanPool } from './render/titanPool'
 import { BossFxView } from './render/bosses'
 import { bossForMilestone, bossPartCenter } from './sim/boss'
 import { nearestStationDist, raycastHookTarget } from './sim/city'
-import { SIM_DT } from './sim/constants'
+import { DEFAULT_BLAST_RADIUS, SIM_DT } from './sim/constants'
 import { LAMP_BATTERY_SECONDS, lampGlow, lampOn, lightAround } from './sim/flashlight'
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
@@ -900,7 +900,8 @@ function handleCoopEvents(events: CoopEvent[]): void {
         break
       case 'spearDetonated': {
         const pos = new Vector3(event.pos.x, event.pos.y, event.pos.z)
-        effects.burst(pos, 0xffb347, 60) // fireball
+        const scale = (event.radius / DEFAULT_BLAST_RADIUS) ** 2 // a wider blast throws more fire
+        effects.burst(pos, 0xffb347, Math.round(60 * scale)) // fireball
         effects.burst(pos.clone().add(new Vector3(0, 1.5, 0)), 0x8a8a90, 40) // smoke
         effects.addShake(0.7)
         audio.spearBoom(pos.distanceTo(game.player.pos))
@@ -1302,7 +1303,7 @@ function handleEvents(events: GameEvent[]): void {
         audio.fizzle()
         break
       case 'spearDetonated':
-        effects.burst(event.pos, 0xffb347, 60) // fireball
+        effects.burst(event.pos, 0xffb347, Math.round(60 * (event.radius / DEFAULT_BLAST_RADIUS) ** 2)) // fireball
         effects.burst(event.pos.clone().add(new Vector3(0, 1.5, 0)), 0x8a8a90, 40) // smoke
         effects.addShake(0.7)
         audio.spearBoom(event.pos.distanceTo(game.player.pos))

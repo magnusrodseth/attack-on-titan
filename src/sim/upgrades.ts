@@ -64,6 +64,53 @@ export const UPGRADE_POOL: Upgrade[] = [
     },
   },
   {
+    id: 'whetstone',
+    name: 'Whetstone',
+    desc: '+3 edge on every blade pair, honed now',
+    apply(p) {
+      // Spare Blade Racks gives you more pairs; this gives each pair a longer life. The two are
+      // different answers to a dry rig, and Hair-Trigger makes both of them matter more.
+      p.config.bladeDurability += 3
+      if (p.blades > 0) p.bladeHp = p.config.bladeDurability
+    },
+  },
+  {
+    id: 'long-reach',
+    name: "Executioner's Reach",
+    desc: '+25% blade reach: a wider nape to find at speed',
+    apply(p) {
+      p.config.slashRange *= 1.25
+    },
+  },
+  {
+    id: 'heavy-ordnance',
+    name: 'Heavy Ordnance',
+    desc: '+30% thunder spear blast radius',
+    apply(p) {
+      // caught spears already in the air keep the radius they were fired with — the spear is
+      // the thing that carries the charge, and it left the rack before this crate arrived
+      p.config.blastRadius *= 1.3
+    },
+  },
+  {
+    id: 'escape-artist',
+    name: 'Escape Artist',
+    desc: 'Tear out of a fist in 5 fewer mashes',
+    apply(p) {
+      // a floor, not a race to zero: an escape you do not have to fight for is not a QTE
+      p.config.grabEscapePresses = Math.max(5, p.config.grabEscapePresses - 5)
+    },
+  },
+  {
+    id: 'field-kit',
+    name: 'Field Kit',
+    desc: '+1 full restock per wave, no station needed',
+    apply(p) {
+      p.config.fieldKits += 1
+      p.kits += 1 // the crate is on your back now, not next wave
+    },
+  },
+  {
     id: 'heart',
     name: "Survivor's Resolve",
     desc: '+1 heart, fully healed',

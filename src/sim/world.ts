@@ -194,7 +194,7 @@ export type WorldEvent =
   | { type: 'spearFired'; playerId?: string; remaining: number }
   | { type: 'spearStuck'; titanId: number | null }
   | { type: 'spearFizzled' }
-  | { type: 'spearDetonated'; pos: Vector3 }
+  | { type: 'spearDetonated'; pos: Vector3; radius: number }
   | { type: 'staggered'; titanId: number }
   | { type: 'spearPickup'; playerId?: string; remaining: number }
   /** A Shifter fight restocked its emptied caches: plated fights never strand you dry. */
@@ -237,7 +237,7 @@ export type WorldEvent =
   | { type: 'bossRoar'; titanId: number }
   | { type: 'bossSpikeTelegraph'; x: number; z: number }
   | { type: 'bossSpike'; x: number; z: number }
-  | { type: 'resupply'; playerId?: string }
+  | { type: 'resupply'; playerId?: string; kit: boolean }
   | { type: 'lampLow' }
   | { type: 'lampDead' }
   | { type: 'canisterSwap'; remaining: number }
@@ -446,6 +446,7 @@ export function startNextWave(w: World): void {
   for (const s of w.soldiers) {
     if (!s.connected) continue
     s.body.hp = s.body.config.maxHp // a fresh wave starts at full health
+    s.body.kits = s.body.config.fieldKits // and a fresh pouch: kits do not bank across waves
     s.alive = true
     s.offers = []
     s.picked = false
@@ -759,7 +760,7 @@ function stepWorldSpears(w: World, dt: number): void {
     w.spearOwners.delete(id)
   }
   for (const blast of result.blasts) {
-    w.events.push({ type: 'spearDetonated', pos: blast.pos.clone() })
+    w.events.push({ type: 'spearDetonated', pos: blast.pos.clone(), radius: blast.radius })
     for (const titanId of blast.staggered) w.events.push({ type: 'staggered', titanId })
     // a spear with no recorded owner still kills, it just pays nobody — except in solo,
     // where there is only one soldier it could ever have belonged to
@@ -834,19 +835,27 @@ function stepWorldSpears(w: World, dt: number): void {
   }
 }
 
-/** Refills at a station; co-op allows a little slack because the position is a report. */
+/**
+ * Refills at a station; co-op allows a little slack because the position is a report.
+ *
+ * Out of a station's reach, a soldier carrying a Field Kit spends one instead. The station is
+ * still free and unlimited — the kit only buys you the walk you did not take, and it is the
+ * kit that is consumed, never the station.
+ */
 export function worldResupply(w: World, s: Soldier): boolean {
   if (w.phase === 'ended' || w.phase === 'dead' || !s.alive || !s.connected) return false
-  const radius = RESUPPLY_RADIUS + (w.coop ? RESUPPLY_REPORT_SLACK : 0)
-  if (nearestStationDist(w.arena, s.body.pos.x, s.body.pos.z) > radius) return false
   const p = s.body
+  const radius = RESUPPLY_RADIUS + (w.coop ? RESUPPLY_REPORT_SLACK : 0)
+  const atStation = nearestStationDist(w.arena, p.pos.x, p.pos.z) <= radius
+  if (!atStation && p.kits <= 0) return false
+  if (!atStation) p.kits -= 1
   p.gas = p.config.maxGas
   p.canisters = p.config.gasCanisters
   p.blades = p.config.bladePairs
   p.bladeHp = p.config.bladeDurability
   p.hp = p.config.maxHp
   p.lamp = LAMP_BATTERY_SECONDS
-  w.events.push({ type: 'resupply', playerId: s.id })
+  w.events.push({ type: 'resupply', playerId: s.id, kit: !atStation })
   return true
 }
 
@@ -895,9 +904,10 @@ function stepHeldSoldier(w: World, s: Soldier, dt: number): void {
   holdSoldier(w, s, titan)
   // every mash banked since the last tick counts; the press is counted before the timer so
   // the final mash on the last tick still breaks free
-  let result = stepGrab(grab, s.mash > 0, dt)
+  const escapePresses = s.body.config.grabEscapePresses
+  let result = stepGrab(grab, s.mash > 0, dt, escapePresses)
   for (let i = 1; i < s.mash && result === 'held'; i++) {
-    result = stepGrab(grab, true, 0)
+    result = stepGrab(grab, true, 0, escapePresses)
   }
   s.mash = 0
   if (result === 'held') return

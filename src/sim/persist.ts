@@ -29,8 +29,14 @@ import { UPGRADE_POOL } from './upgrades'
  *
  * v3 (footballer removal, 2026-07-13): the matchday mode and the striker/captain titan
  * kinds no longer exist, so any v2 save could reference them; old runs are discarded.
+ *
+ * v5 (five new upgrades, 2026-07-14): PlayerConfig grew blastRadius, grabEscapePresses and
+ * fieldKits, PlayerState grew kits, and SpearState grew blastRadius. A v4 save would restore a
+ * soldier whose config has no blastRadius, and every spear fired from it would then test its
+ * blast against `distance <= undefined` — false for every titan, so the spear would flash and
+ * kill nothing, silently. Discarded rather than migrated.
  */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 type V3 = [number, number, number]
 
@@ -64,6 +70,7 @@ interface SavedPlayer {
   hp: number
   spears: number
   lamp?: number // absent in saves from before the flashlight existed
+  kits: number
   onGround: boolean
   slashTimer: number
   fireTimer: number
@@ -142,6 +149,7 @@ export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }
       hp: p.hp,
       spears: p.spears,
       lamp: p.lamp,
+      kits: p.kits,
       onGround: p.onGround,
       slashTimer: p.slashTimer,
       fireTimer: p.fireTimer,
@@ -250,6 +258,7 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
   p.hp = sp.hp
   p.spears = sp.spears
   p.lamp = sp.lamp ?? LAMP_BATTERY_SECONDS
+  p.kits = sp.kits
   p.onGround = sp.onGround
   p.slashTimer = sp.slashTimer
   p.fireTimer = sp.fireTimer

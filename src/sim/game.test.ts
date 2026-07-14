@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_BLAST_RADIUS } from './constants'
 import { BOSS_LADDER, BOSS_WAVE_INTERVAL, bossDebutWave, bossPartCenter, createBossFight } from './boss'
 import { CYCLE_SECONDS, startFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS } from './flashlight'
@@ -605,6 +606,7 @@ describe('thunder spears', () => {
     return {
       id: 99,
       phase: 'stuck',
+      blastRadius: DEFAULT_BLAST_RADIUS,
       pos: pos.clone(),
       vel: new Vector3(),
       traveled: 0,

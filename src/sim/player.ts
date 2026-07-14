@@ -1,7 +1,12 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
 import { clampToCeiling, clampToWall, groundHeightAt, resolveBuildingCollision } from './city'
-import { EYE_HEIGHT, GRAVITY } from './constants'
+import {
+  DEFAULT_BLAST_RADIUS,
+  DEFAULT_GRAB_ESCAPE_PRESSES,
+  EYE_HEIGHT,
+  GRAVITY,
+} from './constants'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { Hook } from './rope'
 import { applyRopeConstraint, createHook, reelHook } from './rope'
@@ -30,6 +35,12 @@ export interface PlayerConfig {
   gasKillRefund: number
   speedCap: number
   spearCapacity: number
+  /** Blast radius of this soldier's thunder spears; captured onto the spear when it is fired. */
+  blastRadius: number
+  /** Mashes it takes to tear out of a titan's fist (grab.ts). Fewer is better. */
+  grabEscapePresses: number
+  /** Field kits carried per wave: a full restock with no station in sight. Zero by default. */
+  fieldKits: number
 }
 
 // Balance anchored in swing physics (see docs/research/odm-mechanics.md): a natural
@@ -57,6 +68,9 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   gasKillRefund: 0,
   speedCap: 40,
   spearCapacity: 2, // two thunder spears, one per arm mount, like the source material
+  blastRadius: DEFAULT_BLAST_RADIUS,
+  grabEscapePresses: DEFAULT_GRAB_ESCAPE_PRESSES,
+  fieldKits: 0, // earned, never issued: a stock soldier walks to a station like everyone else
 }
 
 export interface InputState {
@@ -99,6 +113,8 @@ export interface PlayerState {
   spears: number
   /** Flashlight battery, in seconds of night light; recharges only at resupply. */
   lamp: number
+  /** Field kits still in the pouch this wave; refilled to config.fieldKits when a wave turns. */
+  kits: number
   onGround: boolean
   slashTimer: number
   /** Seconds a pressed swing stays live waiting for a titan to arrive (see combat.ts). */
@@ -124,6 +140,7 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
     hp: config.maxHp,
     spears: config.spearCapacity,
     lamp: LAMP_BATTERY_SECONDS,
+    kits: config.fieldKits,
     onGround: true,
     slashTimer: 0,
     slashBuffer: 0,

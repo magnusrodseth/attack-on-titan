@@ -11,7 +11,7 @@ import type { CoopEvent, CoopSnapshot, HookAnchor, MatchResults } from '../sim/c
  * Bumped to 2 for the unified world (ADR 0003): the lobby now carries the map and the mode,
  * matchStart names the world it starts, and a mash intent exists because the grab QTE does.
  */
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 3
 
 export type RoomPhase = 'lobby' | 'match' | 'results'
 

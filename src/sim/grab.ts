@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import type { PlayerState } from './player'
 import type { TitanState } from './titan'
 import { forwardOf } from './titan'
+import { DEFAULT_GRAB_ESCAPE_PRESSES } from './constants'
 
 // The grab: loiter slow or still inside a grounded titan's reach — on the street at its
 // feet or hanging off its flank — and it plucks you into its fist. Escape is a mash QTE:
@@ -13,7 +14,7 @@ export const GRAB_LINGER_SECONDS = 2.5
 /** Speeds above this (m/s) read as flight, not loitering; the linger resets. */
 export const GRAB_SPEED_LIMIT = 2.5
 /** Fresh key presses needed to break the grip. */
-export const GRAB_ESCAPE_PRESSES = 15
+export const GRAB_ESCAPE_PRESSES = DEFAULT_GRAB_ESCAPE_PRESSES
 /** Seconds the fist gives you to mash before it squeezes. */
 export const GRAB_ESCAPE_SECONDS = 3
 /** Hearts the squeeze takes when the timer empties. */
@@ -132,9 +133,10 @@ export function stepGrab(
   grab: GrabState,
   mashPressed: boolean,
   dt: number,
+  escapePresses: number = GRAB_ESCAPE_PRESSES,
 ): 'held' | 'escaped' | 'failed' {
   if (mashPressed) grab.presses += 1
-  if (grab.presses >= GRAB_ESCAPE_PRESSES) return 'escaped'
+  if (grab.presses >= escapePresses) return 'escaped'
   grab.timeLeft -= dt
   if (grab.timeLeft <= 0) return 'failed'
   return 'held'

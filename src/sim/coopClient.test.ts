@@ -39,6 +39,7 @@ function snapPlayer(id: string, over: Partial<CoopSnapshot['players'][number]> =
     blades: 4,
     bladeHp: 6,
     spears: 2,
+    kits: 0,
     picked: false,
     grab: null,
     ...over,

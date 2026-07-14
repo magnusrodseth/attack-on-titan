@@ -3,6 +3,7 @@ import type { BossBlastOutcome, BossFight } from './boss'
 import { applyBossBlast } from './boss'
 import type { Arena } from './city'
 import { groundHeightAt, raycastHookTarget } from './city'
+import { DEFAULT_BLAST_RADIUS } from './constants'
 import type { NavGrid } from './nav'
 import { nearestWalkable } from './nav'
 import type { PlayerState } from './player'
@@ -15,7 +16,7 @@ import { napeCenter, raycastTitan, staggerTitan } from './titan'
 export const SPEAR_SPEED = 60
 export const SPEAR_RANGE = 120 // past this a miss fizzles; no mid-air detonation
 export const SPEAR_FUSE = 2.5 // seconds of rising beeps between sticking and the blast
-export const BLAST_RADIUS = 5
+export const BLAST_RADIUS = DEFAULT_BLAST_RADIUS
 export const BLAST_DAMAGE = 60 // non-nape hit: heavy but survivable (titans have 100)
 export const FIRE_COOLDOWN = 0.6 // a nervous double-tap must not dump the whole rack
 export const PICKUPS_PER_WAVE = 3
@@ -32,6 +33,13 @@ export interface SpearState {
   titanId: number | null
   local: Vector3
   fuse: number
+  /**
+   * The blast this spear will make, captured from the firer's config at launch rather than
+   * read from a player at detonation. Detonation has no player: co-op passes playerPos: null
+   * and checks every soldier afterwards, and the firer may well be dead by the time the fuse
+   * runs out. The spear is the only thing that still knows whose rack it came off.
+   */
+  blastRadius: number
 }
 
 /** A per-wave street cache holding one spear; uncollected racks despawn with the wave. */
@@ -59,12 +67,15 @@ export function fireSpear(p: PlayerState, id: number, lookDir: Vector3): SpearSt
     titanId: null,
     local: new Vector3(),
     fuse: SPEAR_FUSE,
+    blastRadius: p.config.blastRadius,
   }
 }
 
 export interface BlastResult {
   spearId: number
   pos: Vector3
+  /** The circle this blast actually used, so the fireball on screen is the size that killed. */
+  radius: number
   kills: { titanId: number; kind: TitanKind }[]
   staggered: number[]
   playerInBlast: boolean
@@ -163,28 +174,32 @@ function detonate(
   playerPos: Vector3 | null,
   boss?: BossFight | null,
 ): BlastResult {
+  // the firer's radius, not the module default: a squad's spears blast at each owner's size,
+  // and the friendly-fire check below must use the same circle that dealt the damage
+  const radius = spear.blastRadius
   const blast: BlastResult = {
     spearId: spear.id,
     pos: spear.pos.clone(),
+    radius,
     kills: [],
     staggered: [],
-    playerInBlast: playerPos !== null && playerPos.distanceTo(spear.pos) <= BLAST_RADIUS,
+    playerInBlast: playerPos !== null && playerPos.distanceTo(spear.pos) <= radius,
   }
   // the Shifter only ever reacts at its lit Weak Point: no nape instakill, no body damage
   if (boss && boss.titan.hp > 0) {
-    const outcome = applyBossBlast(boss, blast.pos, BLAST_RADIUS)
+    const outcome = applyBossBlast(boss, blast.pos, radius)
     blast.boss = outcome
     if (outcome.staggered) blast.staggered.push(boss.titan.id)
   }
   for (const t of titans) {
     if (t.hp <= 0 || t.kind === 'shifter') continue
-    if (napeCenter(t).distanceTo(blast.pos) <= BLAST_RADIUS) {
+    if (napeCenter(t).distanceTo(blast.pos) <= radius) {
       // on or near the nape: the kill needs no speed — that is the whole point of the spear
       t.hp = 0
       blast.kills.push({ titanId: t.id, kind: t.kind })
       continue
     }
-    if (blastDistanceToTitan(t, blast.pos) <= BLAST_RADIUS) {
+    if (blastDistanceToTitan(t, blast.pos) <= radius) {
       t.hp = Math.max(0, t.hp - BLAST_DAMAGE)
       if (t.hp <= 0) blast.kills.push({ titanId: t.id, kind: t.kind })
       else if (staggerTitan(t)) blast.staggered.push(t.id)

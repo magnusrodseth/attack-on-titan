@@ -318,6 +318,8 @@ export interface CoopSnapshot {
     blades: number
     bladeHp: number
     spears: number
+    /** Field kits left this wave: server-authoritative like blades — the client only shows it. */
+    kits: number
     picked: boolean
     /** The fist around this soldier: the QTE the client renders and mashes against. */
     grab: { titanId: number; presses: number; timeLeft: number } | null
@@ -406,6 +408,7 @@ export function coopSnapshot(w: CoopWorld): CoopSnapshot {
       blades: s.body.blades,
       bladeHp: s.body.bladeHp,
       spears: s.body.spears,
+      kits: s.body.kits,
       picked: s.picked,
       grab: s.grab
         ? { titanId: s.grab.titanId, presses: s.grab.presses, timeLeft: r2(s.grab.timeLeft) }

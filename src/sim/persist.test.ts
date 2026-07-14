@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_BLAST_RADIUS } from './constants'
 import { BOSS_WAVE_INTERVAL } from './boss'
 import { createGame, startGame, stepGame } from './game'
 import { chooseUpgrade } from './game'
@@ -74,6 +75,7 @@ describe('serializeRun / restoreRun', () => {
       titanId: g.titans[0]!.id,
       local: new Vector3(0.5, 1, 0),
       fuse: 1.25,
+      blastRadius: DEFAULT_BLAST_RADIUS,
     })
     g.pickups[0]!.taken = true
     const save = JSON.parse(JSON.stringify(serializeRun(g, { yaw: 1.2, pitch: -0.3 })))

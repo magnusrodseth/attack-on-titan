@@ -1,4 +1,5 @@
 import { Vector3 } from 'three'
+import { DEFAULT_BLAST_RADIUS } from './constants'
 import type { BossState } from './boss'
 import { BOSS_LADDER } from './boss'
 import { nearestStationDist } from './city'
@@ -70,7 +71,11 @@ export function stepCoopClient(g: GameState, input: InputState, dt: number): voi
   }
 
   if (input.resupply && !g.prevInput.resupply) {
-    if (nearestStationDist(g.arena, p.pos.x, p.pos.z) <= RESUPPLY_PROMPT_RADIUS) {
+    // a Field Kit is a resupply with no station in it, so gating the intent on station range
+    // would make the pick work in solo and do nothing in co-op — the client would refuse to
+    // even ask. Ask whenever a station OR a kit could answer; worldResupply still decides.
+    const atStation = nearestStationDist(g.arena, p.pos.x, p.pos.z) <= RESUPPLY_PROMPT_RADIUS
+    if (atStation || p.kits > 0) {
       g.events.push({ type: 'coopResupply' })
     }
   }
@@ -264,6 +269,10 @@ export function syncSpearMirror(g: GameState, buf: SnapshotBuffer, now: number):
         titanId: snap.titanId,
         local: new Vector3(),
         fuse: snap.fuse,
+        // this mirror never detonates — the server does, and its blast arrives as a
+        // spearDetonated event carrying the firer's real radius. The default here is inert,
+        // and it is the wire's business only if a client ever has to draw a fuse's kill circle.
+        blastRadius: DEFAULT_BLAST_RADIUS,
       }
     }
     const prev = prevById.get(snap.id)
@@ -308,6 +317,7 @@ export function applySelfSnapshot(g: GameState, buf: SnapshotBuffer, me: string)
   g.player.blades = snap.blades
   g.player.bladeHp = snap.bladeHp
   g.player.spears = snap.spears
+  g.player.kits = snap.kits // the server spends them, so the pouch is never predicted locally
   g.score.score = snap.score
   g.score.kills = snap.kills
   g.score.combo = snap.combo

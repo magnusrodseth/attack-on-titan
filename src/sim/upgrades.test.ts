@@ -1,5 +1,9 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { nearestStationDist } from './city'
+import { startGrab, stepGrab } from './grab'
+import { BLAST_DAMAGE, fireSpear, stepSpears } from './spear'
+import { RESUPPLY_RADIUS } from './world'
 import { raycastHookTarget } from './city'
 import type { Arena } from './city'
 import { trySlash } from './combat'
@@ -9,7 +13,6 @@ import type { InputState, PlayerState } from './player'
 import { DEFAULT_PLAYER_CONFIG, createPlayer, neutralInput, stepPlayer, tryBoost } from './player'
 import { createRng } from './rng'
 import { attachHook } from './rope'
-import { fireSpear } from './spear'
 import { createTitan, napeCenter } from './titan'
 import { applyUpgrade, offerUpgrades, UPGRADE_POOL } from './upgrades'
 
@@ -138,6 +141,83 @@ function cutsInOneSecond(p: PlayerState, arena: Arena): number {
   return cuts
 }
 
+/**
+ * Napes a swing can still find from a standoff ring. Reach widens napeHitRadius, so a swing
+ * that whiffed at 9 m connects — this is the "did the bubble actually grow" probe, and it runs
+ * trySlash, never a radius formula.
+ */
+function napesReachedFromStandoff(p: PlayerState): number {
+  let connects = 0
+  // napeHitRadius is (slashRange + height) * 0.35: 7.35 m on a stock rig against a 15 m titan,
+  // 7.88 m with the reach. These samples straddle exactly that gap — sit them outside both and
+  // the probe reads zero either way, which is a green test that proves nothing.
+  for (const dist of [7.0, 7.2, 7.4, 7.6, 7.8, 8.0, 8.2]) {
+    const titan = createTitan({ id: 7000 + dist, kind: 'normal', height: 15, x: 0, z: 0 })
+    titan.facing = 0
+    const nape = napeCenter(titan)
+    p.pos.copy(nape).add(new Vector3(dist, 0, 0)) // back off along +x, aim back at the nape
+    p.vel.set(2, 0, 0)
+    p.onGround = false
+    p.slashTimer = 0
+    p.blades = p.config.bladePairs
+    p.bladeHp = p.config.bladeDurability
+    if (trySlash(p, [titan], aimAt(p, nape)).napeHit) connects++
+  }
+  return connects
+}
+
+/** Titans one thunder spear kills out of a ring standing just outside the stock blast. */
+function titansKilledByOneBlast(p: PlayerState, arena: Arena): number {
+  const titans = [0, 1, 2, 3, 4, 5].map((i) => {
+    const angle = (i / 6) * Math.PI * 2
+    // the blast measures to the body CYLINDER, not the center: a 15 m titan is 2.1 m thick, so
+    // standing it 7.6 m out puts its hide 5.5 m from the spear — clear of the stock 5 m blast,
+    // caught by the 6.5 m one. Ring them at 5.6 m and the stock blast already kills all six.
+    const t = createTitan({
+      id: 8000 + i,
+      kind: 'normal',
+      height: 15,
+      x: Math.cos(angle) * 7.6,
+      z: Math.sin(angle) * 7.6,
+    })
+    t.facing = 0
+    t.hp = BLAST_DAMAGE // one blast is lethal, so a catch is a kill and the probe counts kills
+    return t
+  })
+  p.pos.set(0, 1, 0)
+  const spear = fireSpear(p, 1, new Vector3(0, -1, 0))! // straight down: it sticks at our feet
+  const spears = [spear]
+  let killed = 0
+  for (let i = 0; i < 400 && spears.length > 0; i++) {
+    const result = stepSpears(spears, titans, null, arena, DT)
+    for (const blast of result.blasts) killed += blast.kills.length
+  }
+  return killed
+}
+
+/** Mashes it actually takes to tear out of a fist, driven through stepGrab. */
+function mashesToEscape(p: PlayerState): number {
+  const titan = createTitan({ id: 9100, kind: 'normal', height: 15, x: 0, z: 0 })
+  const grab = startGrab(titan)
+  for (let presses = 1; presses <= 100; presses++) {
+    if (stepGrab(grab, true, 0, p.config.grabEscapePresses) === 'escaped') return presses
+  }
+  return 999
+}
+
+/** Gas a soldier has after calling for resupply while stranded far from every station. */
+function gasAfterResupplyInTheField(game: GameState): number {
+  const p = game.player
+  p.gas = 5
+  p.hp = 1
+  // dead center of the district is 0.62R from every cardinal station and far from the plaza's
+  // ring; assert the standoff rather than trust it, or a moved station turns this probe green
+  p.pos.set(game.arena.wallRadius * 0.35, 2, game.arena.wallRadius * 0.35)
+  expect(nearestStationDist(game.arena, p.pos.x, p.pos.z)).toBeGreaterThan(RESUPPLY_RADIUS)
+  stepGame(game, { ...neutralInput(), resupply: true }, DT)
+  return p.gas
+}
+
 /** Spears the rack fires before it clicks empty. */
 function spearsUntilEmpty(p: PlayerState): number {
   let fired = 0
@@ -193,7 +273,16 @@ const PROBES: Record<string, Probe> = {
   'fast-reel': { probe: (p, g) => reeledInOneSecond(p, g.arena), wants: 'up' },
   'long-cables': { probe: (p, g) => anchorsInReach(p, g.arena), wants: 'up' },
   'extra-blades': { probe: (p) => cutsUntilBladesGone(p), wants: 'up' },
+  // same probe as extra-blades, honestly: more edge per pair and more pairs both buy you cuts.
+  // The pick is a placebo if and only if the rig runs dry no later than a stock one — which is
+  // exactly what this counts, so sharing it is the assertion, not a shortcut.
+  whetstone: { probe: (p) => cutsUntilBladesGone(p), wants: 'up' },
   'hair-trigger': { probe: (p, g) => cutsInOneSecond(p, g.arena), wants: 'up' },
+  'long-reach': { probe: (p) => napesReachedFromStandoff(p), wants: 'up' },
+  'heavy-ordnance': { probe: (p, g) => titansKilledByOneBlast(p, g.arena), wants: 'up' },
+  // fewer mashes is a better rig, so this is the one probe that must go DOWN
+  'escape-artist': { probe: (p) => mashesToEscape(p), wants: 'down' },
+  'field-kit': { probe: (_p, g) => gasAfterResupplyInTheField(g), wants: 'up' },
   'spear-racks': { probe: (p) => spearsUntilEmpty(p), wants: 'up' },
   // a cut at 15.5 m/s chips at the stock threshold (17) and kills at the sharpened one (14.45)
   'sharp-blades': { probe: (p) => oneCutsAt(p, 15.5), wants: 'up' },

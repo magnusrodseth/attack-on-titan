@@ -3,7 +3,6 @@ import type { CommendationRow } from './sim/commendations'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
-import { GRAB_ESCAPE_PRESSES } from './sim/grab'
 import { loadHuntBest, HUNT_URGENCY_FRACTION } from './sim/hunt'
 import { DEFAULT_MAP_ID, coopMaps, mapScopedSeed } from './sim/maps'
 import { coopModes } from './sim/modes'
@@ -609,9 +608,11 @@ export class Hud {
     // grabbed: the dial fills per mash press while the countdown drains toward the squeeze
     this.grabQte.classList.toggle('hidden', game.grab === null)
     if (game.grab) {
+      // the soldier's own threshold, not the stock one: Escape Artist has to make the dial
+      // fill faster, or the pick is invisible exactly where the player is looking hardest
       this.grabDialFill.style.setProperty(
         '--p',
-        Math.min(1, game.grab.presses / GRAB_ESCAPE_PRESSES).toFixed(3),
+        Math.min(1, game.grab.presses / game.player.config.grabEscapePresses).toFixed(3),
       )
       this.grabTime.textContent = Math.max(0, game.grab.timeLeft).toFixed(1)
     }
@@ -626,8 +627,17 @@ export class Hud {
       const kmh = Math.round(frame.speed * 3.6)
       this.speedo.innerHTML =
         frame.speed >= p.config.killSpeed ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
+      // a Field Kit is a station you carry, so it has to prompt like one — otherwise the pick
+      // works and the player never finds out, which is the same as it not working
+      const kits = p.kits
       this.prompt.textContent =
-        frame.nearStation && game.phase === 'playing' ? 'R — RESUPPLY' : ''
+        game.phase !== 'playing'
+          ? ''
+          : frame.nearStation
+            ? 'R — RESUPPLY'
+            : kits > 0
+              ? `R — FIELD KIT (${kits})`
+              : ''
     }
   }
 

@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_BLAST_RADIUS } from './constants'
 import { BOSS_LADDER, bossDebutWave, bossPartCenter, createBossFight } from './boss'
 import { emptyArena } from './city'
 import { buildNavGrid } from './nav'
@@ -21,10 +22,16 @@ import { createTitan, napeCenter } from './titan'
 
 const DT = 1 / 120
 
-function stuckSpear(pos: Vector3, titanId: number | null = null, fuse = 0.01): SpearState {
+function stuckSpear(
+  pos: Vector3,
+  titanId: number | null = null,
+  fuse = 0.01,
+  blastRadius = DEFAULT_BLAST_RADIUS,
+): SpearState {
   return {
     id: 1,
     phase: 'stuck',
+    blastRadius,
     pos: pos.clone(),
     vel: new Vector3(),
     traveled: 0,
