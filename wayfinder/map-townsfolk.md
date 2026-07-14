@@ -1,7 +1,22 @@
-# Wayfinder Map: The people in the streets
+# Wayfinder Map: The people in the streets — REVERTED
+
+> **This effort was built, shipped, played, and then removed from the game on 2026-07-14 (user
+> call). There are no civilians in Wings of Freedom.** The whole concept is gone: the crowd, the
+> devour window, the rescue, the supply line, station stock, The Evacuation mode, the civilian
+> bodies, the screams. Wave Survival is what it always was.
+>
+> The map is kept because the *reasoning* is worth having: what was tried, what the tuning
+> probes measured, and the two silent bugs the effort surfaced (the chase-token pool stealing
+> titans mid-hunt, and predation that emptied the district by wave three). Anyone who wants to
+> revisit "the city has people in it" should read this before starting, not after.
+>
+> **What survived the revert**, because it is good on its own and independent of the crowd:
+> dull blades (`oneCutSpeed`, the one-cut bar rising with the edge on the pair in hand) and the
+> gasLow/bladesLow supply warnings.
 
 Label: `wayfinder:map` · Tracker: local markdown (`wayfinder/tickets/`, `tf-` prefix) · Charted
-2026-07-14 via grilling, from the townsfolk idea in `IDEAS.md` (user idea, same day).
+2026-07-14 via grilling, from the townsfolk idea in `IDEAS.md` (user idea, same day). Reverted the
+same day.
 
 ## Destination
 

@@ -20,11 +20,6 @@ export interface GameMap {
   modes: string[]
   /** What this arena does in multiplayer. Required, like every other piece of content. */
   coop: CoopStance
-  /**
-   * How many people live here. Required, and zero is a real answer: nobody lives in the
-   * Forest of Giant Trees, and its emptiness is a characteristic rather than an omission.
-   */
-  population: number
   /** Pinned day/night clock fraction (0 = midnight), or null for the seeded cycle. */
   clockFraction: number | null
   generate(seed: string): Arena
@@ -39,9 +34,7 @@ export const DEFAULT_MAP_ID = 'district'
  * Those are fixed at the source (see city.ts headroom, titan.ts leap, Arena.bossEntry), so
  * the roster is no longer a per-map question.
  */
-const ALL_MODES = ['waves', 'evacuation', 'bossrush', 'race', 'hunt']
-/** The Forest has nobody living in it, so it cannot host the mode that is about them. */
-const UNPEOPLED_MODES = ALL_MODES.filter((id) => id !== 'evacuation')
+const ALL_MODES = ['waves', 'bossrush', 'race', 'hunt']
 
 export const GAME_MAPS: GameMap[] = [
   {
@@ -50,7 +43,6 @@ export const GAME_MAPS: GameMap[] = [
     desc: 'The walled surface district — rooftops, boulevards and the canal under an open sky.',
     modes: ALL_MODES,
     coop: { kind: 'shared' },
-    population: 64, // the home case: a walled district full of people who cannot fight back
     clockFraction: null,
     // the exact pre-maps rng stream: existing ?seed= URLs must replay unchanged
     generate: (seed) => generateCity(createRng(hashSeed(`${seed}:city`))),
@@ -64,8 +56,6 @@ export const GAME_MAPS: GameMap[] = [
       kind: 'shared',
       note: 'The world ducks every spawn under the rock it stands beneath (maxTitanHeightAt), and the Colossal is dropped from the cavern ladder rather than shrunk to fit.',
     },
-    // a hidden population under the capital: fewer of them, and nowhere to run
-    population: 40,
     // the shafts are open to the surface, so the cavern keeps the seeded day/night cycle:
     // sun through the holes by day, stars by night, torches burning through both
     clockFraction: null,
@@ -75,11 +65,8 @@ export const GAME_MAPS: GameMap[] = [
     id: 'forest',
     name: 'The Forest of Giant Trees',
     desc: 'Eighty metres of bark in every direction — swing the giants, rest on their limbs, and run the crown line. The definitive ODM playground.',
-    // nobody lives in the forest, and its silence is the point — so it does not offer the mode
-    // that is entirely about the people who do
-    modes: UNPEOPLED_MODES,
+    modes: ALL_MODES,
     coop: { kind: 'shared' },
-    population: 0,
     clockFraction: null,
     generate: generateForest,
   },

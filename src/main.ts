@@ -18,7 +18,6 @@ import { SoldierPool } from './render/soldiers'
 import { SpearsView } from './render/spears'
 import { TitanPool } from './render/titanPool'
 import { BossFxView } from './render/bosses'
-import { CivilianPool } from './render/civilians'
 import { bossForMilestone, bossPartCenter } from './sim/boss'
 import { nearestStationDist, raycastHookTarget } from './sim/city'
 import { DEFAULT_BLAST_RADIUS, SIM_DT } from './sim/constants'
@@ -134,7 +133,6 @@ const minimap = new Minimap(game.arena)
 const spearsView = new SpearsView(scene)
 const gatesView = new GatesView(scene)
 const bossFx = new BossFxView(scene)
-const civilians = new CivilianPool(scene)
 hud.setRaceUi(game.mode.id === 'race')
 hud.setHuntUi(game.mode.id === 'hunt')
 let roarTimer = 3
@@ -980,17 +978,6 @@ function handleCoopEvents(events: CoopEvent[]): void {
         break
       // the crowd is the squad's problem, not one soldier's: the same scream, the same window,
       // the same silence when it closes. These route through the solo handlers untouched.
-      case 'civilianSeized':
-      case 'civilianDevoured':
-      case 'civilianDelivered':
-      case 'districtEmpty':
-      case 'stationBare':
-        handleEvents([event])
-        break
-      case 'civilianSaved':
-        if (event.playerId === me) handleEvents([event])
-        else hud.addFeedLine(`<b>${event.playerId}</b> snatched one from the jaws`)
-        break
       // the fist: mine is a QTE, a teammate's is a line in the feed
       case 'grabbed':
       case 'grabEscaped':
@@ -1278,43 +1265,6 @@ function handleEvents(events: GameEvent[]): void {
       case 'resupply':
         hud.showBanner('Resupplied', 900)
         audio.refill()
-        break
-      case 'civilianSeized':
-        // Deliberately silent (user call, 2026-07-14: the screaming was too much). The window
-        // still announces itself, but with the eye rather than the ear: the red pulse on the
-        // minimap, and a titan that has stopped dead in the street with its nape out. A titan
-        // standing perfectly still in a wave that is otherwise moving is its own kind of loud.
-        break
-      case 'civilianSaved':
-        // no points, ever (the whole design turns on refusing to pay for this). Just the
-        // scream stopping, and the fact of it.
-        hud.popText('Snatched From the Jaws')
-        audio.pickupChime()
-        break
-      case 'civilianDevoured':
-        // no cry, no gore: just the small, ugly fact of it. A soft synth thud, and the body
-        // stays in the street for the rest of the run, which says it better than a sample could.
-        audio.thud(0.25)
-        break
-      case 'civilianDelivered':
-        audio.click() // someone made it home, and the rack is one deeper for it
-        break
-      case 'districtEmpty':
-        hud.showBanner('The Streets Are Empty', 3200)
-        break
-      case 'districtLost':
-        // the run is over, and not because you died: there is nothing left in this district
-        // worth standing in
-        hud.showBanner('The District Is Lost', 4000)
-        audio.boom()
-        effects.addShake(1)
-        break
-      case 'stationBare':
-        hud.showBanner(
-          event.kind === 'blades' ? 'No Blades Left Here' : 'No Spears Left Here',
-          2000,
-        )
-        audio.click()
         break
       case 'gasLow':
         hud.showBanner('Gas Running Low · Make for a Station', 2400)
@@ -1768,7 +1718,6 @@ renderer.setAnimationLoop(() => {
   hud.setStrikePrompt(lockedTitan !== undefined)
 
   titanPool.sync(game.titans, dt)
-  civilians.sync(game.folk, dt)
   bossFx.sync(game, dt)
   spearsView.sync(game.spears, game.pickups, dt)
   gatesView.sync(game, now * 0.001)
@@ -1823,23 +1772,9 @@ renderer.setAnimationLoop(() => {
     game.phase === 'playing' &&
     raycastHookTarget(game.arena, game.player.pos, lookDir, game.player.config.hookRange) !== null
   const nearStation = nearestStationDist(game.arena, game.player.pos.x, game.player.pos.z) <= 10
-  // which station, and what it has left: the prompt says so before you commit to the flight in
-  let stationStock: { blades: number; spears: number } | null = null
-  if (nearStation) {
-    let best = -1
-    let bestDist = Infinity
-    for (const [i, station] of game.arena.stations.entries()) {
-      const d = Math.hypot(station.x - game.player.pos.x, station.z - game.player.pos.z)
-      if (d < bestDist) {
-        best = i
-        bestDist = d
-      }
-    }
-    stationStock = best >= 0 ? (game.stations[best] ?? null) : null
-  }
   const lamp =
     lampOn(light) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
-  hud.update(game, { speed, nearStation, stationStock, hookInRange, lamp })
+  hud.update(game, { speed, nearStation, hookInRange, lamp })
 
   if (game.mode.id === 'hunt') {
     audio.setHeartbeat(game.hunt !== null && hud.updateHunt(game))

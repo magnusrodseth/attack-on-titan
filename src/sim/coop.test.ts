@@ -84,10 +84,8 @@ describe('titan targeting', () => {
     applyPlayerUpdate(w, 'erwin', { pos: new Vector3(75, 2, 61), vel: new Vector3(), onGround: true })
     applyPlayerUpdate(w, 'hange', { pos: new Vector3(-110, 2, -110), vel: new Vector3(), onGround: true })
     stepSeconds(w, 1)
-    // a titan in a chase state is not necessarily chasing YOU any more: the ones without a
-    // token go hunting the crowd instead (world.appetite). The cap is on hunters of soldiers.
     const chasing = w.titans.filter(
-      (t) => (t.state === 'chase' || t.state === 'attack' || t.state === 'leap') && t.prey === null,
+      (t) => t.state === 'chase' || t.state === 'attack' || t.state === 'leap',
     )
     expect(chasing.length).toBeGreaterThan(0)
     expect(chasing.length).toBeLessThanOrEqual(CHASERS_PER_PLAYER)

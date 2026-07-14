@@ -484,23 +484,6 @@
         border: 1px solid #241b0e; transform: rotate(45deg);
       }
 
-      #death-stats .toll { display: inline-block; margin-top: 6px; color: #cfc7b4; }
-      #death-stats .toll b { color: #c1121f; }
-
-      /* the district's headcount: quiet, top-left under the wave line. It is a fact about the
-         city, not a score — we do not pay points for rescues, and this must never look like a
-         prize meter. It only ever goes down. */
-      #folk-count {
-        position: fixed; top: 76px; left: 26px; z-index: 6;
-        font-family: var(--label-font); font-size: 12px; letter-spacing: 2px;
-        color: #cfc7b4; text-shadow: 0 2px 6px #000c; pointer-events: none;
-      }
-      #folk-count.hidden { display: none; }
-      #folk-count .lost { color: #c1121f; }
-      #prompt .stock {
-        display: block; font-size: 11px; letter-spacing: 2px; color: #e0a355; margin-top: 3px;
-      }
-
       /* blades that dull: the fill stains from bright steel toward a tired, brown edge, and
          the label spells out the speed a nape now demands so the rise is never a mystery */
       #blade-fill.dull { background: linear-gradient(90deg, #8d7b5f, #6f5f49) !important; }
@@ -758,7 +741,6 @@
       <div id="banner" class="aot-title"></div>
       <div id="popup"></div>
       <div id="prompt"></div>
-      <div id="folk-count" class="hidden"></div>
       <div id="zoom-mask"></div>
       <div id="vignette"></div>
       <div id="flash"></div>

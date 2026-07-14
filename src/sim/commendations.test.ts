@@ -33,7 +33,6 @@ function fakeStorage(): StorageLike & { data: Map<string, string>; writes: numbe
 }
 
 interface FakeOverrides {
-  folk?: unknown[]
   seed?: string
   phase?: GameState['phase']
   time?: number
@@ -62,8 +61,6 @@ function fakeGame(over: FakeOverrides = {}): GameState {
     hunt: over.hunt ?? null,
     mode: { id: over.modeId ?? 'waves' },
     map: { id: 'district', clockFraction: null },
-    folk: over.folk ?? [],
-    folkStats: { saved: 0, lost: 0, delivered: 0 },
   } as unknown as GameState
 }
 
@@ -404,16 +401,6 @@ describe('reachability', () => {
       ]
       collect(step(cs, g))
     }
-    // the crowd: a rescue, and a clean wave in a living district
-    const rescueGame = fakeGame({ folk: [{ id: 1 }] })
-    rescueGame.events = [
-      { type: 'civilianSaved', playerId: 'solo', civilianId: 1, titanId: 1 } as GameEvent,
-    ]
-    collect(step(cs, rescueGame))
-    const cleanWave = fakeGame({ folk: [{ id: 1 }] })
-    cleanWave.events = [{ type: 'waveClear', wave: 1, bonus: 250 } as GameEvent]
-    collect(step(cs, cleanWave))
-
     // one focus kill
     const gFocus = fakeGame()
     gFocus.events = [kill({ weapon: 'focus' })]

@@ -74,9 +74,6 @@ function makeSnap(tick: number, titans: CoopSnapshot['titans'], players: CoopSna
     players,
     spears: [],
     pickups: [],
-    folk: [],
-    stations: [],
-    folkStats: { saved: 0, lost: 0, delivered: 0 },
     results: null,
   }
 }

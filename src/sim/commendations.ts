@@ -14,7 +14,7 @@ import { gameClock } from './game'
 export const COMMEND_KEY = 'aot-odm-commendations'
 export const COMMEND_VERSION = 1
 
-export type CounterKey = 'kills' | 'oneCuts' | 'waves' | 'breaks' | 'spearKills' | 'rescues'
+export type CounterKey = 'kills' | 'oneCuts' | 'waves' | 'breaks' | 'spearKills'
 
 export interface CommendationSave {
   version: number
@@ -58,18 +58,6 @@ const felledCount = (save: CommendationSave): number =>
 export const COMMENDATIONS: Commendation[] = [
   // feats
   { id: 'first-blood', name: 'First Blood', desc: 'Fell your first titan.' },
-  // the crowd. Deliberately few and deliberately hard: we refuse to pay points for a rescue,
-  // and a wall of civilian trophies would turn the district into a farm.
-  {
-    id: 'from-the-jaws',
-    name: 'From the Jaws',
-    desc: 'Break a titan\'s grip with a civilian already in its fist.',
-  },
-  {
-    id: 'not-one-soul',
-    name: 'Not One Soul',
-    desc: 'Clear a wave without losing a single civilian.',
-  },
   { id: 'clean-cut', name: 'Clean Cut', desc: 'Take a nape in a single cut.' },
   { id: 'point-blank', name: 'Point-Blank', desc: 'Fell a titan while hooked to it.' },
   { id: 'terminal-velocity', name: 'Terminal Velocity', desc: 'Fell a titan at 35 m/s or faster.' },
@@ -124,8 +112,6 @@ export const BUZZER_BEATER_SECONDS = 3
 export const TERMINAL_VELOCITY_SPEED = 35
 
 interface RunScratch {
-  /** Civilians the district lost this wave; zero at a wave clear earns Not One Soul. */
-  lostThisWave: number
   /** Titan ids the hooks held on the previous tick: kills tear hooks within the tick. */
   prevHooked: number[]
   /** Hunt clock on the previous tick: a level clear resets it within the tick. */
@@ -151,13 +137,12 @@ function emptySave(): CommendationSave {
   return {
     version: COMMEND_VERSION,
     awarded: {},
-    counters: { kills: 0, oneCuts: 0, waves: 0, breaks: 0, spearKills: 0, rescues: 0 },
+    counters: { kills: 0, oneCuts: 0, waves: 0, breaks: 0, spearKills: 0 },
   }
 }
 
 function freshScratch(): RunScratch {
   return {
-    lostThisWave: 0,
     prevHooked: [],
     prevHuntLeft: null,
     boostThisWave: false,
@@ -238,13 +223,6 @@ export function stepCommendations(
   let spearKillsThisTick = 0
   for (const event of g.events) {
     switch (event.type) {
-      case 'civilianSaved':
-        bump('rescues')
-        award('from-the-jaws')
-        break
-      case 'civilianDevoured':
-        cs.scratch.lostThisWave += 1
-        break
       case 'kill':
         bump('kills')
         award('first-blood')
@@ -268,9 +246,6 @@ export function stepCommendations(
         if (!cs.scratch.boostThisWave) award('cold-steel')
         cs.scratch.boostThisWave = false
         if (g.player.hp === 1) award('last-heart')
-        // a whole wave, in a living district, and nobody died. It is meant to be rare.
-        if ((g.folk?.length ?? 0) > 0 && cs.scratch.lostThisWave === 0) award('not-one-soul')
-        cs.scratch.lostThisWave = 0
         if (g.mode.id === 'hunt') {
           if (event.wave >= 5) award('cull-five')
           if (cs.scratch.prevHuntLeft !== null && cs.scratch.prevHuntLeft < BUZZER_BEATER_SECONDS) {

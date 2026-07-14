@@ -38,16 +38,6 @@ export interface TitanState {
   crippleTimer: number
   staggerTimer: number
   avoidTimer: number
-  /**
-   * The civilian this titan is hunting, or null when it is hunting a soldier (or nobody).
-   * It lives here rather than in a side table because a chase is titan state: the run save
-   * carries it, and the soldier's chase-token pool has to know that a titan already stalking
-   * someone in the street is NOT engaged with you — otherwise it gets handed a token, turns
-   * around, and the district is never in any danger at all.
-   */
-  prey: number | null
-  /** Seconds of heavy-lidded quiet after a meal, during which it hunts nobody. */
-  satiated: number
   /** Street-grid waypoints toward the player while chasing (world x/z pairs). */
   path: [number, number][] | null
   pathIndex: number
@@ -150,8 +140,6 @@ export function createTitan(opts: {
     crippleTimer: 0,
     staggerTimer: 0,
     avoidTimer: 0,
-    prey: null,
-    satiated: 0,
     path: null,
     pathIndex: 0,
     repathTimer: 0,

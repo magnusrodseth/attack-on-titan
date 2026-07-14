@@ -82,11 +82,6 @@ export function createHuntMode(
     name: 'The Culling',
     desc: 'Eternal timed levels: every titan on the map knows where you are and never stops coming. Cull the full roster before the countdown dies — each cleared level buys an upgrade and a tighter clock.',
 
-    // relentless is the mode's whole rule: EVERY titan hunts the soldiers, always. Nothing is
-    // ever free to wander off and eat someone, so a crowd here would just be scenery that the
-    // titans ignore — which would be a lie about how this game works.
-    crowd: false,
-
     coop: {
       kind: 'soloOnly',
       reason:
