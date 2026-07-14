@@ -21,11 +21,14 @@ and becomes a record.
 
 - **This effort carries execution in-map** (like the solo, multiplayer and time-trials maps):
   the decisions are ticketed HITL; the build slices graduate out of the fog once they land.
-- **State, 2026-07-14**: every design decision except the UI shape is settled (de-001 → de-004),
-  and **de-006 is built** (`src/sim/daily.ts`, branch `worktree-daily-roll`). The frontier is now
-  **de-007** (the Worker: schema, claim, submit, board, standings — unblocked, and the module it
-  needs is proven to compile under `tsc -p server`) and **de-005** (prototype the daily's UI,
-  which needs a human to react to it). de-008 (client + ship) waits on both.
+- **State, 2026-07-14 (evening)**: every design decision except the UI shape is settled
+  (de-001 → de-004); **de-006 is merged to main** (`src/sim/daily.ts` — merged ahead of the feature
+  because the UTC bug it fixes was live in prod, and a fix should not wait on a mode); and
+  **de-007 is built and deployed** (`server/daily.ts`, `server/db/daily.ts`, four routes,
+  `daily_runs`, `DAILY_SECRET`). The endpoints are live and **dark** — nothing in the client calls
+  them yet. The frontier is now **de-005** (prototype the daily's UI: the one remaining ticket that
+  needs a human to react to it, and the one that decides whether the daily reads as the headline of
+  the game or as a fifth button in a list). de-008 (client + ship) waits on it alone.
 - Workflow: one worktree branch off main; `pnpm test` + `pnpm typecheck` before commits;
   playwriter + `window.__aot` for render/HUD verification; merge only after a prod-shape E2E.
 - Skills in play: tdd (sim seams first), grilling for any ticket carrying a real user decision,
@@ -69,6 +72,16 @@ and becomes a record.
   earns one (results are retained so it can be backfilled). **Sealed orders**: the seed is issued
   only by the claim, so the course cannot be rehearsed — and the Hall of the Fallen leads with the
   daily, showing per-arena boards only on a *contested* course.
+
+- [The worker](tickets/de-007-worker.md) — `daily_runs` keyed `(user_id, date)`, the claim stamping
+  the authoritative orders, submit validated against the claim (never against the body's word for
+  what it was playing), the board fetched **by date** while the seed stays sealed, and the
+  Standings aggregated live. The metric table, the ranking and the win rule are **one comparator in
+  TypeScript**, not a second copy as SQL — the win ("rank 1 on a closed day") is literally the board
+  sort, and de-003 §4 already paid for learning what a duplicated formula costs. A missing
+  `DAILY_SECRET` degrades to de-003's "Headquarters unreachable" rather than 500ing the mode.
+  Driven end to end against a real `wrangler dev` + D1, including the abandoned run and a closed
+  day's win.
 
 - [The roll module and the sim](tickets/de-006-roll-module-and-sim.md) — `src/sim/daily.ts` built
   and tested (12 tests): the closed-form walk, **no per-cycle shuffle** (it broke the no-repeat

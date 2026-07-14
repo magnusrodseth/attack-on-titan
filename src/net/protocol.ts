@@ -148,6 +148,60 @@ export interface TrialBoards {
   hunt: TrialHuntEntry[]
 }
 
+// --- the Daily Expedition (de-007) -------------------------------------------
+
+/** What a day's discipline is judged on (de-004 §1). One metric per day; the mode decides it. */
+export type DailyMetric = 'time' | 'level' | 'score'
+
+/**
+ * The day's orders, issued by the claim and never before it (de-004, "sealed orders"). The mode
+ * and the arena are public; the **seed is not**, because a seed anyone can derive is a course
+ * anyone can rehearse before spending their one attempt on it.
+ */
+export interface DailyOrdersResponse {
+  date: string
+  modeId: string
+  mapId: string
+  metric: DailyMetric
+  /** the sealed course, released only now. */
+  seed: string
+  /**
+   * false when the claim wrote no row — signed out (de-003 amendment) or Headquarters unreachable
+   * (de-003 §2). The run is playable and will not post, and the UI must say so out loud.
+   */
+  ranked: boolean
+}
+
+/** A row on today's board. */
+export interface DailyBoardEntry {
+  username: string
+  metric: DailyMetric
+  timeS: number | null
+  level: number | null
+  score: number | null
+  wave: number | null
+  submittedAt: string
+}
+
+export interface DailyBoard {
+  date: string
+  modeId: string
+  mapId: string
+  metric: DailyMetric
+  /** today's board is live: nobody is credited a win until the day closes (de-004 §2). */
+  provisional: boolean
+  entries: DailyBoardEntry[]
+}
+
+/** The thing that accumulates. No podium column until the field earns one (de-004 §4). */
+export interface StandingsEntry {
+  username: string
+  expeditions: number
+  finished: number
+  won: number
+  streak: number
+}
+
 export const MAX_ROOM_PLAYERS = 4
 
 /** Room codes read like Wall districts: TROST-7K. Generated client-side on Create Lobby. */

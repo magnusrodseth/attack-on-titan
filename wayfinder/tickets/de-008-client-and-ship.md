@@ -35,8 +35,10 @@ Build the client to the settled shape, verify it in a real browser, and ship it.
   unit tests and verified live). Drive `window.__aot`, and E2E the whole thing against a local
   `wrangler dev` + a seeded D1: claim → run → submit → board → standings → 409 on a second claim.
   Cover the abandoned run (claim, close the tab, confirm nothing posts and the streak breaks).
-- **Ship**: `pnpm test` + `pnpm typecheck` green, merge to main (auto-deploys to Vercel), and
-  **`pnpm server:deploy` for the worker** — it does not ride the front-end deploy.
+- **Ship**: `pnpm test` + `pnpm typecheck` green, merge to main. Both halves now ride the same push
+  (Vercel for the client, `.github/workflows/deploy-worker.yml` for the Worker, which then asserts
+  the deployed world matches the commit), so there is no separate `pnpm server:deploy` step to
+  forget. **de-007 is already deployed** — the endpoints are live and dark, waiting on this client.
 - **Graduate**: delete the Daily entry from IDEAS.md's "Graduated to the wayfinder" section once
   this is live, and record the decision on `wayfinder/map.md` (the solo map) the way the other
   shipped efforts are.

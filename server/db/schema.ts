@@ -56,6 +56,45 @@ export const trials = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.mode, t.seed] })],
 )
 
+/**
+ * The Daily Expedition (de-003 §5, de-007): one row per (soldier, UTC date). The claim inserts it;
+ * the submit fills the result in.
+ *
+ * **The date is the key, not the seed.** A day's discipline can change under a row (it never does
+ * retroactively, but the schema should not depend on that), the board query is a single date scan,
+ * and "one attempt per soldier per day" becomes a primary key rather than a rule someone has to
+ * remember to enforce.
+ *
+ * The orders (`mode` / `map` / `seed`) are stamped here **at claim time** and are authoritative:
+ * the submit is validated against this row, never against what the client says it was playing.
+ *
+ * The result columns are nullable because a claim with no result is the whole point — an abandoned
+ * run is a row with `submittedAt` null, and the gap between claims and results is exactly what the
+ * Standings show as the difference between `expeditions` and `finished` (de-004 §4).
+ */
+export const dailyRuns = sqliteTable(
+  'daily_runs',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(), // UTC 'YYYY-MM-DD'
+    claimedAt: integer('claimed_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    mode: text('mode').notNull(), // authoritative, stamped at claim
+    map: text('map').notNull(),
+    seed: text('seed').notNull(),
+    metric: text('metric'), // 'time' | 'level' | 'score' — null until a result lands
+    timeS: real('time_s'),
+    level: integer('level'),
+    score: integer('score'),
+    wave: integer('wave'),
+    submittedAt: integer('submitted_at', { mode: 'timestamp_ms' }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.date] })],
+)
+
 export const matchPlayers = sqliteTable(
   'match_players',
   {

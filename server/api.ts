@@ -5,11 +5,15 @@ import { MIN_PASSWORD_LENGTH, USERNAME_RE, hashPassword, verifyPassword } from '
 import { createDb } from './db/client'
 import { readLeaderboard } from './db/matches'
 import { users } from './db/schema'
+import type { DailyClaimRow } from './db/daily'
+import { claimDaily, findClaim, readDailyBoard, readStandings, submitDaily } from './db/daily'
 import { createSession, validateSessionToken } from './db/sessions'
 import { readTrialBoards, writeTrial } from './db/trials'
 import type { Env } from './env'
+import { metricForMode, parseDailyResult } from './daily'
 import { MAX_SEED_LENGTH, parseTrialPost } from './trials'
 import { CONTENT_HASH } from '../src/sim/content'
+import { dailyCourseSeed, dailyDate, dailyRoll } from '../src/sim/daily'
 
 /** Origins allowed to call the API and open rooms: prod, previews, local dev. */
 export function isAllowedOrigin(origin: string): boolean {
@@ -133,3 +137,90 @@ api.get('/trials', async (c) => {
   if (seed.length === 0 || seed.length > MAX_SEED_LENGTH) return c.json({ error: 'Bad seed' }, 400)
   return c.json(await readTrialBoards(createDb(c.env.DB), seed), 200)
 })
+
+// --- the Daily Expedition (de-007) ---------------------------------------------------
+//
+// The Worker derives the day and the roll itself and never takes the client's word for either
+// (de-003 §4). `dailyDate()` here is the *server's* clock: a client whose machine says it is
+// tomorrow does not get tomorrow's expedition, and one that says it is yesterday cannot re-run a
+// day it already spent.
+
+/** The sealed course for a date, or null when this Worker has no secret to seal it with. */
+function sealedSeed(env: Env, date: string): string | null {
+  const secret = env.DAILY_SECRET
+  return secret ? dailyCourseSeed(secret, date) : null
+}
+
+api.post('/daily/claim', async (c) => {
+  const date = dailyDate()
+  const seed = sealedSeed(c.env, date)
+  // no secret, no orders: the client cannot build the world, so this is the "Headquarters
+  // unreachable" path (de-003 §2) and it must read as a service fault, not as the player's fault.
+  if (!seed) return c.json({ error: 'Headquarters unreachable' }, 503)
+
+  const orders = dailyRoll(date)
+  const metric = metricForMode(orders.modeId)
+  if (!metric) return c.json({ error: 'Headquarters unreachable' }, 503)
+  const issued = { date, modeId: orders.modeId, mapId: orders.mapId, metric, seed }
+
+  const db = createDb(c.env.DB)
+  const session = await validateSessionToken(db, bearerToken(c.req.header('Authorization')))
+  // signed out still gets the orders and writes no row (de-003 amendment): the seed is sealed, so
+  // without this a signed-out visitor could not generate the world at all — and de-001 says they
+  // may run it. They simply cannot post.
+  if (!session) return c.json({ ...issued, ranked: false }, 201)
+
+  const { spent, run } = await claimDaily(db, session.userId, orders, seed)
+  if (spent) {
+    // 409, but with the day attached: the returning player wants to see what they did with it, not
+    // a bare refusal. An unposted row here is an abandoned run — the day is gone (de-003 §1).
+    return c.json({ ...issued, ranked: false, spent: true, run: postedRun(run) }, 409)
+  }
+  return c.json({ ...issued, ranked: true }, 201)
+})
+
+function postedRun(run: DailyClaimRow): Record<string, unknown> | null {
+  if (run.submittedAt === null) return null
+  return {
+    metric: run.metric,
+    timeS: run.timeS,
+    level: run.level,
+    score: run.score,
+    wave: run.wave,
+    submittedAt: run.submittedAt.toISOString(),
+  }
+}
+
+api.post('/daily/submit', async (c) => {
+  const db = createDb(c.env.DB)
+  const session = await validateSessionToken(db, bearerToken(c.req.header('Authorization')))
+  if (!session) return c.json({ error: 'Not signed in' }, 401)
+
+  const body = await readBody(c.req.raw)
+  const date = typeof body?.date === 'string' ? body.date : ''
+  // the claim row is the authority for what was being played — the body says what it *scored*, not
+  // what the discipline was. A result with no claim is rejected outright (de-003 §3): a claim
+  // nobody has to hold is decorative.
+  const claim = date ? await findClaim(db, session.userId, date) : null
+  if (!claim) return c.json({ error: 'No claim for that day' }, 403)
+
+  const result = parseDailyResult(claim.mode, body)
+  if (!result) return c.json({ error: 'Bad daily payload' }, 400)
+
+  const splits = Array.isArray(body?.splits) ? (body.splits as number[]) : null
+  const outcome = await submitDaily(db, session.userId, date, result, splits)
+  if (outcome === 'no-claim') return c.json({ error: 'No claim for that day' }, 403)
+  if (outcome === 'already-posted') return c.json({ error: 'That expedition is already on the board' }, 409)
+  return c.json({ posted: true }, 200)
+})
+
+api.get('/daily/board', async (c) => {
+  const today = dailyDate()
+  const date = (c.req.query('date') ?? today).trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ error: 'Bad date' }, 400)
+  return c.json(await readDailyBoard(createDb(c.env.DB), date, today), 200)
+})
+
+api.get('/daily/standings', async (c) =>
+  c.json(await readStandings(createDb(c.env.DB), dailyDate()), 200),
+)
