@@ -334,14 +334,29 @@ function trunkGeometry(variant: number): BufferGeometry {
 }
 
 /**
- * The limbs. The sim's solid is an axis-aligned box (that is what makes a limb a platform you
- * can land on), but a box is not a branch — so the DRESSING is a tapered bough, thick where it
- * leaves the trunk and thin at the tip, with a spray of foliage hanging off the end. The top of
- * the bough sits on the sim's standable surface, so where you land is where you see yourself land.
+ * The limbs.
+ *
+ * The sim's solid is an axis-aligned box — that is what makes a limb a platform you can land
+ * on — and a straight tapered cylinder laid in that box reads as exactly what it is: a spoke
+ * stuck through the trunk. A real bough is CROOKED and it FORKS, and it leaves the tree
+ * angling up rather than square out of it.
+ *
+ * So the bough is swept along a wandering centreline instead of instanced from a cylinder,
+ * with the one rule the sim imposes: the TOP of the main bough tracks the box's standable
+ * face, so where you land is where you see yourself land. Everything that is free to be
+ * crooked, is — the centreline wanders sideways, the radius knuckles as it tapers, it ends
+ * blunt rather than as a spear point, and it throws forks. The forks spring from the last
+ * tenth of the limb and splay up and outward past the tip, i.e. off the end of the standable
+ * box, so the silhouette gets its branching without growing anything through the floor you
+ * are standing on.
+ *
+ * One geometry, one draw call: the sweep is baked to world space and merged, and the bark
+ * tint that used to be per-instance rides vertex colours instead.
  */
 function addBranches(scene: Scene, arena: Arena): void {
   const limbs = arena.buildings.filter((b) => b.kind === 'branch')
   if (limbs.length === 0) return
+  const trunks = arena.buildings.filter((b) => b.kind === 'trunk')
 
   const barkMat = new MeshStandardMaterial({
     map: tex('/textures/giant_bark.jpg', 3, 1),
@@ -351,64 +366,218 @@ function addBranches(scene: Scene, arena: Arena): void {
     // shading it renders as a black slab pasted on the canopy
     emissive: 0x241a12,
     roughness: 1,
+    vertexColors: true,
   })
   const leafMat = leafMaterial('conifer')
 
-  // a bough lying along +x: thick at the trunk end, tapering to the tip
-  const boughGeo = new CylinderGeometry(0.32, 0.5, 1, 9, 1)
-  boughGeo.rotateZ(Math.PI / 2) // lie it down along x
-  const boughs = new InstancedMesh(boughGeo, barkMat, limbs.length)
-  const sprays = new InstancedMesh(LEAF_CARD, leafMat, limbs.length * SPRAY_CARDS)
-
-  const matrix = new Matrix4()
-  const quat = new Quaternion()
-  const euler = new Euler()
-  const color = new Color()
-  const scale = new Vector3()
-  const at = new Vector3()
+  const positions: number[] = []
+  const uvs: number[] = []
+  const colors: number[] = []
+  const sprayAt: { x: number; y: number; z: number; size: number }[] = []
   const rng = createRng(0x5eaf)
+  const color = new Color()
 
-  limbs.forEach((b, i) => {
+  const v = new Vector3()
+  const tangent = new Vector3()
+  const nrm = new Vector3()
+  const bin = new Vector3()
+  const UP = new Vector3(0, 1, 0)
+
+  /**
+   * Sweeps a tube along a centreline. The frame is rebuilt per ring from the local tangent,
+   * so a bough that bends keeps a round cross-section instead of shearing into a ribbon.
+   */
+  const sweep = (
+    centre: (t: number) => Vector3,
+    radius: (t: number) => number,
+    rings: number,
+    sectors: number,
+    vRepeat: number,
+    tint: number,
+  ): void => {
+    const ringPos: Vector3[][] = []
+    for (let ri = 0; ri <= rings; ri++) {
+      const t = ri / rings
+      const p = centre(t)
+      const ahead = centre(Math.min(1, t + 0.02))
+      const behind = centre(Math.max(0, t - 0.02))
+      tangent.subVectors(ahead, behind)
+      if (tangent.lengthSq() < 1e-8) tangent.set(1, 0, 0)
+      tangent.normalize()
+      // any stable perpendicular will do; fall back when the bough runs near-vertical
+      nrm.crossVectors(tangent, UP)
+      if (nrm.lengthSq() < 1e-6) nrm.set(1, 0, 0)
+      nrm.normalize()
+      bin.crossVectors(tangent, nrm).normalize()
+
+      const r = radius(t)
+      const ring: Vector3[] = []
+      for (let si = 0; si <= sectors; si++) {
+        const a = (si / sectors) * Math.PI * 2
+        v.copy(p)
+          .addScaledVector(nrm, Math.cos(a) * r)
+          .addScaledVector(bin, Math.sin(a) * r)
+        ring.push(v.clone())
+      }
+      ringPos.push(ring)
+    }
+
+    color.setHSL(0.07, 0.22, 0.3 + tint * 0.12)
+    const push = (p: Vector3, u: number, w: number): void => {
+      positions.push(p.x, p.y, p.z)
+      uvs.push(u, w)
+      colors.push(color.r, color.g, color.b)
+    }
+    for (let ri = 0; ri < rings; ri++) {
+      for (let si = 0; si < sectors; si++) {
+        const a = ringPos[ri]![si]!
+        const b = ringPos[ri + 1]![si]!
+        const c = ringPos[ri + 1]![si + 1]!
+        const d = ringPos[ri]![si + 1]!
+        const u0 = si / sectors
+        const u1 = (si + 1) / sectors
+        const w0 = (ri / rings) * vRepeat
+        const w1 = ((ri + 1) / rings) * vRepeat
+        push(a, u0, w0)
+        push(b, u0, w1)
+        push(c, u1, w1)
+        push(a, u0, w0)
+        push(c, u1, w1)
+        push(d, u1, w0)
+      }
+    }
+    // blunt the tip: fan the last ring shut, so a bough ends in a stub and not a hole
+    const tip = centre(1)
+    const last = ringPos[rings]!
+    for (let si = 0; si < sectors; si++) {
+      push(last[si]!, si / sectors, vRepeat)
+      push(last[si + 1]!, (si + 1) / sectors, vRepeat)
+      push(tip, 0.5, vRepeat)
+    }
+  }
+
+  for (const b of limbs) {
     const thickness = b.h - b.y0
     const alongX = b.w > b.d
     const length = alongX ? b.w : b.d
-    // the bough's crown rides the sim's standable top, so a landing looks like a landing
-    const topY = b.h - thickness * 0.5
-    euler.set(0, alongX ? 0 : Math.PI / 2, 0)
-    quat.setFromEuler(euler)
-    at.set(b.x, topY, b.z)
-    scale.set(length, thickness * 1.5, thickness * 1.5)
-    matrix.compose(at, quat, scale)
-    boughs.setMatrixAt(i, matrix)
-    color.setHSL(0.07, 0.22, 0.3 + b.tint * 0.12)
-    boughs.setColorAt(i, color)
+    const halfWidth = (alongX ? b.d : b.w) / 2
 
-    // Foliage hanging off the limb, spread along its whole outboard half rather than
-    // bunched at the tip — a bare bough with a pom-pom on the end is the giveaway. It
-    // still never sits over the top face: that is the platform you land and stand on.
-    const dir = (alongX ? b.x : b.z) > 0 ? 1 : -1
-    for (let c = 0; c < SPRAY_CARDS; c++) {
-      const out = length * (0.22 + (c / SPRAY_CARDS) * 0.32 + rng() * 0.06)
-      const size = 5 + rng() * 6
-      euler.set(Math.PI / 2 + (rng() - 0.5) * 0.7, rng() * Math.PI * 2, (rng() - 0.5) * 0.5)
-      quat.setFromEuler(euler)
-      const lateral = (rng() - 0.5) * 5
-      at.set(
-        b.x + (alongX ? dir * out : lateral),
-        // hung under and beside the bough, drooping a little further the further out it is
-        b.h - 1.5 - rng() * 3 * (out / length),
-        b.z + (alongX ? lateral : dir * out),
-      )
-      scale.set(size, size, size)
-      matrix.compose(at, quat, scale)
-      sprays.setMatrixAt(i * SPRAY_CARDS + c, matrix)
-      color.setHSL(0.24 + rng() * 0.05, 0.32, 0.32 + rng() * 0.18)
-      sprays.setColorAt(i * SPRAY_CARDS + c, color)
+    // Which way is OUT? Away from the giant this limb grew from. This used to be read off
+    // the sign of the limb's world position, which is not the same thing at all — so on
+    // roughly half the limbs the foliage hung off the trunk end.
+    let trunk: Building | null = null
+    let best = Infinity
+    for (const t of trunks) {
+      const d2 = (t.x - b.x) ** 2 + (t.z - b.z) ** 2
+      if (d2 < best) {
+        best = d2
+        trunk = t
+      }
     }
-  })
+    const axisOf = (p: { x: number; z: number }): number => (alongX ? p.x : p.z)
+    const dir = trunk && axisOf(b) < axisOf(trunk) ? -1 : 1
 
+    // outboard unit vector, and the horizontal one square to it
+    const out = alongX ? new Vector3(dir, 0, 0) : new Vector3(0, 0, dir)
+    const side = alongX ? new Vector3(0, 0, 1) : new Vector3(1, 0, 0)
+
+    const rBase = thickness * 0.72
+    const rTip = rBase * 0.44 // blunt: a branch ends in a stub, not a needle
+    const phase = rng() * Math.PI * 2
+    // the sideways wander, held inside the box's half-width so the bark still covers the
+    // face you stand on
+    const wander = Math.min(halfWidth * 0.55, 1.1)
+    const root = new Vector3(b.x, 0, b.z).addScaledVector(out, -length / 2)
+
+    const radiusAt = (t: number): number =>
+      (rBase + (rTip - rBase) * t) * (1 + 0.13 * Math.sin(t * 7.5 + phase * 2.3))
+
+    const centreAt = (t: number): Vector3 => {
+      const r = radiusAt(t)
+      // the top of the bough IS the standable face; a little sag is allowed out at the tip,
+      // where nobody lands, and it is what stops the top edge reading as a drawn straight line
+      const sag = 0.34 * thickness * t * t
+      const lat = wander * (Math.sin(t * 2.6 + phase) * 0.7 + Math.sin(t * 5.9 + phase * 1.7) * 0.3) * t ** 0.7
+      return new Vector3(root.x, b.h - r - sag, root.z)
+        .addScaledVector(out, t * length)
+        .addScaledVector(side, lat)
+    }
+
+    sweep(centreAt, radiusAt, 7, 7, Math.max(2, length / 5), b.tint)
+
+    // The forks. They spring from the last tenth of the limb and splay up and out past the
+    // tip — beyond the standable box — so the branch gets the shape without putting bark
+    // where a soldier's feet go.
+    const forks = 2 + Math.floor(rng() * 2)
+    for (let f = 0; f < forks; f++) {
+      const t0 = 0.88 + rng() * 0.1
+      const base = centreAt(t0)
+      const r0 = radiusAt(t0) * (0.5 + rng() * 0.22)
+      const pitch = 0.3 + rng() * 0.7 // up off the horizontal
+      const splay = (f - (forks - 1) / 2) * 0.55 + (rng() - 0.5) * 0.4
+      const fLen = length * (0.26 + rng() * 0.3)
+      const fPhase = rng() * Math.PI * 2
+      const away = new Vector3()
+        .addScaledVector(out, Math.cos(pitch) * Math.cos(splay))
+        .addScaledVector(side, Math.cos(pitch) * Math.sin(splay))
+        .addScaledVector(UP, Math.sin(pitch))
+        .normalize()
+
+      const fRadius = (t: number): number => r0 * (1 - 0.78 * t) * (1 + 0.16 * Math.sin(t * 9 + fPhase))
+      const fCentre = (t: number): Vector3 =>
+        new Vector3(base.x, base.y, base.z)
+          .addScaledVector(away, t * fLen)
+          // curling up and wandering as it goes, the way the reference boughs do
+          .addScaledVector(UP, fLen * 0.16 * t * t)
+          .addScaledVector(side, fLen * 0.07 * Math.sin(t * 3.4 + fPhase))
+
+      sweep(fCentre, fRadius, 5, 5, Math.max(1.5, fLen / 5), b.tint)
+
+      // the fork carries its own spray of needles at the end
+      const tipAt = fCentre(1)
+      sprayAt.push({ x: tipAt.x, y: tipAt.y, z: tipAt.z, size: 6 + rng() * 6 })
+    }
+
+    // and foliage hangs along the bough's outboard half, under it — never over the top face
+    for (let c = 0; c < SPRAY_CARDS; c++) {
+      const t = 0.32 + (c / SPRAY_CARDS) * 0.6 + rng() * 0.06
+      const p = centreAt(Math.min(1, t))
+      const lateral = (rng() - 0.5) * 5
+      sprayAt.push({
+        x: p.x + side.x * lateral,
+        y: p.y - 1.2 - rng() * 2.6 * t,
+        z: p.z + side.z * lateral,
+        size: 5 + rng() * 6,
+      })
+    }
+  }
+
+  const geo = new BufferGeometry()
+  geo.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3))
+  geo.setAttribute('uv', new BufferAttribute(new Float32Array(uvs), 2))
+  geo.setAttribute('color', new BufferAttribute(new Float32Array(colors), 3))
+  geo.computeVertexNormals()
+  const boughs = new Mesh(geo, barkMat)
   boughs.castShadow = true
   boughs.receiveShadow = true
+
+  const sprays = new InstancedMesh(LEAF_CARD, leafMat, sprayAt.length)
+  const matrix = new Matrix4()
+  const quat = new Quaternion()
+  const euler = new Euler()
+  const at = new Vector3()
+  const scale = new Vector3()
+  sprayAt.forEach((s, i) => {
+    euler.set(Math.PI / 2 + (rng() - 0.5) * 0.7, rng() * Math.PI * 2, (rng() - 0.5) * 0.5)
+    quat.setFromEuler(euler)
+    at.set(s.x, s.y, s.z)
+    scale.set(s.size, s.size, s.size)
+    matrix.compose(at, quat, scale)
+    sprays.setMatrixAt(i, matrix)
+    color.setHSL(0.24 + rng() * 0.05, 0.32, 0.32 + rng() * 0.18)
+    sprays.setColorAt(i, color)
+  })
+
   scene.add(boughs, sprays)
 }
 
