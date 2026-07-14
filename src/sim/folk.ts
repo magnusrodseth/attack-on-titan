@@ -5,7 +5,7 @@ import type { NavGrid } from './nav'
 import { isWalkable, nearestWalkable } from './nav'
 import type { Rng } from './rng'
 import type { TitanState } from './titan'
-import { grabHoldPoint } from './grab'
+import { forwardOf } from './titan'
 
 /**
  * The people in the streets.
@@ -77,6 +77,20 @@ export const FOLK_DELIVER_RADIUS = 7
 export const DEVOUR_SECONDS = 3.6
 /** How close a titan's swat has to land to catch someone. */
 export const FOLK_CATCH_RADIUS = 4.5
+/**
+ * How far a titan will go out of its way for a meal. Without this they beeline across the
+ * whole district the instant a wave starts, and the crowd is a machine-fed conveyor: the
+ * first playtest lost seven people in twenty seconds and would have emptied the city by wave
+ * three. A titan hunts what it can see, and wanders otherwise.
+ */
+export const FOLK_HUNT_RADIUS = 75
+/**
+ * A titan that has just eaten is slow and stupid for a while: it does not immediately pick
+ * the next person out of the street. This is what turns predation from a rate into a rhythm,
+ * and it is what makes the district something you can hold rather than something you watch
+ * drain.
+ */
+export const SATIATED_SECONDS = 25
 
 export function createCivilian(id: number, x: number, z: number): Civilian {
   return {
@@ -194,7 +208,7 @@ export function stepFolk(folk: Civilian[], ctx: FolkStepContext): FolkStepResult
     if (c.state === 'held') {
       const holder = titans.find((t) => t.id === c.heldBy)
       if (!holder || holder.hp <= 0) continue // the world resolves the rescue, not us
-      c.pos.copy(grabHoldPoint(holder))
+      c.pos.copy(mealHoldPoint(holder))
       c.facing = holder.facing + Math.PI
       c.window -= dt
       if (c.window <= 0) {
@@ -213,7 +227,10 @@ export function stepFolk(folk: Civilian[], ctx: FolkStepContext): FolkStepResult
     }
     if (threat <= FOLK_PANIC_RADIUS) {
       c.calm = 0
-      if (c.state !== 'flee') {
+      // a civilian already running for a station is committed: they do not lose their nerve
+      // and turn around, they just run, and the street decides whether they make it. Anything
+      // else and a rescue could never actually pay for itself.
+      if (c.state !== 'flee' && c.state !== 'delivering') {
         c.state = 'flee'
         c.station = null
       }
@@ -305,18 +322,44 @@ function nearestTitanAway(c: Civilian, titans: TitanState[]): [number, number] |
   return [c.pos.x + (dx / len) * 30, c.pos.z + (dz / len) * 30]
 }
 
+/**
+ * Where a titan holds a meal: up at its mouth, out in front, not down at its chest. The
+ * player's own grab (grab.ts) holds them lower, because a soldier being crushed in a fist is
+ * a different beat from a civilian being raised to a face. This one has to read as *about to
+ * be eaten*, from sixty metres up, in one glance.
+ */
+export function mealHoldPoint(titan: TitanState): Vector3 {
+  return titan.pos
+    .clone()
+    // held well CLEAR of the face, not tucked against it: inside the mouth's shadow a
+    // civilian is a dark lump you cannot read, and the whole point of this pose is that it
+    // reads. Out at arm's length they are lit, and they are silhouetted against the sky.
+    .addScaledVector(forwardOf(titan), titan.height * 0.52)
+    .add(new Vector3(0, titan.height * 0.66, 0))
+}
+
 /** The fist closes. */
 export function seize(c: Civilian, titan: TitanState): void {
   c.state = 'held'
   c.heldBy = titan.id
   c.window = DEVOUR_SECONDS
-  c.pos.copy(grabHoldPoint(titan))
+  c.pos.copy(mealHoldPoint(titan))
 }
 
-/** Cut loose: dropped, terrified, and already running for the nearest soldier. */
+/**
+ * Cut loose from a fist. They do not go back to milling about in the street: they have had
+ * enough, and they run for the nearest station with whatever they were carrying.
+ *
+ * This is the causal chain the whole economy hangs on, and it is worth being explicit about:
+ * **the supply line is fed by rescues.** Break a grip, watch them run, watch the rack tick up.
+ * Save nobody and the stations stay as bare as you left them. (They can still be caught on the
+ * way home — they are slow, and the street is full of titans. A rescue is counted the moment
+ * the grip breaks, but the supply only lands if they make it.)
+ */
 export function release(c: Civilian): void {
-  c.state = 'flee'
+  c.state = 'delivering'
   c.heldBy = null
   c.window = 0
-  c.calm = 0
+  c.calm = FOLK_CALM_SECONDS
+  c.station = null
 }

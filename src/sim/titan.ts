@@ -46,6 +46,8 @@ export interface TitanState {
    * around, and the district is never in any danger at all.
    */
   prey: number | null
+  /** Seconds of heavy-lidded quiet after a meal, during which it hunts nobody. */
+  satiated: number
   /** Street-grid waypoints toward the player while chasing (world x/z pairs). */
   path: [number, number][] | null
   pathIndex: number
@@ -149,6 +151,7 @@ export function createTitan(opts: {
     staggerTimer: 0,
     avoidTimer: 0,
     prey: null,
+    satiated: 0,
     path: null,
     pathIndex: 0,
     repathTimer: 0,

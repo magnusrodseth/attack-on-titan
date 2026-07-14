@@ -9,6 +9,8 @@ import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { Civilian } from './folk'
 import {
   FOLK_CATCH_RADIUS,
+  FOLK_HUNT_RADIUS,
+  SATIATED_SECONDS,
   isAlive,
   isStanding,
   populate,
@@ -674,6 +676,8 @@ function stepCrowd(w: World, dt: number): void {
   })
   for (const gone of result.devoured) {
     w.folkStats.lost += 1
+    const eater = w.titans.find((t) => t.id === gone.titanId)
+    if (eater) eater.satiated = SATIATED_SECONDS // heavy and slow, for a while
     w.events.push({ type: 'civilianDevoured', civilianId: gone.civilianId, titanId: gone.titanId })
   }
   for (const home of result.delivered) {
@@ -705,10 +709,11 @@ function stepCrowd(w: World, dt: number): void {
   }
 }
 
-/** The nearest person this titan could still reach: its meal, if nobody stops it. */
+/** The nearest person this titan can see and is still hungry enough to go for. */
 function preyFor(w: World, titan: TitanState): Civilian | null {
+  if (titan.satiated > 0) return null // it just ate. it is not looking for anybody.
   let best: Civilian | null = null
-  let bestDist = Infinity
+  let bestDist = FOLK_HUNT_RADIUS
   for (const c of w.folk) {
     if (!isStanding(c)) continue
     const d = Math.hypot(c.pos.x - titan.pos.x, c.pos.z - titan.pos.z)
@@ -724,6 +729,7 @@ function stepTitans(w: World, dt: number): void {
   const targets = pickTargets(w)
   const chasers = pickChasers(w, targets)
   for (const titan of w.titans) {
+    titan.satiated = Math.max(0, titan.satiated - dt)
     const holding = w.soldiers.find((s) => s.grab && s.grab.titanId === titan.id)
     const feeding = w.folk.find((c) => c.state === 'held' && c.heldBy === titan.id)
     if (holding || feeding) {

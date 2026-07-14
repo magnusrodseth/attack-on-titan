@@ -164,7 +164,8 @@ describe('the devour window: the easiest nape in the game is attached to someone
     titan.hp = 0
     stepGame(g, neutralInput(), DT)
 
-    expect(c.state).toBe('flee') // dropped, terrified, already running at you
+    // cut loose, they run for the rack: the supply line is fed by rescues, and nothing else
+    expect(c.state).toBe('delivering')
     expect(g.folkStats.saved).toBe(1)
     expect(g.folkStats.lost).toBe(0)
     const saved = g.events.find((e) => e.type === 'civilianSaved')
@@ -181,7 +182,7 @@ describe('the devour window: the easiest nape in the game is attached to someone
     expect(c.state).toBe('held')
     staggerTitan(titan)
     stepGame(g, neutralInput(), DT)
-    expect(c.state).toBe('flee')
+    expect(c.state).toBe('delivering')
     expect(g.folkStats.saved).toBe(1)
   })
 })

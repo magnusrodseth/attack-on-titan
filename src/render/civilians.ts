@@ -42,11 +42,15 @@ function sourced(url: string, repeat: number): MeshStandardMaterial {
   return new MeshStandardMaterial({ map, roughness: 0.85, metalness: 0 })
 }
 
-/** The clothing palette: earthy, drab, period. A district of bakers, not of adventurers. */
+/**
+ * The clothing palette: earthy, drab, period — a district of bakers, not of adventurers. Kept
+ * deliberately LIGHT, because these bodies spend their most important moments in the shadow of
+ * a titan's face, and a dark tint there crushes to an unreadable black lump.
+ */
 const CLOTH_TINTS = [
-  0x8f7f6a, 0x6f6552, 0xa08b6e, 0x5e5a4e, 0x94764f, 0x7d6b58, 0xa9a290, 0x6b5d4a,
+  0xc9b79a, 0xb8a684, 0xd6c3a4, 0xa89a80, 0xc7a878, 0xb59c82, 0xd8d2c0, 0xa2907a,
 ]
-const LEG_TINTS = [0x4a4238, 0x5b5044, 0x3f3a33, 0x6a5c4a]
+const LEG_TINTS = [0x8a7c68, 0x9b8b74, 0x7d7263, 0xa08c72]
 
 export class CivilianPool {
   private head: InstancedMesh
@@ -115,35 +119,43 @@ export class CivilianPool {
 
       this.q.setFromAxisAngle(this.up, c.facing)
       if (dead) {
-        // face down in the street, and they stay there. an emptying district is visible from
+        // face down in the street, and they stay there. An emptying district is visible from
         // the air as the bodies it is leaving behind.
         this.q.multiply(new Quaternion().setFromAxisAngle(this.tilt, Math.PI / 2))
       } else if (held) {
-        // dangling head-down in the fist: the one silhouette that has to read instantly,
-        // because it is the only one with a clock on it
-        this.q.multiply(new Quaternion().setFromAxisAngle(this.tilt, Math.PI * 0.82))
+        // held ALOFT and kicking, not dangling head-down: a body inverted in a titan's hand
+        // reads as a speck clipping through its face, and this silhouette has to be legible in
+        // one glance from sixty metres. Lean them back, kick the legs, throw the arms up.
+        this.q.multiply(new Quaternion().setFromAxisAngle(this.tilt, -0.4))
       }
+      // and scale them up a touch in the fist: at a titan's mouth a real 1.7 m human is 20 px
+      // of screen, which is not a thing anyone can act on. This is a readability lie and it is
+      // the only one in here.
+      const s = held ? 1.6 : 1
+      this.scale.set(s, s, s)
 
       const base = dead ? 0.12 : held ? 0 : bob
       // head
-      this.pos.set(c.pos.x, c.pos.y + base + (held ? -0.35 : dead ? 0.18 : 1.62), c.pos.z)
+      this.pos.set(c.pos.x, c.pos.y + base + (held ? 0.62 : dead ? 0.18 : 1.62), c.pos.z)
       this.head.setMatrixAt(n, this.m.compose(this.pos, this.q, this.scale))
       // torso
-      this.pos.set(c.pos.x, c.pos.y + base + (held ? 0.05 : dead ? 0.16 : 1.2), c.pos.z)
+      this.pos.set(c.pos.x, c.pos.y + base + (held ? 0.18 : dead ? 0.16 : 1.2), c.pos.z)
       this.torso.setMatrixAt(n, this.m.compose(this.pos, this.q, this.scale))
-      // legs, kicking when they are held (they are not going quietly)
-      const kick = held ? new Quaternion().setFromAxisAngle(this.tilt, Math.sin(this.time * 14) * 0.35) : null
-      this.pos.set(c.pos.x, c.pos.y + base + (held ? 0.62 : dead ? 0.14 : 0.42), c.pos.z)
+      // legs, kicking hard when a fist has them (nobody goes quietly)
+      const kick = held
+        ? new Quaternion().setFromAxisAngle(this.tilt, Math.sin(this.time * 13) * 0.55)
+        : null
+      this.pos.set(c.pos.x, c.pos.y + base + (held ? -0.5 : dead ? 0.14 : 0.42), c.pos.z)
       this.legs.setMatrixAt(
         n,
         this.m.compose(this.pos, kick ? this.q.clone().multiply(kick) : this.q, this.scale),
       )
-      // arms: up and out when they run, thrown up when they are lifted
+      // arms: swinging when they run, thrown up when they are lifted
       const armSwing = new Quaternion().setFromAxisAngle(
         new Vector3(0, 0, 1),
-        held ? -1.15 : swing * 0.6,
+        held ? -1.25 + Math.sin(this.time * 11) * 0.25 : swing * 0.6,
       )
-      this.pos.set(c.pos.x, c.pos.y + base + (held ? -0.1 : dead ? 0.16 : 1.32), c.pos.z)
+      this.pos.set(c.pos.x, c.pos.y + base + (held ? 0.45 : dead ? 0.16 : 1.32), c.pos.z)
       this.arms.setMatrixAt(n, this.m.compose(this.pos, this.q.clone().multiply(armSwing), this.scale))
 
       n++
