@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: []
 ---
 
@@ -31,3 +31,19 @@ These two are the first users of the stance declaration (pa-002), so their answe
 - **The precedent.** Whichever way these go, they are the worked examples the ADR will quote. Say
   what they teach about when a solo mechanic *should* be reworked for a shared world versus when
   solo-only is the right answer.
+
+## Resolution
+
+**Focus: solo-only, declared** (`FEATURES` in stance.ts). It is not a world rule at all — the solo
+driver scales `dt` before calling `stepWorld`, so the world never learns time bent. There is
+nowhere to put that in a room of four. The meter is hidden in co-op rather than shown and refused.
+The focus strike inherits the same stance (it is spent from a Focus window).
+
+**Grab: adapted, self-escape only** (user ruling, 2026-07-14). The fist takes any soldier; the
+snapshot carries the escape bar (`presses`, `timeLeft`); the mash is an intent; a held client stops
+flying entirely (`applyPlayerUpdate` ignores its reports, `stepCoopClient` returns early). No
+teammate rescue in v1 — a held soldier is on their own.
+
+What they teach, and what the ADR quotes: rework a solo mechanic for a shared world when its
+*subject* can be generalised from "the player" to "a soldier" (the grab). Declare it solo-only when
+its subject is **time itself** (Focus) — because time is the one thing every soldier shares.

@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: []
 ---
 
@@ -32,3 +32,21 @@ city seed is derived from the room code (`coop-<code>`) precisely so the city su
   until the lobby announces the map. Choose, and say what the joiner sees while it resolves.
 - **Illegal combinations.** What happens when a client asks for a map or mode whose declared
   co-op stance (pa-002) is solo-only, or that its build does not know about at all.
+
+## Resolution
+
+Protocol v2. `LobbyMsg` carries `mapId`/`modeId`; a creator-only `setWorld` ClientMsg sets them
+(validated against the registries **and** their co-op stance); `matchStart` names the world the
+server is actually running. The room's city seed stays the room code, so a rematch keeps its city;
+a different map is a different arena because the arena derives from (mapId, citySeed) — no folding
+needed.
+
+**Client bootstrap**: the page builds its arena and its whole three.js scene at load, so the honest
+place to change the ground is a reload — done *in the lobby*, where nothing is lost. A client whose
+URL names a different world reloads into the announced one (`syncWorldToLobby`); a late joiner who
+arrives mid-match on the wrong ground reloads too. This is the same reload pattern solo already
+uses for mode switching. Ready flags reset on a world change, which is honest: it is a new
+battlefield.
+
+Verified with two browsers: creator picks Forest + The Nine, both clients land in
+`?lobby=trost-aa&map=forest&mode=bossrush`, and the non-creator sees the world read-only.

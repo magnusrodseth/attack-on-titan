@@ -53,6 +53,20 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 - **Time budget** — a Culling level's countdown: seconds per titan in the roster, granted up
   front and tightening every level.
 
+## The world (ADR 0003)
+
+- **World** — the one simulation: an arena, a mode, the titans and Shifters in it, and the
+  Soldiers fighting them. Solo drives a World with a roster of one; a Match drives one with N.
+  There is no other place the game happens.
+  _Avoid_: "the sim", "the server world" (there is only one, whoever is driving it).
+- **Driver** — whatever advances a World: the solo loop, or the room's server tick.
+- **Co-op stance** — what a piece of content does in multiplayer, declared in its registry entry
+  and required by the type system: **shared** (same code for one soldier or four), **adapted**
+  (reshaped to survive a shared world, with the adaptation stated), or **solo-only** (cannot be
+  shared, with the reason stated).
+- **Content hash** — the fingerprint of the mode/map/kind/boss/upgrade registries, carried in the
+  room handshake. Same hash, same game; a mismatch is refused rather than fudged.
+
 ## Multiplayer
 
 - **Soldier** — a player's in-world character: first-person for its owner, a visible body to teammates.

@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: [pa-001]
 ---
 
@@ -32,3 +32,23 @@ Given the `World` from pa-001, decide the ownership table and make it a single s
   or does it hold the same body type the world sees, with the extra solo-only fields hanging off it?
 - **Persistence.** `serializeRun` serializes today's `GameState`. Say what it serializes after the
   split (this is the seam that later decides whether co-op can ever have saves).
+
+## Resolution
+
+The ownership table, now single-sourced in `World`:
+
+- **World owns**: hp, maxHp, blades, bladeHp, spears (ammo), score, kills, combo, alive, deaths,
+  invulnTimer, the grab, offers/picked. These stream down in the snapshot.
+- **Client owns**: position, velocity, onGround, hooks, gas, canisters, and the flashlight battery.
+  Gas is movement fuel, so it must be local for feel; resupply is a world *event* that the client
+  applies (`worldResupply` emits, the client refills).
+- **Shadow state**: the world keeps a body per soldier so it can validate and resupply. Reports are
+  sanity-clamped (NaN rejected outright, radial clamp, 60 m/s speed cap) and that is all the
+  anti-cheat this game wants — it is a friends-and-links game, and a modified client can already
+  only cheat itself into a leaderboard row.
+- **Divergent constants folded**: `RESUPPLY_RADIUS` is 10 everywhere, with an explicit
+  `RESUPPLY_REPORT_SLACK` of 5 added only in co-op (the position is a *report*, not a fact) — one
+  value, one stated reason. `WAVE_BONUS` is one exported constant, no longer a literal in one file
+  and a constant in the other.
+- **Persistence**: `serializeRun` still serializes the solo `GameState`, which is a World with one
+  soldier. Co-op saves stay out of scope (a match lives in its room; reconnect re-subscribes).

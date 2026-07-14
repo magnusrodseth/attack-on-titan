@@ -1,7 +1,7 @@
 ---
 type: wayfinder:prototype
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: []
 ---
 
@@ -32,3 +32,20 @@ works-as-is / adapted (with the adaptation) / solo-only (with a reason). Pin it 
   express its truth in your union, the union is wrong.
 
 Deliver the type plus the filled-in declarations for today's content as a prototype to react to.
+
+## Resolution
+
+`src/sim/stance.ts`: `CoopStance = { kind: 'shared', note? } | { kind: 'adapted', note } |
+{ kind: 'soloOnly', reason }`. **Required** on `GameMode`, `GameMap`, `TitanKindSpec` (titan kinds
+became a real registry — `KIND_STATS` is now derived from it), `BossSpec` (all nine), and a new
+`FEATURES` table for cross-cutting things with no registry (Focus, the strike, the grab, the
+flashlight, the run save). Omitting it is a `tsc` error.
+
+Upgrades deliberately carry **no** stance: an upgrade is a pure `PlayerConfig` mutation with no
+world surface, and `applyUpgrade` was already shared. They get an assertion instead — the parity
+harness applies every upgrade in the pool through the server in a four-soldier match. An upgrade
+that ever grows a world surface belongs in `FEATURES`.
+
+Read sites: `coopModes()` / `coopMaps()` filter the lobby pickers, and `server/room.ts` refuses a
+solo-only pick. Verified in a real browser: the co-op lobby offers three maps and exactly two
+missions (Wave Survival, The Nine) — race and hunt are honestly absent.

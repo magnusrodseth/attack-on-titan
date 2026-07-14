@@ -2,6 +2,30 @@
 
 Conventions for working in this repository.
 
+## Adding content: the one rule (ADR 0003)
+
+**There is one world.** `src/sim/world.ts` (`stepWorld`) owns titans, waves, modes, maps,
+Shifters, spears and the N soldiers in it. Solo drives it with a roster of one; the co-op server
+drives it with N. A new map, mode, titan kind, boss or variation is written **once**, and it
+reaches singleplayer and multiplayer together.
+
+Every registry entry (`GameMode`, `GameMap`, `TitanKindSpec`, `BossSpec`, and the `FEATURES`
+table for cross-cutting things like Focus) carries a **required** `coop: CoopStance`:
+
+- `{ kind: 'shared' }` — same code, one soldier or four.
+- `{ kind: 'adapted', note }` — works with a squad, but it had to be reshaped. Say how.
+- `{ kind: 'soloOnly', reason }` — cannot exist in a shared world. Say why. The menu and the
+  lobby then refuse it honestly instead of half-running it.
+
+Omitting the stance is a **type error**. That is deliberate: the bug this rule exists to kill was
+never a wrong answer, it was silence (three maps, four modes and nine bosses shipped without co-op
+ever hearing about any of them). `src/sim/parity.test.ts` then turns the claim into an assertion —
+it is registry-driven, so new content is swept the day it is added.
+
+**Deploy contract**: the client (Vercel, on push) and the Worker (`pnpm server:deploy`) must ship
+together whenever content changes. A content hash rides the handshake, so a skewed client is
+refused with a reload rather than fighting a world nobody else is in.
+
 ## Architecture
 
 - `src/sim/` is pure TypeScript stepped at a fixed 120 Hz, fully unit-tested (vitest, colocated

@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: [pa-001, pa-002]
 ---
 
@@ -35,3 +35,24 @@ Given the `World` from pa-001, design the harness:
 - **Cost.** These sweeps run on every `pnpm test`. Say what the budget is and what gets sampled
   rather than exhausted. (Note the known vitest trap: running from the main checkout also sweeps
   `.claude/worktrees/*`.)
+
+## Resolution
+
+`src/sim/parity.test.ts`, 52 specs, entirely registry-driven so new content is swept the day it is
+added:
+
+1. every registry entry carries a stance; a `soloOnly` always says why and an `adapted` always says
+   how (the type catches absence; this catches an empty gesture);
+2. the lobby offers exactly the content whose stance allows a squad;
+3. **every co-op mode × every co-op map, with one soldier and with four** — boots a real world,
+   ticks it, snapshots it;
+4. every map's own spawner: no titan inside a wall, none through the roof (the clamp co-op never
+   had — this is the assertion that would have caught the latent cavern bug);
+5. **every Shifter in every map's ladder: engaged, broken part by part, killed** — in a
+   four-soldier room, with the roster-scaled pools honestly taking proportionally more cuts;
+6. the wire round trip: the Shifter, the fist and every titan kind surviving snapshot → mirror;
+7. solo and co-op spawning the identical roster from the identical seed;
+8. every upgrade in the pool applied by the server in a real match.
+
+Budget: the whole file runs in ~1.5 s. `server/room.ts` still has no direct tests — the pure world
+it drives is covered, and the DO is thin wiring; that is a knowing gap, not an oversight.

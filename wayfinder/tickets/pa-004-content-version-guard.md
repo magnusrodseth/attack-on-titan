@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: []
 ---
 
@@ -35,3 +35,20 @@ Decide:
   instead of throwing?
 
 Research is fair game here: how other server-authoritative games handle client/server content skew.
+
+## Resolution
+
+`src/sim/content.ts`: `CONTENT_HASH` is **derived** (not hand-bumped) from the sorted ids of every
+registry — modes, maps, titan kinds, bosses, upgrades. Add content anywhere and the hash moves by
+itself.
+
+It rides the websocket handshake as a query param. The room compares it in `onConnect` **before
+anything else** and refuses a mismatch with a new `outdated` ErrorCode + a reload prompt. Rationale:
+the client deploys to Vercel on push while the Worker deploys separately, so skew is routine in
+both directions, and a stale client would build a titan of an unknown kind and read
+`KIND_STATS[undefined]` with nothing to catch it. A refusal is loud, immediate and recoverable; a
+divergent world is none of those.
+
+Deploy contract (now in CLAUDE.md and ADR 0003): the Worker and the client ship together whenever
+content changes. Verified live — the E2E connected successfully, which means the hash computed
+identically in the Vite bundle and in the Worker bundle.

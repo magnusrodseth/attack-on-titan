@@ -1,7 +1,7 @@
 ---
 type: wayfinder:grilling
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: [pa-001, pa-006, pa-007]
 ---
 
@@ -31,3 +31,24 @@ that the build map's tickets are mechanical.
   maps, which modes, how many players, solo and co-op, day and night.
 - **Sequencing against the fog.** Name which of the map's "Not yet specified" items must be resolved
   before the build starts and which can wait until after it lands.
+
+## Resolution
+
+Route taken: **a worktree branch, two green commits, no big-bang**.
+
+1. `world: one sim for both ways to play` — extract the World, move solo onto it, move co-op onto
+   it, land the stance type. Pure refactor plus the parity content it unlocks; 501 tests green.
+2. `coop: the lobby names the world, and the wire carries all of it` — protocol v2, the lobby
+   pickers, the boss on the wire, the grab, the content guard, the harness; 553 tests green.
+
+Bugs folded in on the way: the missing `maxTitanHeightAt` clamp in co-op's spawner; the divergent
+resupply radius (10 vs 15) and wave bonus (literal vs constant); co-op silently swallowing a
+dry-rack press.
+
+**Rollback**: the content hash makes a bad deploy loud instead of silent — an old Worker with a new
+client refuses connections rather than diverging, so the fix is redeploying the Worker (or
+reverting the client), not archaeology on a corrupted match.
+
+**Acceptance runs** (all executed): `pnpm test` (553), `pnpm typecheck` (client + server), `vite
+build`, and a live two-browser E2E against a local wrangler + D1 — Forest, The Nine, two soldiers,
+Beast Titan engaged and throwing, boss bar rendering off the mirrored fight, team wipe and results.

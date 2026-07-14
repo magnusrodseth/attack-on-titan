@@ -19,9 +19,16 @@ multiplayer.
 
 ## Notes
 
-- **This effort is PLAN-ONLY** (unlike the solo, multiplayer and time-trials maps, which carried
-  execution). Tickets resolve decisions; the last ticket writes the ADR and charts the build map.
-  Resist the pull to start refactoring `coop.ts`: that pull is the signal a ticket is done.
+- **Plan-only was overridden by the user on the day it was charted** (2026-07-14: "can we go ahead
+  and implement it all now?"). The four alignment rulings below were settled by grilling, then the
+  whole map was built and shipped in one session on branch `worktree-unified-world`. The map is
+  therefore a record, not a route: every ticket is closed, and there is no build map to chart
+  because there is nothing left to build.
+- Four further rulings were taken at the start of execution, all user decisions: the grab is
+  **adapted, self-escape only** (no teammate rescue in v1); Shifter part pools **scale with the
+  roster** so a four-hand fight lasts a fight; the squad leader **picks map and mode live in the
+  lobby** (which forced the honest fix to client bootstrap: the scene defers to the announced
+  world); and the effort ships **all the way to production**.
 - Skills every session should consult: `/grilling` and `/domain-modeling` (decisions are the
   user's; facts are the codebase's), `/prototype` for the type-level sketches, `/codebase-design`
   for the deep-module vocabulary when arguing about where a seam goes.
@@ -49,22 +56,52 @@ multiplayer.
 
 ## Decisions so far
 
-<!-- one line per closed ticket -->
+- [pa-001 · The World/Player split](tickets/pa-001-world-player-split.md) — `src/sim/world.ts`: one
+  `World` (arena, mode, titans, boss, spears, N soldiers) advanced by one `stepWorld`. `GameState`
+  IS a World whose `player`/`score`/`offers`/`grab` are views of its single soldier; `CoopWorld` IS
+  a World plus the wire's bookkeeping. Player physics stays client-local in both; Focus never
+  reaches the world (the solo driver scales dt).
+- [pa-002 · The typed co-op stance](tickets/pa-002-typed-coop-stance.md) — `CoopStance` = shared /
+  adapted(note) / soloOnly(reason), **required** on modes, maps, titan kinds (now a registry) and
+  all nine Shifters, plus a `FEATURES` table for Focus and the grab. Omitting it does not compile.
+  Upgrades deliberately opt out (no world surface) and are covered by the harness instead.
+- [pa-003 · Getting a map into a co-op room](tickets/pa-003-map-in-the-lobby.md) — protocol v2: the
+  lobby carries mapId/modeId, a creator-only `setWorld` sets them (stance-gated), `matchStart` names
+  the world. A client on the wrong ground reloads into it *in the lobby*, where nothing is lost.
+- [pa-004 · The content-version guard](tickets/pa-004-content-version-guard.md) — `CONTENT_HASH`,
+  derived from every registry, rides the handshake; a skewed client is refused with a reload rather
+  than reading `KIND_STATS[undefined]`. The Worker and the client must now ship together.
+- [pa-005 · Focus and the grab QTE](tickets/pa-005-focus-and-grab.md) — Focus is solo-only (a shared
+  world cannot slow for one soldier); the grab is adapted, self-escape only. The rule they teach:
+  generalise a mechanic whose subject is "the player"; declare solo-only when its subject is time.
+- [pa-006 · Who owns a soldier's state](tickets/pa-006-player-state-ownership.md) — the world owns
+  hp/blades/score/alive/grab; the client owns position/velocity/gas/canisters/lamp. Resupply radius
+  is one value plus a stated co-op slack; the wave bonus is one constant.
+- [pa-007 · The Nine on the wire](tickets/pa-007-bosses-on-the-wire.md) — the Shifter rides the
+  snapshot (parts, lit weak point, plated, phase, steam, windup, projectiles, spikes); all eleven
+  boss events cross; lag comp covers parts for free; pools scale with the squad; abilities wound
+  every soldier in radius.
+- [pa-008 · The parity harness](tickets/pa-008-parity-harness.md) — 52 registry-driven specs: every
+  mode × map with 1 and 4 soldiers, every map's spawns under its own roof, every Shifter engaged and
+  killed in a four-soldier room, the wire round trips, and every upgrade applied by the server.
+- [pa-009 · The migration route](tickets/pa-009-migration-route.md) — worktree branch, two green
+  commits, no big-bang; folded in the missing ceiling clamp and the divergent constants; the content
+  hash makes a bad deploy loud instead of silent.
+- [pa-010 · The handoff](tickets/pa-010-adr-and-build-map.md) — **destination reached 2026-07-14**:
+  `docs/adr/0003-unified-world.md`, the rule in `CLAUDE.md`, the vocabulary in `CONTEXT.md`, and the
+  whole thing shipped. No build map to chart: the user overrode plan-only and it was built.
 
 ## Not yet specified
 
-- **Snapshot budget.** What bosses plus N players cost on the wire at 20 Hz (part HP arrays, the
-  eleven boss events, weak-point state). Only sharp once the boss wire surface exists.
-- **Co-op save/resume.** Solo persists a run by serializing `GameState`; if a `World` becomes the
-  serializable thing, a reconnect-to-a-saved-match becomes conceivable. Revisit once the World
-  owns what it owns.
-- **Titan kinds as a real registry.** `TitanKind` is a bare union plus a `KIND_STATS` table; the
-  stance rule may need something to hang a declaration off. Depends on how the stance is shaped.
-- **The upgrade prediction mirror.** `main.ts` replays `applyUpgrade` client-side to stay in step
-  with the server's own call. Whether that survives unification or collapses into a snapshot field.
-- **Player-count scaling as a mode concern.** `waveComposition` already takes a `countScale`;
-  whether modes must declare how they scale with roster size, or whether the world decides.
-- **The lobby UI for picking a map and mode.** May want a prototype once the handshake is fixed.
+- **Snapshot budget.** Bosses plus four soldiers now ride 20 Hz snapshots (part pools, projectiles,
+  spikes). It measured fine in a two-browser E2E; a four-soldier boss fight has not been profiled.
+- **Co-op save/resume.** The World is the serializable thing now, so a reconnect-to-a-saved-match
+  became conceivable rather than absurd. Still declared `soloOnly` in FEATURES.
+- **`server/room.ts` has no direct tests.** The pure world it drives is covered; the Durable Object
+  itself is not. A knowing gap.
+- **The upgrade prediction mirror.** `main.ts` still replays `applyUpgrade` client-side alongside the
+  server's own call. It works, and the harness covers the server side, but the two call sites remain
+  a hand-kept invariant.
 
 ## Out of scope
 

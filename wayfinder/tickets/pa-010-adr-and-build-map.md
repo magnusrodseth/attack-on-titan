@@ -1,7 +1,7 @@
 ---
 type: wayfinder:task
-status: open
-assignee:
+status: closed
+assignee: claude (worktree-unified-world, 2026-07-14)
 blocked-by: [pa-001, pa-002, pa-003, pa-004, pa-005, pa-006, pa-007, pa-008, pa-009]
 ---
 
@@ -28,3 +28,17 @@ Also update: `CONTEXT.md` (glossary terms this effort coins: World, co-op stance
 pa-001 and pa-002 name), `CLAUDE.md` (the rule for adding new content, so the next session reads it
 before it writes a mode), and the `Not yet specified` section of this map (graduate what is now
 sharp into the build map, leave what is still fog).
+
+## Resolution
+
+Destination reached, with the map's plan-only rule **overridden by the user mid-effort** ("can we
+go ahead and implement it all now?"). So this ticket delivered the ADR *and* the implementation
+rather than the ADR and a build map — there was no build map left to chart.
+
+- `docs/adr/0003-unified-world.md`: the context (two sims, and the silence), the decision (one
+  world; the typed stance; the ownership table; the content guard; roster-scaled Shifter pools), the
+  consequences (including the deploy contract), and the three rejected alternatives (full loopback
+  unification, checklist-and-discipline, everything-must-work-in-co-op).
+- `CLAUDE.md`: "Adding content: the one rule" — the first thing the next session reads.
+- `CONTEXT.md`: the World / Driver / Co-op stance / Content hash vocabulary.
+- Shipped to production; co-op gained all three maps, boss rush and the Nine, and the grab QTE.
