@@ -25,6 +25,7 @@ import { LAMP_BATTERY_SECONDS, lampGlow, lampOn, lightAround } from './sim/flash
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
+import { dailyDate } from './sim/daily'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, gameClock, saveBest, startGame, stepGame } from './sim/game'
 import { DEFAULT_MAP_ID, GAME_MAPS, getMap, mapScopedSeed, mapsForMode } from './sim/maps'
@@ -51,9 +52,14 @@ import { SPEAR_FUSE } from './sim/spear'
 import { anklePos, napeCenter } from './sim/titan'
 import { UPGRADE_POOL, applyUpgrade } from './sim/upgrades'
 
+/**
+ * The course everyone shares today. UTC, not local: this used to build its date from
+ * `new Date()`'s local getters, so two soldiers either side of a timezone were on different
+ * cities at the same instant — and posting to different boards for what looked like the same
+ * day. One world, one day. (`dailyDate` is the same clock the Daily Expedition rolls on.)
+ */
 function dailySeed(): string {
-  const d = new Date()
-  return `wall-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+  return `wall-${dailyDate()}`
 }
 
 const MODE_KEY = 'aot-odm-mode'

@@ -9,6 +9,17 @@ blocked-by: [de-005, de-007]
 
 Build the client to the settled shape, verify it in a real browser, and ship it.
 
+## Inherited from de-006 (moved here on purpose, 2026-07-14)
+
+- **Switch free play to a random seed** (de-002 §6). This MUST land with the daily and not before:
+  the daily seed is currently the only thing giving everyone a shared course, so randomizing free
+  play early leaves no shared course at all and every per-arena board goes dead. `?seed=` URLs
+  keep working; the run save still resumes.
+- **The "this run is a daily" flag on the run save** (`SAVE_VERSION` bump), so a refresh resumes a
+  daily *as* a daily: Restart Run suppressed, the local mark spent, the result routed to the daily
+  submit. Deliberately not added in de-006 — until a daily run exists, nothing reads it, and a
+  field written by nothing and read by nobody is the placebo defect all over again.
+
 - **Menu**: the daily plate, the sealed-orders state, the commitment warning, the spent state and
   the streak — all to the shape de-005 settles. `src/hud.ts` + `index.html`.
 - **The run**: Restart Run suppressed on a daily; a refresh resumes it as a daily (the run-save
