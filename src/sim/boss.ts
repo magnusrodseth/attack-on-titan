@@ -8,7 +8,7 @@ import type { KindStats, TitanState } from './titan'
 import { createTitan, forwardOf, staggerTitan } from './titan'
 
 /**
- * Shifters: the Nine named boss titans, fought every 5th wave of Wave Survival (solo).
+ * Shifters: the Nine named boss titans, fought every 3rd wave of Wave Survival (solo).
  * Combat model per ADR 0002: damage lands ONLY on the single lit Weak Point, by blade or
  * blast alike. Parts have HP pools; a cut at or above killSpeed always deals a flat 100
  * (the one-cut threshold never moves); breaks reuse the Staggered state and disable
@@ -50,8 +50,6 @@ export interface BossSpec {
    * reads "the player" has to answer *which* one before it can be shared.
    */
   coop: CoopStance
-  /** Ladder slot: the first wave this shifter walks. */
-  wave: number
   height: number
   /** Seconds the break-freeze lasts (the spear stagger is 3). */
   staggerSeconds: number
@@ -77,16 +75,16 @@ const S = (over: Partial<KindStats>): KindStats => ({
 })
 
 /**
- * The fixed ladder (grilled decision, 2026-07-13): same order every run, Founding as the
- * wave-45 apex; after 45 it repeats with scaled part HP. Part sequences are authored
- * choreography — 3 parts early, 5 at the apex, the nape always last.
+ * The fixed ladder (grilled decision, 2026-07-13): same order every run, the Founding as the
+ * apex on the ninth rung; past it the ladder repeats with scaled part HP. Which wave each rung
+ * lands on is BOSS_WAVE_INTERVAL's business, not this list's — see bossDebutWave. Part sequences
+ * are authored choreography: 3 parts early, 5 at the apex, the nape always last.
  */
 export const BOSS_LADDER: BossSpec[] = [
   {
     id: 'beast-titan',
     name: 'Beast Titan',
     coop: { kind: 'shared', note: 'Throws at the nearest soldier; the boulder wounds everyone in its impact radius.' },
-    wave: 5,
     height: 17,
     staggerSeconds: 5,
     stats: S({ walk: 0.22, turn: 1.6, swatRest: 2.0 }),
@@ -101,7 +99,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'cart-titan',
     name: 'Cart Titan',
     coop: { kind: 'shared', note: 'The quadruped chases the nearest soldier and swats whoever is in reach.' },
-    wave: 10,
     height: 10,
     staggerSeconds: 4.5,
     stats: S({ walk: 0.5, turn: 2.4, swatRest: 1.6 }),
@@ -117,7 +114,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'jaw-titan',
     name: 'Jaw Titan',
     coop: { kind: 'shared', note: 'Fast and close-range: it hunts the nearest soldier and re-picks every tick.' },
-    wave: 15,
     height: 9,
     staggerSeconds: 3.5,
     stats: S({ walk: 0.5, turn: 3.0, swatRest: 1.0, leaps: true, leapY: 15 }),
@@ -132,7 +128,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'female-titan',
     name: 'Female Titan',
     coop: { kind: 'shared', note: 'Hardened parts and the roar shove every soldier in the shockwave, not just one.' },
-    wave: 20,
     height: 14,
     staggerSeconds: 4.5,
     stats: S({ walk: 0.42, turn: 2.6, swatRest: 1.2, leaps: true, leapY: 15 }),
@@ -148,7 +143,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'armored-titan',
     name: 'Armored Titan',
     coop: { kind: 'shared', note: 'The charge tracks the nearest soldier; plated parts need a blast from anyone.' },
-    wave: 25,
     height: 15,
     staggerSeconds: 5,
     stats: S({ walk: 0.4, turn: 2.0, swatRest: 1.4, leaps: true, leapY: 8 }),
@@ -163,7 +157,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'warhammer-titan',
     name: 'War Hammer Titan',
     coop: { kind: 'shared', note: 'Spikes telegraph under the nearest soldier and skewer anyone standing low in the radius.' },
-    wave: 30,
     height: 15,
     staggerSeconds: 4.5,
     stats: S({ walk: 0.3, turn: 1.8, swatRest: 1.8 }),
@@ -178,7 +171,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'attack-titan',
     name: 'Attack Titan',
     coop: { kind: 'shared' },
-    wave: 35,
     height: 15,
     staggerSeconds: 4,
     stats: S({ walk: 0.46, turn: 2.8, swatRest: 0.9, leaps: true, leapY: 14 }),
@@ -194,7 +186,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'colossus-titan',
     name: 'Colossus Titan',
     coop: { kind: 'adapted', note: 'The steam aura scalds every soldier inside it, so a squad cannot surround it for free. Dropped from the cavern ladder entirely (60 m under a 44 m dome) rather than shrunk — see bossLadderFor.' },
-    wave: 40,
     height: 60,
     staggerSeconds: 6,
     stats: S({ walk: 0.05, turn: 0.6, swatRest: 4.5 }),
@@ -210,7 +201,6 @@ export const BOSS_LADDER: BossSpec[] = [
     id: 'founding-titan',
     name: 'Founding Titan',
     coop: { kind: 'shared', note: 'The apex: summons chase whoever is nearest, and the pools scale with the squad like every Shifter.' },
-    wave: 45,
     height: 20,
     staggerSeconds: 4.5,
     stats: S({ walk: 0.34, turn: 2.2, swatRest: 1.2 }),
@@ -226,11 +216,26 @@ export const BOSS_LADDER: BossSpec[] = [
   },
 ]
 
-export const BOSS_WAVE_INTERVAL = 5
+/**
+ * How often Wave Survival meets a Shifter. Every wave number the ladder speaks in is derived
+ * from this — never hand-written beside it (see bossDebutWave). It was 5 until 2026-07-14; at
+ * that spacing the Founding sat 45 waves out, which almost nobody ever saw. Three brings the
+ * whole ladder inside a run people actually finish.
+ */
+export const BOSS_WAVE_INTERVAL = 3
 
 /**
- * Which ladder slot (0-based) a wave holds, per mode: Wave Survival meets a Shifter
- * every 5th wave; The Nine (boss rush) is nothing but the ladder, one per wave.
+ * The first wave a Shifter walks: purely its rung on the ladder times the interval. Derived,
+ * because the alternative is nine hand-written wave numbers that quietly become lies the day
+ * the interval moves — which is exactly what happened to this one.
+ */
+export function bossDebutWave(spec: BossSpec, ladder: BossSpec[] = BOSS_LADDER): number {
+  return (ladder.indexOf(spec) + 1) * BOSS_WAVE_INTERVAL
+}
+
+/**
+ * Which ladder slot (0-based) a wave holds, per mode: Wave Survival meets a Shifter every
+ * BOSS_WAVE_INTERVAL waves; The Nine (boss rush) is nothing but the ladder, one per wave.
  * Null = an ordinary wave.
  */
 export function bossSlot(wave: number, modeId: string): number | null {
@@ -275,7 +280,7 @@ export function bossForMilestone(
   return slot === null ? null : bossForSlot(slot, bossLadderFor(arena))
 }
 
-/** Wave Survival's ladder view (slot every 5th wave); tests and docs speak in waves. */
+/** Wave Survival's ladder view (slot every BOSS_WAVE_INTERVAL waves); tests and docs speak in waves. */
 export function bossForWave(wave: number, arena?: Arena): { spec: BossSpec; lap: number } {
   return bossForSlot(Math.round(wave / BOSS_WAVE_INTERVAL) - 1, bossLadderFor(arena))
 }

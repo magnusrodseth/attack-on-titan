@@ -4,9 +4,13 @@ Date: 2026-07-13 · Status: accepted
 
 ## Context
 
-Shifters (the Nine boss titans) are milestone fights: every 5th wave of Wave Survival, one
-named titan fought through a sequence of lit Weak Points ending at the nape. Three existing
-rules collide with a naive boss implementation:
+Shifters (the Nine boss titans) are milestone fights: every `BOSS_WAVE_INTERVAL` waves of Wave
+Survival, one named titan fought through a sequence of lit Weak Points ending at the nape. Three
+existing rules collide with a naive boss implementation:
+
+> **Amended 2026-07-14**: the interval was 5 when this ADR was written; it is now 3. Nothing in
+> the combat model below depends on the spacing — the decision this ADR records is *how* a
+> Shifter is fought, not how often one shows up.
 
 1. **Speed is damage** — a nape cut at `killSpeed` is the universal clean answer, and the
    project has an explicit non-goal (IDEAS.md, 2026-07-09): the one-cut threshold never

@@ -1,5 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
+import { BOSS_WAVE_INTERVAL } from './boss'
 import { createGame, startGame, stepGame } from './game'
 import { chooseUpgrade } from './game'
 import { restoreRun, SAVE_VERSION, serializeRun } from './persist'
@@ -196,7 +197,7 @@ describe('boss wave persistence', () => {
   function bossWaveGame(seed = 'boss-save') {
     const game = createGame(seed, null, 'waves')
     startGame(game)
-    while (game.wave < 5) {
+    while (game.wave < BOSS_WAVE_INTERVAL) {
       for (const t of game.titans) {
         t.hp = 0
         t.state = 'dead'

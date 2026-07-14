@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { BOSS_LADDER, bossLadderFor, bossPartCenter, partHpScale, rosterHpScale } from './boss'
+import { BOSS_LADDER, BOSS_WAVE_INTERVAL, bossLadderFor, bossPartCenter, partHpScale, rosterHpScale } from './boss'
 import { maxTitanHeightAt } from './city'
 import { applySelfSnapshot, createSnapshotBuffer, pushSnapshot, syncBossMirror } from './coopClient'
 import {
@@ -12,7 +12,7 @@ import {
   coopStep,
   createCoopWorld,
 } from './coop'
-import { CONTENT_HASH } from './content'
+import { CONTENT_HASH, contentFacts, hashFacts } from './content'
 import { SIM_DT } from './constants'
 import { createGame, startGame } from './game'
 import { GAME_MAPS, coopMaps, getMap } from './maps'
@@ -263,9 +263,17 @@ describe('the wire carries everything the fight needs', () => {
   })
 
   it('the content hash moves when content moves, and holds when it does not', () => {
-    const again = CONTENT_HASH
-    expect(again).toBe(CONTENT_HASH) // a rebuild of the same registries is the same world
+    expect(hashFacts(contentFacts())).toBe(CONTENT_HASH) // same registries, same world
     expect(CONTENT_HASH.length).toBeGreaterThan(3)
+
+    // and it genuinely MOVES: the boss cadence is content, because a client that thinks wave 3
+    // is a Shifter wave while the server still thinks wave 5 is announces a boss nobody spawned.
+    // Asserting CONTENT_HASH === CONTENT_HASH (what this test used to do) would pass even if the
+    // cadence were not in the hash at all.
+    expect(hashFacts(contentFacts(BOSS_WAVE_INTERVAL + 1))).not.toBe(CONTENT_HASH)
+
+    // an added or removed registry entry moves it too, which is the whole point
+    expect(hashFacts([...contentFacts(), 'boss:some-new-shifter'])).not.toBe(CONTENT_HASH)
   })
 })
 

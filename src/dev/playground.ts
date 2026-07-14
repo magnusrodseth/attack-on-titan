@@ -6,7 +6,7 @@ import { getRecruitStyle, setRecruitStyle } from '../render/soldiers'
 import type { BossBodyVisual } from '../render/titans/lib'
 import { BOSS_BODY_BUILDERS } from '../render/titans/registry'
 import type { BossFight } from '../sim/boss'
-import { BOSS_LADDER, createBossFight } from '../sim/boss'
+import { BOSS_LADDER, bossDebutWave, createBossFight } from '../sim/boss'
 import { EYE_HEIGHT } from '../sim/constants'
 import type { RemoteSoldier } from '../sim/coopClient'
 import { clockFraction } from '../sim/daynight'
@@ -169,7 +169,7 @@ function bootPlayground(ctx: DevCtx): (dt: number) => void {
     const spec = BOSS_LADDER.find((s) => s.id === `${slug}-titan`)
     const builder = BOSS_BODY_BUILDERS[`${slug}-titan`]
     if (!spec || !builder) return
-    const fight = createBossFight(titanId++, spec, spec.wave, 'playground', x, z)
+    const fight = createBossFight(titanId++, spec, bossDebutWave(spec), 'playground', x, z)
     fight.titan.facing = facing
     const visual = builder(fight.titan)
     visual.addTo(scene)

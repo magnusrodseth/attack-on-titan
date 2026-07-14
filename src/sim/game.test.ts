@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { BOSS_LADDER, bossPartCenter, createBossFight } from './boss'
+import { BOSS_LADDER, BOSS_WAVE_INTERVAL, bossDebutWave, bossPartCenter, createBossFight } from './boss'
 import { CYCLE_SECONDS, startFraction } from './daynight'
 import { LAMP_BATTERY_SECONDS, LAMP_LOW_SECONDS } from './flashlight'
 import type { GameEvent, GameState } from './game'
@@ -871,7 +871,7 @@ describe('the shifter fight through the game loop', () => {
     const game = createGame('boss-loop', null, 'waves')
     startGame(game)
     const spec = BOSS_LADDER.find((s) => s.id === specId)!
-    const fight = createBossFight(game.nextTitanId++, spec, spec.wave, game.seed, 0, 0)
+    const fight = createBossFight(game.nextTitanId++, spec, bossDebutWave(spec), game.seed, 0, 0)
     fight.titan.facing = 0
     game.boss = fight
     game.titans = [fight.titan]
@@ -1027,7 +1027,7 @@ describe('spear caches during a shifter fight', () => {
   function bossWaveGame() {
     const game = createGame('restock-loop', null, 'waves')
     startGame(game)
-    while (game.wave < 5) {
+    while (game.wave < BOSS_WAVE_INTERVAL) {
       for (const t of game.titans) {
         t.hp = 0
         t.state = 'dead'

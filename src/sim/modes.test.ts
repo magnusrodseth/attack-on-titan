@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BOSS_LADDER, BOSS_WAVE_INTERVAL } from './boss'
 import { chooseUpgrade, createGame, startGame, stepGame } from './game'
 import type { GameMode } from './modes'
 import { DEFAULT_MODE_ID, GAME_MODES, getMode } from './modes'
@@ -123,10 +124,10 @@ describe('shifter waves', () => {
     while (game.wave < target) clearWave(game)
   }
 
-  it('wave 5 of Wave Survival fields exactly one shifter, arriving via the gate', () => {
+  it('the first shifter wave of Wave Survival fields exactly one shifter, arriving via the gate', () => {
     const game = createGame('boss-spawn', null, 'waves')
     startGame(game)
-    advanceToWave(game, 5)
+    advanceToWave(game, BOSS_WAVE_INTERVAL)
     expect(game.titans).toHaveLength(1)
     expect(game.titans[0]!.kind).toBe('shifter')
     expect(game.boss).not.toBeNull()
@@ -144,19 +145,23 @@ describe('shifter waves', () => {
     expect(game.pickups.length).toBeGreaterThan(0)
   })
 
-  it('wave 15 collides with matchday and the shifter outranks the duo', () => {
+  it('a deep shifter wave still fields exactly one titan: the boss outranks the horde', () => {
     const game = createGame('boss-vs-matchday', null, 'waves')
     startGame(game)
-    advanceToWave(game, 15)
+    // wave 15: deep enough that an ordinary wave here would field a crowd, and a shifter wave
+    // at every spacing this interval has had (5 → 3), so the regression it guards survives both
+    const deep = 15
+    expect(deep % BOSS_WAVE_INTERVAL).toBe(0)
+    advanceToWave(game, deep)
     expect(game.titans).toHaveLength(1)
     expect(game.titans[0]!.kind).toBe('shifter')
-    expect(game.boss!.spec.id).toBe('jaw-titan')
+    expect(game.boss!.spec.id).toBe(BOSS_LADDER[deep / BOSS_WAVE_INTERVAL - 1]!.id)
   })
 
-  it('waves 6 and 7 return to normal hordes with the boss cleared', () => {
+  it('the wave after a shifter returns to a normal horde with the boss cleared', () => {
     const game = createGame('boss-then-horde', null, 'waves')
     startGame(game)
-    advanceToWave(game, 6)
+    advanceToWave(game, BOSS_WAVE_INTERVAL + 1)
     expect(game.boss).toBeNull()
     expect(game.titans.length).toBeGreaterThan(1)
     expect(game.titans.every((t) => t.kind !== 'shifter')).toBe(true)
@@ -165,7 +170,7 @@ describe('shifter waves', () => {
   it('the boss dying clears the wave like any roster', () => {
     const game = createGame('boss-clear', null, 'waves')
     startGame(game)
-    advanceToWave(game, 5)
+    advanceToWave(game, BOSS_WAVE_INTERVAL)
     game.boss!.titan.hp = 0
     stepGame(game, neutralInput(), DT)
     expect(game.phase).toBe('upgrading')

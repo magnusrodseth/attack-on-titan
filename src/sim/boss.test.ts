@@ -6,6 +6,7 @@ import {
   BOSS_LADDER,
   BOSS_WAVE_INTERVAL,
   type BossFight,
+  bossDebutWave,
   bossForMilestone,
   bossForWave,
   bossLadderFor,
@@ -31,7 +32,7 @@ const KILL_SPEED = DEFAULT_PLAYER_CONFIG.killSpeed
 
 function fightFor(specId: string, wave?: number): BossFight {
   const spec = BOSS_LADDER.find((s) => s.id === specId)!
-  return createBossFight(1, spec, wave ?? spec.wave, 'test-seed', 0, 0)
+  return createBossFight(1, spec, wave ?? bossDebutWave(spec), 'test-seed', 0, 0)
 }
 
 /** Cuts the current lit part with clean cuts until it breaks; returns the outcomes. */
@@ -48,20 +49,26 @@ function breakLitPart(fight: BossFight) {
 }
 
 describe('the ladder', () => {
-  it('maps waves 5..45 to the nine in order, Founding last', () => {
+  const debut = (id: string) => bossDebutWave(BOSS_LADDER.find((s) => s.id === id)!)
+  const last = BOSS_LADDER.length * BOSS_WAVE_INTERVAL // the Founding's wave, whatever the spacing
+
+  it('walks the nine in order, one every BOSS_WAVE_INTERVAL waves, Founding last', () => {
     expect(BOSS_LADDER).toHaveLength(9)
-    expect(bossForWave(5).spec.id).toBe('beast-titan')
-    expect(bossForWave(25).spec.id).toBe('armored-titan')
-    expect(bossForWave(45).spec.id).toBe('founding-titan')
-    expect(BOSS_LADDER.map((s) => s.wave)).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 45])
+    expect(bossForWave(debut('beast-titan')).spec.id).toBe('beast-titan')
+    expect(bossForWave(debut('armored-titan')).spec.id).toBe('armored-titan')
+    expect(bossForWave(last).spec.id).toBe('founding-titan')
+    // every rung derives from the interval — nine hand-written numbers is what we just deleted
+    expect(BOSS_LADDER.map((s) => bossDebutWave(s))).toEqual(
+      BOSS_LADDER.map((_s, i) => (i + 1) * BOSS_WAVE_INTERVAL),
+    )
   })
 
-  it('repeats after wave 45 with scaled part HP', () => {
-    const { spec, lap } = bossForWave(50)
+  it('repeats past the Founding with scaled part HP', () => {
+    const { spec, lap } = bossForWave(last + BOSS_WAVE_INTERVAL)
     expect(spec.id).toBe('beast-titan')
     expect(lap).toBe(1)
-    const first = fightFor('beast-titan', 5)
-    const second = createBossFight(1, spec, 50, 'test-seed', 0, 0, lap)
+    const first = fightFor('beast-titan')
+    const second = createBossFight(1, spec, last + BOSS_WAVE_INTERVAL, 'test-seed', 0, 0, lap)
     expect(second.state.parts[0]!.maxHp).toBeGreaterThan(first.state.parts[0]!.maxHp)
   })
 
@@ -72,17 +79,18 @@ describe('the ladder', () => {
       spec: BOSS_LADDER[0],
       lap: 1,
     })
-    expect(bossForMilestone(3, 'waves')).toBeNull()
-    expect(bossForMilestone(5, 'waves')!.spec.id).toBe('beast-titan')
+    expect(bossForMilestone(BOSS_WAVE_INTERVAL - 1, 'waves')).toBeNull()
+    expect(bossForMilestone(BOSS_WAVE_INTERVAL, 'waves')!.spec.id).toBe('beast-titan')
   })
 
-  it('only fires every 5th wave, and only in the waves mode', () => {
-    expect(isBossWave(5, 'waves')).toBe(true)
-    expect(isBossWave(10, 'waves')).toBe(true)
+  it('fires every third wave (2026-07-14: was every fifth), and only in the waves mode', () => {
+    expect(BOSS_WAVE_INTERVAL).toBe(3)
+    expect(isBossWave(3, 'waves')).toBe(true)
+    expect(isBossWave(6, 'waves')).toBe(true)
     expect(isBossWave(4, 'waves')).toBe(false)
-    expect(isBossWave(5, 'matchday')).toBe(false)
-    expect(isBossWave(5, 'hunt')).toBe(false)
-    expect(BOSS_WAVE_INTERVAL).toBe(5)
+    expect(isBossWave(5, 'waves')).toBe(false) // the old cadence is genuinely gone
+    expect(isBossWave(3, 'matchday')).toBe(false)
+    expect(isBossWave(3, 'hunt')).toBe(false)
   })
 })
 

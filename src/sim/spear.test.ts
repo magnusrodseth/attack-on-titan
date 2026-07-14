@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
-import { BOSS_LADDER, bossPartCenter, createBossFight } from './boss'
+import { BOSS_LADDER, bossDebutWave, bossPartCenter, createBossFight } from './boss'
 import { emptyArena } from './city'
 import { buildNavGrid } from './nav'
 import { createPlayer } from './player'
@@ -255,7 +255,7 @@ describe('spear pickups', () => {
 describe('blasting a shifter', () => {
   function bossBlastSetup(specId = 'beast-titan') {
     const spec = BOSS_LADDER.find((s) => s.id === specId)!
-    const fight = createBossFight(9, spec, spec.wave, 'spear-test', 0, 0)
+    const fight = createBossFight(9, spec, bossDebutWave(spec), 'spear-test', 0, 0)
     fight.titan.facing = 0
     return fight
   }

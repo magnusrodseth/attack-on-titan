@@ -7,7 +7,7 @@ Glossary: Shifter, Weak Point, Plated, Staggered (extended) in CONTEXT.md.
 
 ## Decisions (all user-confirmed, 2026-07-13)
 
-- **Placement**: every 5th wave of Wave Survival is a Shifter wave — solo only for v1
+- **Placement**: every BOSS_WAVE_INTERVAL waves of Wave Survival is a Shifter wave (5 at the time of this ticket; 3 since 2026-07-14) — solo only for v1
   (co-op matches get a normal wave instead, like Focus's solo-only precedent). Matchday and
   The Culling keep their identities; the system sits behind its own mode-agnostic seam.
   On collision with a Matchday wave (15, 30, 45) the Shifter outranks the footballer duo.
@@ -74,7 +74,7 @@ and the vault Blender loop note).
 
 - **The Nine** (`bossrush` in GAME_MODES): nothing but the Shifter ladder, one boss per
   wave with upgrades between, lapping HP-scaled past the Founding. boss.ts grew the
-  mode-aware `bossSlot`/`bossForMilestone` (Wave Survival = every 5th wave, The Nine =
+  mode-aware `bossSlot`/`bossForMilestone` (Wave Survival = every BOSS_WAVE_INTERVAL waves, The Nine =
   every wave); `createBossFight` takes its lap explicitly. Solo like all boss content.
 - **Cardinal resupply stations**: `Arena.stations` (plaza first, then one per cardinal on
   open street, ~0.62 wallRadius). Placement is a deterministic post-pass in citygen that

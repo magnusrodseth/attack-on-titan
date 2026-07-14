@@ -1,4 +1,4 @@
-import { BOSS_LADDER } from './boss'
+import { BOSS_LADDER, BOSS_WAVE_INTERVAL } from './boss'
 import { GAME_MAPS } from './maps'
 import { GAME_MODES } from './modes'
 import { hashSeed } from './rng'
@@ -21,17 +21,35 @@ import { UPGRADE_POOL } from './upgrades'
  *
  * It is derived, not hand-bumped: add a mode, a map, a kind, a Shifter or an upgrade and
  * the hash moves by itself. Nobody has to remember.
+ *
+ * It is not *only* a list of ids, either. Content is also the handful of numbers that decide
+ * which world you are standing in — BOSS_WAVE_INTERVAL is the first of them (2026-07-14, when
+ * it went 5 → 3). Everything above says what *exists*; a cadence says *when*, and a client that
+ * thinks wave 3 is a Shifter wave while the server still thinks wave 5 is will announce a boss
+ * nobody spawned. Same silent class of skew, same refusal. Tuning that changes the shape of a
+ * shared run belongs in this hash; tuning that only changes how a soldier feels (gas, drag,
+ * slash cooldown) does not — the server never disagreed with you about those.
  */
-export const CONTENT_HASH: string = computeContentHash()
+export const CONTENT_HASH: string = hashFacts(contentFacts())
 
-function computeContentHash(): string {
-  const ids = [
+/**
+ * Every fact about the world both sides must agree on, flat. `bossEvery` is a parameter for
+ * exactly one reason: a test can vary it and prove the hash actually moves. The old guard here
+ * asserted CONTENT_HASH === CONTENT_HASH, which is true of any constant and proves nothing —
+ * the same placebo shape that let three dead upgrades ship green (see upgrades.test.ts).
+ */
+export function contentFacts(bossEvery: number = BOSS_WAVE_INTERVAL): string[] {
+  return [
     ...GAME_MODES.map((m) => `mode:${m.id}`),
     ...GAME_MAPS.map((m) => `map:${m.id}`),
     ...Object.keys(KIND_STATS).map((k) => `kind:${k}`),
     ...BOSS_LADDER.map((b) => `boss:${b.id}`),
     ...UPGRADE_POOL.map((u) => `upgrade:${u.id}`),
+    `bossEvery:${bossEvery}`,
   ]
+}
+
+export function hashFacts(facts: string[]): string {
   // sorted so a reordered registry is the same content: only what exists matters
-  return hashSeed(ids.sort().join('|')).toString(36)
+  return hashSeed([...facts].sort().join('|')).toString(36)
 }
