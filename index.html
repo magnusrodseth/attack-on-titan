@@ -414,7 +414,8 @@
       }
 
       /* upgrade cards: field-modification plaques, same plate construction */
-      #upgrade-cards, #mode-cards { display: flex; gap: 20px; }
+      /* wrap so a row of cards never runs off a narrow window; the row shrinks to fit the overlay */
+      #upgrade-cards, #mode-cards, #map-cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
       .mode-card { width: 300px; }
       .card.selected {
         filter:
