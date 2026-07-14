@@ -1,6 +1,6 @@
 import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeometry, Vector3, WebGLRenderer } from 'three'
 import { initAnalytics, track } from './analytics'
-import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
+import { AudioSystem, FLINCHES, GRUNTS, ROARS, SCREAMS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
 import type { SettingsValues, ThreatPing, TrialSection } from './hud'
 import { formatRaceTime, Hud } from './hud'
@@ -18,6 +18,7 @@ import { SoldierPool } from './render/soldiers'
 import { SpearsView } from './render/spears'
 import { TitanPool } from './render/titanPool'
 import { BossFxView } from './render/bosses'
+import { CivilianPool } from './render/civilians'
 import { bossForMilestone, bossPartCenter } from './sim/boss'
 import { nearestStationDist, raycastHookTarget } from './sim/city'
 import { DEFAULT_BLAST_RADIUS, SIM_DT } from './sim/constants'
@@ -133,6 +134,7 @@ const minimap = new Minimap(game.arena)
 const spearsView = new SpearsView(scene)
 const gatesView = new GatesView(scene)
 const bossFx = new BossFxView(scene)
+const civilians = new CivilianPool(scene)
 hud.setRaceUi(game.mode.id === 'race')
 hud.setHuntUi(game.mode.id === 'hunt')
 let roarTimer = 3
@@ -976,6 +978,19 @@ function handleCoopEvents(events: CoopEvent[]): void {
       case 'spearCachesRestocked':
         handleEvents([event])
         break
+      // the crowd is the squad's problem, not one soldier's: the same scream, the same window,
+      // the same silence when it closes. These route through the solo handlers untouched.
+      case 'civilianSeized':
+      case 'civilianDevoured':
+      case 'civilianDelivered':
+      case 'districtEmpty':
+      case 'stationBare':
+        handleEvents([event])
+        break
+      case 'civilianSaved':
+        if (event.playerId === me) handleEvents([event])
+        else hud.addFeedLine(`<b>${event.playerId}</b> snatched one from the jaws`)
+        break
       // the fist: mine is a QTE, a teammate's is a line in the feed
       case 'grabbed':
       case 'grabEscaped':
@@ -1263,6 +1278,42 @@ function handleEvents(events: GameEvent[]): void {
       case 'resupply':
         hud.showBanner('Resupplied', 900)
         audio.refill()
+        break
+      case 'civilianSeized': {
+        // the scream: positional, and the only reason you will ever know this is happening.
+        // It stops when the window does — because you got there, or because you didn't.
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        if (titan) {
+          audio.playAt(SCREAMS, titan.pos.distanceTo(game.player.pos), { volume: 1.5 })
+        }
+        break
+      }
+      case 'civilianSaved':
+        // no points, ever (the whole design turns on refusing to pay for this). Just the
+        // scream stopping, and the fact of it.
+        hud.popText('Snatched From the Jaws')
+        audio.pickupChime()
+        break
+      case 'civilianDevoured': {
+        const titan = game.titans.find((t) => t.id === event.titanId)
+        const dist = titan ? titan.pos.distanceTo(game.player.pos) : 80
+        if (audio.has('devoured')) audio.playAt('devoured', dist, { volume: 1.1 })
+        else audio.playAt('death-groan', dist, { volume: 0.7, rate: 0.7 })
+        effects.addShake(0.05)
+        break
+      }
+      case 'civilianDelivered':
+        audio.click() // someone made it home, and the rack is one deeper for it
+        break
+      case 'districtEmpty':
+        hud.showBanner('The Streets Are Empty', 3200)
+        break
+      case 'stationBare':
+        hud.showBanner(
+          event.kind === 'blades' ? 'No Blades Left Here' : 'No Spears Left Here',
+          2000,
+        )
+        audio.click()
         break
       case 'gasLow':
         hud.showBanner('Gas Running Low · Make for a Station', 2400)
@@ -1716,6 +1767,7 @@ renderer.setAnimationLoop(() => {
   hud.setStrikePrompt(lockedTitan !== undefined)
 
   titanPool.sync(game.titans, dt)
+  civilians.sync(game.folk, dt)
   bossFx.sync(game, dt)
   spearsView.sync(game.spears, game.pickups, dt)
   gatesView.sync(game, now * 0.001)
@@ -1770,9 +1822,23 @@ renderer.setAnimationLoop(() => {
     game.phase === 'playing' &&
     raycastHookTarget(game.arena, game.player.pos, lookDir, game.player.config.hookRange) !== null
   const nearStation = nearestStationDist(game.arena, game.player.pos.x, game.player.pos.z) <= 10
+  // which station, and what it has left: the prompt says so before you commit to the flight in
+  let stationStock: { blades: number; spears: number } | null = null
+  if (nearStation) {
+    let best = -1
+    let bestDist = Infinity
+    for (const [i, station] of game.arena.stations.entries()) {
+      const d = Math.hypot(station.x - game.player.pos.x, station.z - game.player.pos.z)
+      if (d < bestDist) {
+        best = i
+        bestDist = d
+      }
+    }
+    stationStock = best >= 0 ? (game.stations[best] ?? null) : null
+  }
   const lamp =
     lampOn(light) && game.phase !== 'menu' ? Math.min(1, game.player.lamp / LAMP_BATTERY_SECONDS) : null
-  hud.update(game, { speed, nearStation, hookInRange, lamp })
+  hud.update(game, { speed, nearStation, stationStock, hookInRange, lamp })
 
   if (game.mode.id === 'hunt') {
     audio.setHeartbeat(game.hunt !== null && hud.updateHunt(game))

@@ -8,6 +8,7 @@ import {
   createSnapshotBuffer,
   pushSnapshot,
   syncBossMirror,
+  syncCivilianMirror,
   syncSoldierMirror,
   syncSpearMirror,
   syncTitanMirror,
@@ -155,6 +156,7 @@ export class CoopSession {
     if (this.phase !== 'match') return
     syncTitanMirror(g, this.buf, now, frameDt)
     syncBossMirror(g, this.buf) // after the titans: the fight hangs off its titan
+    syncCivilianMirror(g, this.buf)
     syncSoldierMirror(this.soldiers, this.buf, this.me, now)
     syncSpearMirror(g, this.buf, now)
     if (this.playing) applySelfSnapshot(g, this.buf, this.me)

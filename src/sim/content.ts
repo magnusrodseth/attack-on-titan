@@ -37,11 +37,16 @@ export const CONTENT_HASH: string = hashFacts(contentFacts())
  * exactly one reason: a test can vary it and prove the hash actually moves. The old guard here
  * asserted CONTENT_HASH === CONTENT_HASH, which is true of any constant and proves nothing —
  * the same placebo shape that let three dead upgrades ship green (see upgrades.test.ts).
+ *
+ * The facts are not only ids. A mode that grew a CROWD, or a map whose POPULATION changed, is a
+ * different game even though every id in the registry is unchanged — and a client that thinks
+ * the streets are empty while the server is feeding titans on them is exactly the divergence
+ * this hash exists to refuse.
  */
 export function contentFacts(bossEvery: number = BOSS_WAVE_INTERVAL): string[] {
   return [
-    ...GAME_MODES.map((m) => `mode:${m.id}`),
-    ...GAME_MAPS.map((m) => `map:${m.id}`),
+    ...GAME_MODES.map((m) => `mode:${m.id}:crowd=${m.crowd}`),
+    ...GAME_MAPS.map((m) => `map:${m.id}:pop=${m.population}`),
     ...Object.keys(KIND_STATS).map((k) => `kind:${k}`),
     ...BOSS_LADDER.map((b) => `boss:${b.id}`),
     ...UPGRADE_POOL.map((u) => `upgrade:${u.id}`),

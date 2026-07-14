@@ -20,6 +20,8 @@ function el<T extends HTMLElement>(id: string): T {
 export interface HudFrame {
   speed: number
   nearStation: boolean
+  /** What the station under the soldier still has, or null when there is none in reach. */
+  stationStock: { blades: number; spears: number } | null
   hookInRange: boolean
   /** Flashlight battery 0..1 while the night lamp window is open; null hides the gauge by day. */
   lamp: number | null
@@ -150,6 +152,7 @@ export class Hud {
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
   private bladeThreshold = el('blade-threshold')
+  private folkCount = el('folk-count')
   private spearBar = el('spear-bar')
   private spearFill = el('spear-fill')
   private spearCount = el('spear-count')
@@ -571,6 +574,20 @@ export class Hud {
       : `BEST ${game.best.bestScore} · WAVE ${game.best.bestWave}`
     this.best.classList.toggle('record', record)
 
+    // the district's people: the run's other score, and the only one that can only go down.
+    // Deliberately quiet — we refuse to pay points for rescues, so this is a fact, not a prize.
+    if (game.folk.length === 0) {
+      this.folkCount.classList.add('hidden')
+    } else {
+      this.folkCount.classList.remove('hidden')
+      const living = game.folk.filter((c) => c.state !== 'dead' && c.state !== 'safe').length
+      const lost = game.folkStats.lost
+      this.folkCount.innerHTML =
+        lost > 0
+          ? `CIVILIANS ${living} <span class="lost">· ${lost} LOST</span>`
+          : `CIVILIANS ${living}`
+    }
+
     const gasRatio = p.gas / p.config.maxGas
     this.gasFill.style.width = `${(gasRatio * 100).toFixed(1)}%`
     this.gasCanisters.textContent = `×${p.canisters}`
@@ -641,17 +658,24 @@ export class Hud {
         // the bar moves with the edge on the blade in hand, so the "fast enough to kill"
         // highlight has to move with it (dull blades, tf-002)
         frame.speed >= oneCutSpeed(p) ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
-      // a Field Kit is a station you carry, so it has to prompt like one — otherwise the pick
-      // works and the player never finds out, which is the same as it not working
+      // Two ways to resupply, and both have to say what they will actually give you:
+      //  - a station spends its own stock, so it prints what is left on the rack (a bare one is
+      //    a wasted flight, and you should learn that on the way in, not on arrival);
+      //  - a Field Kit is a station you carry, and it carries its own steel — which is the
+      //    answer to a district you have let empty.
       const kits = p.kits
-      this.prompt.textContent =
-        game.phase !== 'playing'
-          ? ''
-          : frame.nearStation
-            ? 'R — RESUPPLY'
-            : kits > 0
-              ? `R — FIELD KIT (${kits})`
-              : ''
+      if (game.phase !== 'playing') {
+        this.prompt.textContent = ''
+      } else if (frame.nearStation) {
+        const stock = frame.stationStock
+        this.prompt.innerHTML = stock
+          ? `R — RESUPPLY <span class="stock">BLADES ${stock.blades} · SPEARS ${stock.spears}</span>`
+          : 'R — RESUPPLY'
+      } else if (kits > 0) {
+        this.prompt.textContent = `R — FIELD KIT (${kits})`
+      } else {
+        this.prompt.textContent = ''
+      }
     }
   }
 
@@ -1251,11 +1275,20 @@ export class Hud {
         .join('<br />')
     } else {
       title.textContent = 'Devoured'
+      // the civilian line goes LAST and it is not a score: "Civilians lost: 61" is a fact
+      // about the city you failed to hold, and it should be the last thing you read.
+      const toll =
+        game.folk.length > 0
+          ? `<span class="toll">CIVILIANS SAVED <b>${game.folkStats.saved}</b> · LOST <b>${game.folkStats.lost}</b></span>`
+          : ''
       this.deathStats.innerHTML = [
         `SCORE <b>${game.score.score}</b>`,
         `WAVE <b>${game.wave}</b> · KILLS <b>${game.score.kills}</b> · BEST CHAIN <b>${game.score.bestChain}</b>`,
         `ALL-TIME BEST <b>${game.best.bestScore}</b> · WAVE <b>${game.best.bestWave}</b>`,
-      ].join('<br />')
+        toll,
+      ]
+        .filter(Boolean)
+        .join('<br />')
     }
     if (abandoned) title.textContent = 'Run Abandoned' // the stats still tell the story
     this.death.classList.remove('hidden')

@@ -71,6 +71,30 @@ export const FEATURES: { id: string; name: string; coop: CoopStance }[] = [
     },
   },
   {
+    id: 'townsfolk',
+    name: 'The people in the streets',
+    coop: {
+      kind: 'shared',
+      note: 'Civilians, their fists and their windows ride the snapshot, so a squad watches the same scream stop at the same instant. A squad is BETTER at this, not merely compatible with it: you cannot be everywhere, and now there are four of you deciding where to be. Rescue credit goes to whoever broke the grip; a restocked station belongs to the whole squad.',
+    },
+  },
+  {
+    id: 'station-stock',
+    name: 'Station stock (blades and spears)',
+    coop: {
+      kind: 'shared',
+      note: 'One rack, four soldiers: a squad drains a station four times as fast and has to keep four times as many people alive to fill it.',
+    },
+  },
+  {
+    id: 'dull-blades',
+    name: 'Blades that dull',
+    coop: {
+      kind: 'shared',
+      note: 'Blade edge is per-soldier state the world already owns and the snapshot already carries.',
+    },
+  },
+  {
     id: 'save',
     name: 'Run save / resume',
     coop: {

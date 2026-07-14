@@ -94,6 +94,27 @@ export class Minimap {
     ctx.clearRect(0, 0, SIZE, SIZE)
     ctx.drawImage(this.background, 0, 0)
 
+    // the crowd: small white dots for the living, and a red pulse for anyone in a fist. That
+    // pulse is the only thing on this map with a clock attached to it, so it has to be the
+    // thing your eye goes to.
+    for (const c of game.folk) {
+      if (c.state === 'safe' || c.state === 'dead') continue
+      const x = CENTER + c.pos.x * this.scale
+      const y = CENTER + c.pos.z * this.scale
+      if (c.state === 'held') {
+        const pulse = 0.55 + 0.45 * Math.sin(performance.now() * 0.012)
+        ctx.fillStyle = `rgba(232, 64, 47, ${pulse.toFixed(2)})`
+        ctx.beginPath()
+        ctx.arc(x, y, 3.4, 0, Math.PI * 2)
+        ctx.fill()
+      } else {
+        ctx.fillStyle = c.state === 'flee' ? 'rgba(255, 240, 220, 0.95)' : 'rgba(220, 214, 200, 0.6)'
+        ctx.beginPath()
+        ctx.arc(x, y, 1.4, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
     // spear caches: amber diamonds so they read apart from the round titan blips
     for (const pickup of game.pickups) {
       if (pickup.taken) continue

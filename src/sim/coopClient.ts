@@ -3,6 +3,8 @@ import { DEFAULT_BLAST_RADIUS } from './constants'
 import type { BossState } from './boss'
 import { BOSS_LADDER } from './boss'
 import { nearestStationDist } from './city'
+import type { Civilian } from './folk'
+import { createCivilian } from './folk'
 import { grabHoldPoint } from './grab'
 import type { CoopSnapshot, HookAnchor } from './coop'
 import type { GameState } from './game'
@@ -338,6 +340,30 @@ export function applySelfSnapshot(g: GameState, buf: SnapshotBuffer, me: string)
   } else {
     g.grab = null
   }
+}
+
+/**
+ * Mirrors the district's people. The client never simulates them — it draws the server's —
+ * but everything downstream (CivilianPool, the minimap pulse, the scream) is the same code
+ * the solo driver feeds, so a co-op street and a solo street are the same street.
+ */
+export function syncCivilianMirror(g: GameState, buf: SnapshotBuffer): void {
+  const b = buf.b
+  if (!b) return
+  const live = new Map(g.folk.map((c) => [c.id, c]))
+  const next: Civilian[] = []
+  for (const snap of b.folk) {
+    let c = live.get(snap.id)
+    if (!c) c = createCivilian(snap.id, snap.x, snap.z)
+    c.pos.set(snap.x, snap.y, snap.z)
+    c.facing = snap.facing
+    c.state = snap.state as Civilian['state']
+    c.heldBy = snap.heldBy
+    next.push(c)
+  }
+  g.folk = next
+  g.stations = b.stations.map((st) => ({ ...st }))
+  g.folkStats = { ...b.folkStats }
 }
 
 /**

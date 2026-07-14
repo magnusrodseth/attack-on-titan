@@ -2,11 +2,19 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { BOSS_LADDER, BOSS_WAVE_INTERVAL, bossLadderFor, bossPartCenter, partHpScale, rosterHpScale } from './boss'
 import { maxTitanHeightAt } from './city'
-import { applySelfSnapshot, createSnapshotBuffer, pushSnapshot, syncBossMirror } from './coopClient'
+import {
+  applySelfSnapshot,
+  createSnapshotBuffer,
+  pushSnapshot,
+  syncBossMirror,
+  syncCivilianMirror,
+} from './coopClient'
+import { seize } from './folk'
 import {
   coopFire,
   coopMash,
   coopPickUpgrade,
+  coopResupply,
   coopSlash,
   coopSnapshot,
   coopStep,
@@ -274,6 +282,76 @@ describe('the wire carries everything the fight needs', () => {
 
     // an added or removed registry entry moves it too, which is the whole point
     expect(hashFacts([...contentFacts(), 'boss:some-new-shifter'])).not.toBe(CONTENT_HASH)
+  })
+})
+
+describe('the crowd is shared, and has to prove it with a squad', () => {
+  it('a co-op district is populated, and the same seed puts the same people in it', () => {
+    const a = createCoopWorld('crowd', COOP_ROSTER, 'city', 'district', 'waves')
+    const b = createCoopWorld('crowd', COOP_ROSTER, 'city', 'district', 'waves')
+    expect(a.folk.length).toBe(getMap('district').population)
+    expect(a.folk.map((c) => [Math.round(c.pos.x), Math.round(c.pos.z)])).toEqual(
+      b.folk.map((c) => [Math.round(c.pos.x), Math.round(c.pos.z)]),
+    )
+  })
+
+  it('titans without a chase token hunt the crowd, with four soldiers exactly as with one', () => {
+    const w = createCoopWorld('crowd-hunt', COOP_ROSTER, 'city', 'district', 'waves')
+    run(w, 6)
+    // somebody, somewhere, is being hunted: that is the whole feature
+    expect(w.titans.some((t) => t.prey !== null)).toBe(true)
+  })
+
+  it('the fist, the window and the rescue all cross the wire', () => {
+    const w = createCoopWorld('crowd-wire', ['levi'], 'city', 'district', 'waves')
+    const titan = w.titans[0]!
+    const c = w.folk[0]!
+    // stage a meal: the sim seizes on the titan's own swat, so put it on top of them
+    seize(c, titan)
+    const snap = coopSnapshot(w)
+    const held = snap.folk.find((f) => f.id === c.id)
+    expect(held).toBeDefined()
+    expect(held!.state).toBe('held')
+    expect(held!.heldBy).toBe(titan.id)
+    expect(snap.stations.length).toBe(w.arena.stations.length)
+
+    // and a client draws exactly what the server holds
+    const g = createGame('crowd-wire', null, 'waves', 'district')
+    startGame(g)
+    const buf = createSnapshotBuffer()
+    pushSnapshot(buf, snap, 0)
+    syncCivilianMirror(g, buf)
+    const mirrored = g.folk.find((f) => f.id === c.id)
+    expect(mirrored?.state).toBe('held')
+    expect(mirrored?.heldBy).toBe(titan.id)
+
+    // the grip breaks, the squad hears it stop, and the save is on the wire
+    w.lastHitBy.set(titan.id, 'levi')
+    titan.hp = 0
+    const events = coopStep(w, SIM_DT)
+    const saved = events.find((e) => e.type === 'civilianSaved')
+    expect(saved).toBeDefined()
+    if (saved && saved.type === 'civilianSaved') expect(saved.playerId).toBe('levi')
+  })
+
+  it('a squad drains a station and the district refills it', () => {
+    const w = createCoopWorld('crowd-stock', COOP_ROSTER, 'city', 'district', 'waves')
+    const before = w.stations[0]!.blades
+    const s = w.soldiers[0]!
+    const station = w.arena.stations[0]!
+    s.body.pos.set(station.x, 1.7, station.z)
+    s.body.blades = 1
+    coopResupply(w, s.id)
+    expect(w.stations[0]!.blades).toBe(before - 1)
+    expect(s.body.blades).toBe(s.body.config.bladePairs)
+  })
+
+  it('the modes that say they have no crowd have no crowd, in co-op too', () => {
+    for (const mode of coopModes()) {
+      const w = createCoopWorld(`crowd-${mode.id}`, ['levi'], 'city', 'district', mode.id)
+      if (mode.crowd) expect(w.folk.length).toBeGreaterThan(0)
+      else expect(w.folk).toHaveLength(0)
+    }
   })
 })
 

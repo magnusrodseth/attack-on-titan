@@ -8,8 +8,10 @@ import type { CoopEvent, CoopSnapshot, HookAnchor, MatchResults } from '../sim/c
  */
 
 /**
- * Bumped to 2 for the unified world (ADR 0003): the lobby now carries the map and the mode,
- * matchStart names the world it starts, and a mash intent exists because the grab QTE does.
+ * 2: the unified world (ADR 0003) — the lobby carries the map and the mode, matchStart names
+ * the world it starts, and a mash intent exists because the grab QTE does.
+ * 3: the townsfolk — the snapshot carries the district's people, its station stock and its
+ * headcount, because a squad has to watch the same window close at the same instant.
  */
 export const PROTOCOL_VERSION = 3
 

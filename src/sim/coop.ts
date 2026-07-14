@@ -334,6 +334,24 @@ export interface CoopSnapshot {
     titanId: number | null
   }[]
   pickups: { id: number; x: number; z: number; taken: boolean }[]
+  /**
+   * The district's people. A held civilian is the one entry that carries a clock, so it also
+   * carries who is holding them: the client draws the fist, the minimap pulses, the scream
+   * plays, and every soldier in the squad sees the same window closing at the same instant.
+   */
+  folk: {
+    id: number
+    x: number
+    y: number
+    z: number
+    facing: number
+    state: string
+    heldBy: number | null
+  }[]
+  /** What each station has left to give; a squad drains a rack four times as fast. */
+  stations: { blades: number; spears: number }[]
+  /** The run's second scoreboard, shared by the whole squad. */
+  folkStats: { saved: number; lost: number; delivered: number }
   results: MatchResults | null
 }
 
@@ -424,6 +442,21 @@ export function coopSnapshot(w: CoopWorld): CoopSnapshot {
       titanId: s.titanId,
     })),
     pickups: w.pickups.map((p) => ({ id: p.id, x: r2(p.x), z: r2(p.z), taken: p.taken })),
+    // the dead stay on the wire: an emptying district is something the whole squad watches
+    // happen, and a body in the street is the most honest scoreboard this game has
+    folk: w.folk
+      .filter((c) => c.state !== 'safe')
+      .map((c) => ({
+        id: c.id,
+        x: r2(c.pos.x),
+        y: r2(c.pos.y),
+        z: r2(c.pos.z),
+        facing: r2(c.facing),
+        state: c.state,
+        heldBy: c.heldBy,
+      })),
+    stations: w.stations.map((st) => ({ ...st })),
+    folkStats: { ...w.folkStats },
     results: w.results,
   }
 }
