@@ -121,10 +121,6 @@ is synthesized at runtime with WebAudio.
 - Blade-jam click: [Gun reload, lock or click sound](https://opengameart.org/content/gun-reload-lock-or-click-sound) (OpenGameArt)
 - Empty-gas hiss: [Steam release sounds](https://opengameart.org/content/steam-release-sounds) (OpenGameArt)
 - Aberrant-kill boom: [Various sound effects](https://opengameart.org/content/various-sound-effects-0) (OpenGameArt)
-- Civilian scream (adult man): ["A single scream of a young male"](https://freesound.org/people/akridiy/sounds/759458/) by akridiy (Freesound, CC0)
-- Civilian scream (adult woman): ["Girl Screaming_01"](https://freesound.org/people/tomattka/sounds/400183/) by tomattka (Freesound, CC0)
-- Civilian scream (child): ["Little girl screaming"](https://freesound.org/people/piermic/sounds/397686/) by piermic (Freesound, CC0)
-- Devoured (the cry cut short): ["Panic-stricken screaming #2"](https://freesound.org/people/Klangkobold/sounds/547964/) by Klangkobold (Freesound, CC0) — trimmed to its onset and hard-cut, so the scream stops rather than fades
 
 Fonts: [Cloister Black](https://www.dafont.com/cloister-black.font) by Dieter Steffmann (free) for
 titles; [Cinzel](https://fonts.google.com/specimen/Cinzel) and

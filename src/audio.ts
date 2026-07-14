@@ -26,12 +26,6 @@ const SAMPLE_NAMES = [
   'empty-click',
   'gas-empty',
   'aberrant-slain',
-  // the crowd: the scream is the telegraph the whole devour window rests on, and the last cry
-  // is the sound of a window closing without you (a missing sample just stays silent)
-  'scream-1',
-  'scream-2',
-  'scream-child',
-  'devoured',
 ] as const
 
 export type SampleName = (typeof SAMPLE_NAMES)[number]
@@ -40,7 +34,6 @@ export const ROARS: SampleName[] = ['roar-1', 'roar-2', 'roar-3', 'roar-4', 'roa
 export const SLASHES: SampleName[] = ['slash-1', 'slash-2', 'slash-3']
 export const GRUNTS: SampleName[] = ['grunt-1', 'grunt-2']
 export const FLINCHES: SampleName[] = ['flinch-1', 'flinch-2']
-export const SCREAMS: SampleName[] = ['scream-1', 'scream-2', 'scream-child']
 
 interface PlayOpts {
   volume?: number

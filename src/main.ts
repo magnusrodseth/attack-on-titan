@@ -1,6 +1,6 @@
 import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeometry, Vector3, WebGLRenderer } from 'three'
 import { initAnalytics, track } from './analytics'
-import { AudioSystem, FLINCHES, GRUNTS, ROARS, SCREAMS, SLASHES } from './audio'
+import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
 import type { SettingsValues, ThreatPing, TrialSection } from './hud'
 import { formatRaceTime, Hud } from './hud'
@@ -1279,29 +1279,23 @@ function handleEvents(events: GameEvent[]): void {
         hud.showBanner('Resupplied', 900)
         audio.refill()
         break
-      case 'civilianSeized': {
-        // the scream: positional, and the only reason you will ever know this is happening.
-        // It stops when the window does — because you got there, or because you didn't.
-        const titan = game.titans.find((t) => t.id === event.titanId)
-        if (titan) {
-          audio.playAt(SCREAMS, titan.pos.distanceTo(game.player.pos), { volume: 1.5 })
-        }
+      case 'civilianSeized':
+        // Deliberately silent (user call, 2026-07-14: the screaming was too much). The window
+        // still announces itself, but with the eye rather than the ear: the red pulse on the
+        // minimap, and a titan that has stopped dead in the street with its nape out. A titan
+        // standing perfectly still in a wave that is otherwise moving is its own kind of loud.
         break
-      }
       case 'civilianSaved':
         // no points, ever (the whole design turns on refusing to pay for this). Just the
         // scream stopping, and the fact of it.
         hud.popText('Snatched From the Jaws')
         audio.pickupChime()
         break
-      case 'civilianDevoured': {
-        const titan = game.titans.find((t) => t.id === event.titanId)
-        const dist = titan ? titan.pos.distanceTo(game.player.pos) : 80
-        if (audio.has('devoured')) audio.playAt('devoured', dist, { volume: 1.1 })
-        else audio.playAt('death-groan', dist, { volume: 0.7, rate: 0.7 })
-        effects.addShake(0.05)
+      case 'civilianDevoured':
+        // no cry, no gore: just the small, ugly fact of it. A soft synth thud, and the body
+        // stays in the street for the rest of the run, which says it better than a sample could.
+        audio.thud(0.25)
         break
-      }
       case 'civilianDelivered':
         audio.click() // someone made it home, and the rack is one deeper for it
         break
