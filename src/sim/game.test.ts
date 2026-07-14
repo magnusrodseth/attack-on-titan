@@ -12,8 +12,9 @@ import {
   GRAB_HP_COST,
   GRAB_LINGER_SECONDS,
 } from './grab'
+import { nearestStationDist } from './city'
 import { isWalkable } from './nav'
-import { SOLO_ID } from './world'
+import { RESUPPLY_RADIUS, SOLO_ID } from './world'
 import { neutralInput } from './player'
 import type { SpearState } from './spear'
 import { anklePos, createTitan, napeCenter } from './titan'
@@ -403,14 +404,32 @@ describe('resupply', () => {
     expect(game.player.gas).toBeLessThan(game.player.config.maxGas)
   })
 
-  it('restores full health at the station', () => {
+  it('does NOT restore health at the station: hearts are earned, not collected', () => {
     const game = playingGame()
     game.player.hp = 1
     game.player.pos.set(2, 1.7, 2)
     const input = neutralInput()
     input.resupply = true
     stepGame(game, input, DT)
-    expect(game.player.hp).toBe(game.player.config.maxHp)
+    expect(game.player.hp).toBe(1) // a clean cut or a cleared wave buys the heart back, not the rack
+    expect(game.player.gas).toBe(game.player.config.maxGas) // the rest of the kit still comes free
+  })
+
+  it('a Field Kit DOES restore health: it is the panic button the rack refuses to be', () => {
+    const game = playingGame()
+    const p = game.player
+    p.hp = 1
+    p.kits = 1
+    // out in the district, nowhere near a rack: this is the kit's whole reason to exist
+    p.pos.set(game.arena.wallRadius * 0.35, 2, game.arena.wallRadius * 0.35)
+    expect(nearestStationDist(game.arena, p.pos.x, p.pos.z)).toBeGreaterThan(RESUPPLY_RADIUS)
+
+    const input = neutralInput()
+    input.resupply = true
+    stepGame(game, input, DT)
+
+    expect(p.hp).toBe(p.config.maxHp)
+    expect(p.kits).toBe(0) // and it is spent, which is what buys it the right to heal
   })
 
   it('recharges the flashlight battery at the station', () => {

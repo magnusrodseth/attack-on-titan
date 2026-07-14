@@ -165,8 +165,9 @@ export interface World {
   folkQuiet: boolean
   /**
    * What each station has left to give, parallel to `arena.stations`. Blades and spears run
-   * out; gas, hearts and the lamp never do (free swinging is sacred to the feel, and the
-   * kill-refund economy already covers hearts). Survivors carry the stock in.
+   * out; gas and the lamp never do (free swinging is sacred to the feel). Hearts are not on
+   * the rack at all — a clean cut and a cleared wave are the only things that pay them back,
+   * and a Field Kit is the only thing you can carry that does. Survivors carry the stock in.
    */
   stations: { blades: number; spears: number }[]
   /** Who last wounded each titan: the soldier a rescue is credited to when its grip breaks. */
@@ -1048,14 +1049,23 @@ function stationAt(w: World, s: Soldier, radius: number): number {
 }
 
 /**
- * A refill. Gas, hearts and the lamp are always free, wherever it comes from: free swinging is
- * sacred to the feel, and the kill-refund economy already pays for hearts.
+ * A refill. Gas and the lamp are always free, wherever it comes from: free swinging is sacred
+ * to the feel.
  *
- * **Blades and spears are not free.** They are the things the townsfolk carry in, so they are
- * the things that run out. Two ways to get them:
+ * **A station is not a heal** (user ruling, 2026-07-14). Hearts already come back from two places
+ * that ask something of you: a clean cut refunds one, and a cleared wave sends you into the next
+ * at full. A rack that also topped you up made both of those worthless, and turned every bad
+ * fight into a jog home.
  *
- *  - **A station** spends its own stock (folk.ts, tf-003). A bare rack gives you gas and hearts
- *    and nothing to cut with, which is exactly what dull blades made painful.
+ * **A Field Kit still is one**, and that is the whole difference between the two. The kit is the
+ * panic button — a finite, upgrade-bought charge that pulls you out of the fire once. The rack
+ * is infinite and free, so it may not sell what the kit sells, or the kit is worth nothing.
+ *
+ * **Blades and spears are not free either.** They are the things the townsfolk carry in, so they
+ * are the things that run out. Two ways to get them:
+ *
+ *  - **A station** spends its own stock (folk.ts, tf-003). A bare rack gives you gas and nothing
+ *    to cut with, which is exactly what dull blades made painful.
  *  - **A Field Kit** is a station you carry, and it carries its own steel — so a kit is what
  *    answers a district you have let empty. That is the point where the two systems meet: the
  *    fewer people you save, the more the run depends on what you brought with you.
@@ -1074,18 +1084,19 @@ export function worldResupply(w: World, s: Soldier): boolean {
   // which is a punishment, not a decision.
   const stock = atStation && w.mode.crowd ? w.stations[index] : undefined
 
-  // always free
+  // always free (hearts are not: at a rack they are earned in the air, never handed over)
   p.gas = p.config.maxGas
   p.canisters = p.config.gasCanisters
-  p.hp = p.config.maxHp
   p.lamp = LAMP_BATTERY_SECONDS
   s.warned.gas = false
 
   if (!atStation) {
-    // the kit brought its own: this is the walk you did not have to take
+    // the kit brought its own: this is the walk you did not have to take, and the heart the
+    // rack will not give you — it is spent, so it is allowed to save you
     p.blades = p.config.bladePairs
     p.bladeHp = p.config.bladeDurability
     p.spears = p.config.spearCapacity
+    p.hp = p.config.maxHp
     s.warned.blades = false
     w.events.push({ type: 'resupply', playerId: s.id, kit: true })
     return true

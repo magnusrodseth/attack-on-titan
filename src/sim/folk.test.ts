@@ -217,7 +217,7 @@ describe('the stations run out, and the people refill them', () => {
     expect(p.gas).toBe(p.config.maxGas) // gas is always free: free swinging is sacred
   })
 
-  it('a bare station still gives gas and hearts, but no steel', () => {
+  it('a bare station still gives gas and lamp, but no steel and never hearts', () => {
     const g = running()
     g.stations[0] = { blades: 0, spears: 0 }
     const p = g.player
@@ -233,7 +233,7 @@ describe('the stations run out, and the people refill them', () => {
     stepGame(g, input, DT)
 
     expect(p.gas).toBe(p.config.maxGas)
-    expect(p.hp).toBe(p.config.maxHp)
+    expect(p.hp).toBe(1) // a resupply is not a heal, bare or stocked
     expect(p.blades).toBe(1) // nothing to hand you: fight on what you have
     expect(p.bladeHp).toBe(1)
     expect(g.events.some((e) => e.type === 'stationBare')).toBe(true)
