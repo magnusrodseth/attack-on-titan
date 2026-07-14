@@ -57,6 +57,62 @@ function formatDelta(delta: number): string {
   return `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toFixed(2)}`
 }
 
+/**
+ * One arena's slice of the leaderboard's trial block: the same seed on a different map is
+ * an honestly different course, so it gets its own scope, its own fetch and its own state.
+ */
+export interface TrialSection {
+  mapName: string
+  /** The map-scoped seed these boards were fetched under. */
+  scope: string
+  /** True for the arena the soldier is standing in right now. */
+  current: boolean
+  boards: TrialBoards | null
+  state: 'loading' | 'ready' | 'error'
+}
+
+/** Three rows per board: enough to show the podium without burying the arena below. */
+const TRIAL_ROWS = 3
+
+function skeletonRows(): string {
+  return Array.from(
+    { length: TRIAL_ROWS },
+    () => '<div class="lb-row skeleton"><span class="sk-bar"></span><span class="sk-bar sk-short"></span></div>',
+  ).join('')
+}
+
+function raceRows(section: TrialSection, you: string | null): string {
+  if (!section.boards) {
+    return section.state === 'loading' ? skeletonRows() : '<div class="lb-empty">Headquarters is unreachable.</div>'
+  }
+  if (section.boards.race.length === 0) return '<div class="lb-empty">No times on this course yet. Set one.</div>'
+  return section.boards.race
+    .slice(0, TRIAL_ROWS)
+    .map(
+      (entry, i) =>
+        `<div class="lb-row${entry.username === you ? ' mine' : ''}">` +
+        `<span><b>${formatRaceTime(entry.timeS)}</b> · ${entry.username}</span>` +
+        `<span class="lb-sub">#${i + 1}</span></div>`,
+    )
+    .join('')
+}
+
+function huntRows(section: TrialSection, you: string | null): string {
+  if (!section.boards) {
+    return section.state === 'loading' ? skeletonRows() : '<div class="lb-empty"></div>'
+  }
+  if (section.boards.hunt.length === 0) return '<div class="lb-empty">No culls on this course yet.</div>'
+  return section.boards.hunt
+    .slice(0, TRIAL_ROWS)
+    .map(
+      (entry, i) =>
+        `<div class="lb-row${entry.username === you ? ' mine' : ''}">` +
+        `<span><b>Level ${entry.level}</b> · ${entry.username}</span>` +
+        `<span class="lb-sub">#${i + 1} · ${entry.score}</span></div>`,
+    )
+    .join('')
+}
+
 export interface SettingsValues {
   music: number
   sfx: number
@@ -194,13 +250,11 @@ export class Hud {
   onCloseCommendations: () => void = () => {}
   onCloseLeaderboard: () => void = () => {}
   onRaceAgain: () => void = () => {}
-  onFeatured: () => void = () => {}
 
   constructor(seed: string) {
     el('death-seed').textContent = `seed: ${seed}`
     el('race-seed').textContent = `seed: ${seed}`
     el<HTMLButtonElement>('race-again-btn').addEventListener('click', () => this.onRaceAgain())
-    el<HTMLButtonElement>('featured-btn').addEventListener('click', () => this.onFeatured())
     el<HTMLButtonElement>('start-btn').addEventListener('click', () => this.onStart())
     el<HTMLButtonElement>('restart-btn').addEventListener('click', () => this.onRestart())
     el<HTMLButtonElement>('giveup-btn').addEventListener('click', () => this.onGiveUp())
@@ -827,7 +881,7 @@ export class Hud {
       const best = g.race?.best ?? loadRaceBest(g.storage, mapScopedSeed(g.map.id, g.seed))
       if (best) parts.push(`best ${formatRaceTime(best.time)}`)
     } else if (g.mode.id === 'hunt') {
-      const best = g.hunt?.best ?? loadHuntBest(g.storage, g.seed)
+      const best = g.hunt?.best ?? loadHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed))
       if (best) parts.push(`best level ${best.level}`)
     } else if (g.best.bestScore > 0) {
       parts.push(`best ${g.best.bestScore} · wave ${g.best.bestWave}`)
@@ -1095,65 +1149,35 @@ export class Hud {
     this.leaderboardPanel.classList.add('hidden')
   }
 
-  /** The menu's featured-course button; disabled once you're already on that seed. */
-  initFeatured(featuredSeed: string, onIt: boolean): void {
-    const btn = el<HTMLButtonElement>('featured-btn')
-    btn.textContent = onIt
-      ? `Featured · ${featuredSeed.toUpperCase()} ✓`
-      : `Featured · ${featuredSeed.toUpperCase()}`
-    btn.disabled = onIt
-    btn.style.opacity = onIt ? '0.55' : '1'
-    if (onIt) el('featured-note').textContent = 'You are on the featured district. Set a time.'
-  }
+  /**
+   * Time-trial boards, one block per arena the caller hands over (main.ts walks the map
+   * registry, so a new map brings its own boards with it). Each arena resolves its fetch
+   * on its own clock, hence the per-section state. An empty list hides the whole block.
+   */
+  showTrialBoards(seed: string, sections: TrialSection[], you: string | null = null): void {
+    const caption = el('lb-trial-caption')
+    const trials = el('lb-trials')
+    caption.classList.toggle('hidden', sections.length === 0)
+    trials.classList.toggle('hidden', sections.length === 0)
+    if (sections.length === 0) return
 
-  /** Per-seed time-trial boards inside the leaderboard panel. */
-  showTrialBoards(
-    seed: string,
-    boards: TrialBoards | null,
-    state: 'loading' | 'ready' | 'error',
-    you: string | null = null,
-  ): void {
-    el('lb-trial-caption').innerHTML = `Time trials on this course — seed: <b>${seed}</b>`
-    const race = el('lb-race')
-    const hunt = el('lb-hunt')
-    if (!boards) {
-      if (state === 'loading') {
-        const skeletons = Array.from(
-          { length: 3 },
-          () => '<div class="lb-row skeleton"><span class="sk-bar"></span><span class="sk-bar sk-short"></span></div>',
-        ).join('')
-        race.innerHTML = skeletons
-        hunt.innerHTML = skeletons
-      } else {
-        race.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
-        hunt.innerHTML = '<div class="lb-empty"></div>'
-      }
-      return
-    }
-    race.innerHTML =
-      boards.race.length === 0
-        ? '<div class="lb-empty">No times on this course yet. Set one.</div>'
-        : boards.race
-            .slice(0, 5)
-            .map(
-              (entry, i) =>
-                `<div class="lb-row${entry.username === you ? ' mine' : ''}">` +
-                `<span><b>${formatRaceTime(entry.timeS)}</b> · ${entry.username}</span>` +
-                `<span class="lb-sub">#${i + 1}</span></div>`,
-            )
-            .join('')
-    hunt.innerHTML =
-      boards.hunt.length === 0
-        ? '<div class="lb-empty">No culls on this district yet.</div>'
-        : boards.hunt
-            .slice(0, 5)
-            .map(
-              (entry, i) =>
-                `<div class="lb-row${entry.username === you ? ' mine' : ''}">` +
-                `<span><b>Level ${entry.level}</b> · ${entry.username}</span>` +
-                `<span class="lb-sub">#${i + 1} · ${entry.score}</span></div>`,
-            )
-            .join('')
+    caption.innerHTML = `Time trials on seed <b>${seed}</b> — every arena keeps its own board.`
+    trials.innerHTML = sections
+      .map((section) => {
+        const here = section.current ? '<span class="lb-here">You are here</span>' : ''
+        const rows = `lb-rows${section.state === 'loading' ? ' loading' : ''}`
+        return (
+          `<div class="lb-arena${section.current ? ' current' : ''}">` +
+          `<div class="lb-arena-name">${section.mapName}${here}</div>` +
+          '<div class="lb-cols">' +
+          `<div class="lb-col"><h3>Signal Run · Fastest</h3>` +
+          `<div class="${rows}">${raceRows(section, you)}</div></div>` +
+          `<div class="lb-col"><h3>The Culling · Deepest</h3>` +
+          `<div class="${rows}">${huntRows(section, you)}</div></div>` +
+          '</div></div>'
+        )
+      })
+      .join('')
   }
 
   get leaderboardOpen(): boolean {

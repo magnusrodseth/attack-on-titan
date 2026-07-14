@@ -2,12 +2,12 @@ import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeo
 import { initAnalytics, track } from './analytics'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
-import type { SettingsValues, ThreatPing } from './hud'
+import type { SettingsValues, ThreatPing, TrialSection } from './hud'
 import { formatRaceTime, Hud } from './hud'
 import type { Account } from './net/client'
 import { clearAccount, fetchLeaderboard, fetchTrials, loadAccount, login, postTrial, register } from './net/client'
 import type { Leaderboard } from './net/protocol'
-import { FEATURED_SEED, generateRoomCode, normalizeRoomCode } from './net/protocol'
+import { generateRoomCode, normalizeRoomCode } from './net/protocol'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { FlashlightBeam } from './render/flashlight'
@@ -424,7 +424,7 @@ hud.onOpenModes = () => {
   if (game.best.bestScore > 0) bests.waves = `Best ${game.best.bestScore} · Wave ${game.best.bestWave}`
   const raceBest = loadRaceBest(game.storage, mapScopedSeed(game.map.id, seed))
   if (raceBest) bests.race = `Best ${formatRaceTime(raceBest.time)} on this course`
-  const huntBest = loadHuntBest(game.storage, seed)
+  const huntBest = loadHuntBest(game.storage, mapScopedSeed(game.map.id, seed))
   if (huntBest) bests.hunt = `Best Level ${huntBest.level} on this district`
   hud.showModes(GAME_MODES, game.mode.id, bests)
 }
@@ -499,17 +499,6 @@ hud.onPickMode = (id) => {
       }),
   )
 }
-
-// featured course: one seed the menu promotes so global times contest the same line
-hud.initFeatured(FEATURED_SEED, seed === FEATURED_SEED)
-hud.onFeatured = () =>
-  confirmIfMidRun('Deploying to the featured district ends your current run.', 'To the Course', () =>
-    dropRunAndGo(() => {
-      const params = new URLSearchParams(location.search)
-      params.set('seed', FEATURED_SEED)
-      location.search = params.toString()
-    }),
-  )
 
 /** A finished trial posts to the board when signed in; localStorage PBs always work. */
 function submitTrial(body: Parameters<typeof postTrial>[1]): void {
@@ -980,6 +969,7 @@ hud.onRematch = () => coop?.sendRematch()
 // stale-while-revalidate: paint the cached board instantly, refresh in the background
 const LB_CACHE_KEY = 'aot-leaderboard-cache'
 let leaderboardCache: Leaderboard | null = null
+let trialsFlight = 0
 try {
   const raw = localStorage.getItem(LB_CACHE_KEY)
   if (raw) leaderboardCache = JSON.parse(raw) as Leaderboard
@@ -990,11 +980,27 @@ hud.onOpenLeaderboard = () => {
   const you = loadAccount()?.username ?? null
   hud.setLeaderboardIdentity(you) // signed-out visitors learn how names get on the board
   hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading', you)
-  const trialScope = mapScopedSeed(game.map.id, seed)
-  hud.showTrialBoards(trialScope, null, 'loading')
-  void fetchTrials(trialScope).then((boards) => {
-    if (hud.leaderboardOpen) hud.showTrialBoards(trialScope, boards, boards ? 'ready' : 'error', you)
-  })
+  // one board pair per arena in the registry, so a new map shows up here for free. Coop
+  // runs never post trials, so a lobby seed would only ever draw empty boards: skip them.
+  const sections: TrialSection[] = coopMode
+    ? []
+    : GAME_MAPS.map((map) => ({
+        mapName: map.name,
+        scope: mapScopedSeed(map.id, seed),
+        current: map.id === game.map.id,
+        boards: null,
+        state: 'loading' as const,
+      }))
+  hud.showTrialBoards(seed, sections, you)
+  // each arena paints the moment its own fetch lands; a reopen supersedes the older flight
+  const flight = ++trialsFlight
+  for (const section of sections) {
+    void fetchTrials(section.scope).then((boards) => {
+      section.boards = boards
+      section.state = boards ? 'ready' : 'error'
+      if (hud.leaderboardOpen && flight === trialsFlight) hud.showTrialBoards(seed, sections, you)
+    })
+  }
   void fetchLeaderboard().then((data) => {
     if (data) {
       leaderboardCache = data
@@ -1556,7 +1562,12 @@ renderer.setAnimationLoop(() => {
       } else {
         // the hunt posts its result when the run ends, however it ended
         if (game.mode.id === 'hunt' && game.wave > 1) {
-          submitTrial({ mode: 'hunt', seed, level: game.wave - 1, score: game.score.score })
+          submitTrial({
+            mode: 'hunt',
+            seed: mapScopedSeed(game.map.id, seed),
+            level: game.wave - 1,
+            score: game.score.score,
+          })
         }
         hud.showDeath(game, abandonedRun)
         abandonedRun = false

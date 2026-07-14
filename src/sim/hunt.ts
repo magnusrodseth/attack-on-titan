@@ -1,4 +1,5 @@
 import type { GameState, StorageLike } from './game'
+import { mapScopedSeed } from './maps'
 import type { GameMode } from './modes'
 import { trialKey } from './race'
 
@@ -79,13 +80,21 @@ export function createHuntMode(
     start(g) {
       g.relentless = true
       base.start(g)
-      g.hunt = { ...freshClock(g), urgencyFired: false, best: loadHuntBest(g.storage, g.seed) }
+      g.hunt = {
+        ...freshClock(g),
+        urgencyFired: false,
+        best: loadHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed)),
+      }
     },
 
     step(g, dt, input) {
       if (!g.hunt) {
         // a save from before the hunt slice existed: rebuild a full clock for this level
-        g.hunt = { ...freshClock(g), urgencyFired: false, best: loadHuntBest(g.storage, g.seed) }
+        g.hunt = {
+        ...freshClock(g),
+        urgencyFired: false,
+        best: loadHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed)),
+      }
       }
       base.step(g, dt, input)
       const h = g.hunt
@@ -94,7 +103,7 @@ export function createHuntMode(
         const best = h.best
         if (!best || g.wave > best.level || (g.wave === best.level && g.score.score > best.score)) {
           h.best = { level: g.wave, score: g.score.score }
-          saveHuntBest(g.storage, g.seed, h.best)
+          saveHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed), h.best)
         }
       }
       if (g.phase !== 'playing') return // the clock pauses with the sim

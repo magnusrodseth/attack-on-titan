@@ -4,7 +4,7 @@ import { BOSS_LADDER } from './boss'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { GamePhase, GameState } from './game'
 import { loadHuntBest } from './hunt'
-import { DEFAULT_MAP_ID } from './maps'
+import { DEFAULT_MAP_ID, mapScopedSeed } from './maps'
 import type { PlayerConfig } from './player'
 import { neutralInput } from './player'
 import { resumeRng } from './rng'
@@ -300,7 +300,7 @@ export function restoreRun(save: SavedRun | null | undefined, g: GameState): boo
 
   // mode state: the relentless rule is The Culling's, and its clock rides the save
   g.relentless = g.mode.id === 'hunt'
-  g.hunt = save.hunt ? { ...save.hunt, best: loadHuntBest(g.storage, g.seed) } : null
+  g.hunt = save.hunt ? { ...save.hunt, best: loadHuntBest(g.storage, mapScopedSeed(g.map.id, g.seed)) } : null
   g.race = null // Signal Run self-heals: a restored race relights the line
   return true
 }

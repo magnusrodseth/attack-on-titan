@@ -346,8 +346,9 @@
       /* pause layout: Resume owns its own row; the grid caps its cells so the widest
          label cannot inflate every button to half the screen */
       #start.paused .menu-col { display: grid; grid-template-columns: repeat(2, minmax(300px, 420px)); justify-content: center; }
-      #start.paused #start-btn, #start.paused #featured-btn, #start.paused .menu-row { grid-column: 1 / -1; justify-self: center; }
-      #start.paused #featured-note { display: none; }
+      /* Map carries the longest label and lands on an odd cell: it takes the full row so
+         its name never wraps and no half cell is left empty beside it */
+      #start.paused #start-btn, #start.paused #maps-btn, #start.paused .menu-row { grid-column: 1 / -1; justify-self: center; }
       /* races hide Abandon (nothing to report), so Restart takes the full row instead */
       body.race #start.paused #restart-btn { grid-column: 1 / -1; justify-self: center; }
       /* small utility row: secondary destinations that don't deserve full plates */
@@ -567,6 +568,21 @@
       .lb-row .sk-bar.sk-short { width: 70px; }
       @keyframes sk-shimmer { to { background-position: -200% 0; } }
 
+      /* trial boards: one titled block per arena, stacked so the registry can grow */
+      #lb-trials { display: flex; flex-direction: column; gap: 24px; }
+      .lb-arena-name {
+        display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+        font-family: var(--header-font); font-size: 16px; letter-spacing: 4px;
+        text-transform: uppercase; color: var(--parchment); text-align: left;
+      }
+      .lb-arena.current .lb-arena-name { color: var(--brass-bright); }
+      .lb-here { font-size: 11px; letter-spacing: 2px; color: #9b8a68; border: 1px solid #4d3d1f; padding: 2px 8px; }
+      .lb-arena .lb-col h3 { font-size: 14px; letter-spacing: 3px; color: #b9ac90; }
+      /* six boards have to fit a laptop screen, so an arena board hugs its rows; only the
+         skeletons hold height, and only until their own arena's fetch lands */
+      .lb-arena .lb-rows { min-height: 0; min-width: 330px; }
+      .lb-arena .lb-rows.loading { min-height: 142px; }
+
       body.coop .solo-only { display: none !important; }
 
       /* lobby code: ornament in the heading, legibility in the code itself */
@@ -743,8 +759,6 @@
           <button id="coop-btn" class="solo-only">Multiplayer</button>
           <button id="modes-btn" class="solo-only">Game Mode</button>
           <button id="maps-btn" class="solo-only hidden"></button>
-          <button id="featured-btn" class="solo-only"></button>
-          <div class="menu-note solo-only" id="featured-note">One fixed district shared by every soldier: its trial times fill the global boards.</div>
           <div class="menu-row" id="menu-row">
             <button id="leaderboard-btn" class="compact">Leaderboard</button>
             <button id="commend-btn" class="compact">Commendations</button>
@@ -819,16 +833,8 @@
           </div>
         </div>
         <div class="sub" id="lb-trial-caption"></div>
-        <div class="lb-cols">
-          <div class="lb-col">
-            <h3>Signal Run · Fastest</h3>
-            <div class="lb-rows" id="lb-race"></div>
-          </div>
-          <div class="lb-col">
-            <h3>The Culling · Deepest</h3>
-            <div class="lb-rows" id="lb-hunt"></div>
-          </div>
-        </div>
+        <!-- one board pair per arena; the map registry decides how many -->
+        <div id="lb-trials"></div>
         <div class="coop-note" id="lb-signin"></div>
         <button id="leaderboard-back">Back</button>
       </div>

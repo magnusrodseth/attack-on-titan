@@ -5,6 +5,7 @@ import {
   HUNT_URGENCY_FRACTION,
   huntAllowance,
 } from './hunt'
+import { mapScopedSeed } from './maps'
 import { getMode } from './modes'
 import { restoreRun, serializeRun } from './persist'
 import { neutralInput } from './player'
@@ -143,6 +144,25 @@ describe('The Culling mode', () => {
     clearLevel(rerun)
     const deeper = JSON.parse(storage.getItem(trialKey('hunt', 'trost'))!) as { level: number }
     expect(deeper.level).toBe(2)
+  })
+
+  it('keys the PB by map, so a cull in the forest never contests the district', () => {
+    const storage = memStorage()
+    const district = huntGame('trost', storage)
+    district.score.score = 1000
+    clearLevel(district)
+    const districtPb = storage.getItem(trialKey('hunt', 'trost'))!
+    expect(JSON.parse(districtPb)).toMatchObject({ level: 1 })
+
+    // same seed, different arena: an honestly different course, so an empty board
+    const forest = createGame('trost', storage, 'hunt', 'forest')
+    startGame(forest)
+    expect(forest.hunt!.best).toBeNull()
+    clearLevel(forest)
+
+    const forestKey = trialKey('hunt', mapScopedSeed('forest', 'trost'))
+    expect(JSON.parse(storage.getItem(forestKey)!)).toMatchObject({ level: 1 })
+    expect(storage.getItem(trialKey('hunt', 'trost'))).toBe(districtPb) // district untouched
   })
 
   it('carries the countdown through a save/restore round trip — no refresh cheese', () => {

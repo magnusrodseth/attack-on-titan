@@ -38,12 +38,14 @@ Canonical language for Wings of Freedom. Terms only — implementation lives in 
 
 - **Signal Run** — the parkour time trial: race a seeded Course of Gates from start to finish
   against the clock; no titans.
-- **Course** — the start-to-finish sequence of Gates a seed lays through the city; same seed,
-  same course, so times are only comparable per seed.
+- **Course** — the start-to-finish sequence of Gates a seed lays through an arena; same seed
+  on the same map, same course, so times are only comparable per course scope.
 - **Gate** — one checkpoint on a Course, passed in order: a signal-flare smoke column marking
   it from afar and a glowing ring at the pass point. Passing a Gate refills gas.
 - **Split** — the time difference against your best run, shown as each Gate is passed.
-- **Featured seed** — the shared Course the menu promotes so global times contest the same run.
+- **Course scope** — what a trial board (and a local PB) is filed under: the seed, prefixed by
+  the map on every arena but the District. Same seed, different map, honestly different course,
+  so the Hall of the Fallen keeps one board per arena and the registry decides how many.
 - **The Culling** — the hunt mode: clear each level's full titan roster before its countdown
   expires; levels escalate forever.
 - **Relentless** — The Culling's rule: every titan tracks soldiers across the whole map and

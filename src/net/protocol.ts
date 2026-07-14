@@ -105,9 +105,6 @@ export interface Leaderboard {
 
 // --- time trials (tt-008) ----------------------------------------------------
 
-/** The course the menu promotes so global times contest the same line (manual, v1). */
-export const FEATURED_SEED = 'shiganshina'
-
 export interface TrialRaceEntry {
   username: string
   timeS: number
@@ -121,7 +118,7 @@ export interface TrialHuntEntry {
   endedAt: string
 }
 
-/** Per-seed boards: Signal Run by time, The Culling by depth (score tiebreak). */
+/** Boards for one course (a map-scoped seed): Signal Run by time, The Culling by depth (score tiebreak). */
 export interface TrialBoards {
   race: TrialRaceEntry[]
   hunt: TrialHuntEntry[]
