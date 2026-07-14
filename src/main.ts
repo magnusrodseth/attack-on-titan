@@ -318,9 +318,10 @@ function announceWave(wave: number): void {
   if (game.mode.id === 'hunt') {
     // The Culling speaks in levels
     hud.showBanner(`Level ${wave}`, 2400)
-  } else if (bossForMilestone(wave, game.mode.id)) {
+  } else if (bossForMilestone(wave, game.mode.id, game.arena)) {
     // the milestone: the Shifter gets the whole drum roll
-    hud.showBanner(`${bossForMilestone(wave, game.mode.id)!.spec.name} Approaches`, 3400)
+    const milestone = bossForMilestone(wave, game.mode.id, game.arena)!
+    hud.showBanner(`${milestone.spec.name} Approaches`, 3400)
     audio.boom()
   } else {
     hud.showBanner(`Wave ${wave}`)
@@ -436,14 +437,18 @@ hud.onCloseCommendations = () => {
   hud.hideCommendations()
   hud.showStart(game.phase === 'playing', game)
 }
-// the map picker: Signal Run offers the registry's arenas; other modes stay district
+// the map picker: every mode now offers every arena in the registry
 hud.initMapsButton(game.map.name, mapsForMode(game.mode.id).length > 1)
 hud.onOpenMaps = () => {
   const maps = mapsForMode(game.mode.id)
   const bests: Record<string, string> = {}
-  for (const map of maps) {
-    const best = loadRaceBest(game.storage, mapScopedSeed(map.id, seed))
-    if (best) bests[map.id] = `Best ${formatRaceTime(best.time)} on this course`
+  // a course record only means anything in a time trial; don't caption a Wave Survival
+  // map with a lap time the player set on it in Signal Run
+  if (game.mode.id === 'race') {
+    for (const map of maps) {
+      const best = loadRaceBest(game.storage, mapScopedSeed(map.id, seed))
+      if (best) bests[map.id] = `Best ${formatRaceTime(best.time)} on this course`
+    }
   }
   hud.showMaps(maps, game.map.id, bests)
 }

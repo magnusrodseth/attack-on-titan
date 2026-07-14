@@ -2,6 +2,7 @@ import { Vector3 } from 'three'
 import { describe, expect, it } from 'vitest'
 import { emptyArena, insideBuildingXZ } from './city'
 import { buildNavGrid, isWalkable } from './nav'
+import type { TitanBehavior } from './titan'
 import {
   createTitan,
   napeCenter,
@@ -237,5 +238,72 @@ describe('raycastTitan', () => {
     const t = createTitan({ id: 1, kind: 'normal', height: 15, x: 30, z: 0 })
     expect(raycastTitan(t, new Vector3(0, 20, 0), new Vector3(1, 0, 0), 100)).toBeNull()
     expect(raycastTitan(t, new Vector3(0, 5, 0), new Vector3(1, 0, 0), 10)).toBeNull()
+  })
+})
+
+/**
+ * A leap is the one titan state that owns its own vertical arc, and it used to own it
+ * completely — no ceiling, no buildings. Under a cavern roof that meant leaping into rock,
+ * and in the Forest it meant sailing through 80m of tree.
+ */
+describe('leaping through the world', () => {
+  function cavern() {
+    const a = emptyArena()
+    a.wallRadius = 240
+    a.cavern = { centerY: 44, edgeY: 22, shafts: [], torches: [] }
+    return a
+  }
+
+  it('keeps a leaping titan out of the cavern roof', () => {
+    const a = cavern()
+    const t = createTitan({ id: 1, kind: 'abnormal', height: 20, x: 0, z: 0 })
+    t.state = 'leap'
+    t.vel.set(0, 40, 0) // absurd upward kick: without a clamp it ends up inside the rock
+    const player = new Vector3(0, 0, 30)
+    for (let i = 0; i < 60; i++) stepTitan(t, player, 1 / 60, () => 0.5, a)
+    // head (feet + height) must stay under the rock overhead, always
+    const roof = 44 // ceiling at the centre
+    expect(t.pos.y + t.height).toBeLessThanOrEqual(roof)
+  })
+
+  it('does not leap through a tree', () => {
+    const a = emptyArena()
+    a.buildings = [
+      { x: 0, z: 20, w: 14, d: 14, y0: 0, h: 80, kind: 'trunk', ridgeAxis: 'x', tint: 0, shape: 'cyl' },
+    ]
+    const t = createTitan({ id: 1, kind: 'abnormal', height: 12, x: 0, z: 0 })
+    t.state = 'leap'
+    t.vel.set(0, 8, 30) // launched straight at the trunk
+    const player = new Vector3(0, 0, 60) // player on the far side
+    for (let i = 0; i < 90; i++) stepTitan(t, player, 1 / 60, () => 0.5, a)
+    // it may end up anywhere except inside the bark
+    expect(insideBuildingXZ(a, t.pos.x, t.pos.z, 0)).toBe(false)
+    expect(Math.hypot(t.pos.x - 0, t.pos.z - 20)).toBeGreaterThan(6.9)
+  })
+
+  it('cannot leap out of a map with no wall', () => {
+    const a = emptyArena()
+    const t = createTitan({ id: 1, kind: 'abnormal', height: 12, x: 250, z: 0 })
+    t.state = 'leap'
+    t.vel.set(200, 5, 0) // flung at the horizon
+    const player = new Vector3(0, 0, 0)
+    for (let i = 0; i < 60; i++) stepTitan(t, player, 1 / 60, () => 0.5, a)
+    expect(Math.hypot(t.pos.x, t.pos.z)).toBeLessThanOrEqual(a.wallRadius)
+  })
+
+  it('still lands and returns to the chase on open ground', () => {
+    const a = emptyArena()
+    const t = createTitan({ id: 1, kind: 'abnormal', height: 12, x: 0, z: 0 })
+    t.state = 'leap'
+    t.vel.set(0, 13, 20)
+    const player = new Vector3(0, 0, 40)
+    let landed = false
+    for (let i = 0; i < 200; i++) {
+      stepTitan(t, player, 1 / 60, () => 0.5, a)
+      const state = t.state as TitanBehavior // stepTitan moves it on; don't let TS narrow
+      if (t.pos.y === 0 && state === 'chase') landed = true
+      expect(t.pos.y).toBeGreaterThanOrEqual(0) // never through the floor
+    }
+    expect(landed).toBe(true) // it comes down and resumes the chase (then leaps again)
   })
 })

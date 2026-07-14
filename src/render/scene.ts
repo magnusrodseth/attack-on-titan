@@ -515,8 +515,9 @@ function addLandmarks(scene: Scene, arena: Arena): void {
     scene.add(body, spire)
   }
 
-  // no sealed gate down here: the Underground's gateAngle marks the surface stairway
-  if (arena.cavern) return
+  // a gate needs a wall to be set into: the Underground's gateAngle marks the surface
+  // stairway, and the Forest has no wall at all (a ring of dark trees closes it instead)
+  if (arena.cavern || arena.wallHeight <= 0) return
 
   // the sealed main gate: a stone gate block set into the wall between the towers,
   // framing a pair of recessed plank door leaves under a stone lintel

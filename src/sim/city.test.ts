@@ -3,13 +3,17 @@ import { describe, expect, it } from 'vitest'
 import type { Arena, Building } from './city'
 import {
   SHAFT_LIP,
+  TITAN_HEADROOM,
   baseGroundY,
   ceilingHeightAt,
+  clampTitanToArena,
   clampToCeiling,
   clampToWall,
   emptyArena,
   groundHeightAt,
   insideBuildingXZ,
+  maxTitanHeightAt,
+  titanRoamRadius,
   raycastHookTarget,
   rayVsBuilding,
   resolveBuildingCollision,
@@ -399,5 +403,78 @@ describe('cavern ceiling', () => {
     clampToCeiling(emptyArena(), openPos, openVel, 1)
     expect(openPos.y).toBe(500)
     expect(openVel.y).toBe(5)
+  })
+})
+
+/**
+ * The headroom rule that lets titans live under a cavern roof. maxTitanHeightAt and
+ * titanRoamRadius are exact inverses of each other: cap a titan's height to the headroom
+ * where it stands and its roam radius is exactly that spot, so it can always walk inward
+ * toward the tall middle and never outward into the rock.
+ */
+describe('cavern headroom', () => {
+  function cavernArena(): Arena {
+    const a = emptyArena()
+    a.wallRadius = 240
+    a.cavern = { centerY: 44, edgeY: 22, shafts: [], torches: [] }
+    return a
+  }
+
+  it('has no ceiling to duck under in the open sky', () => {
+    expect(maxTitanHeightAt(emptyArena(), 0, 0)).toBe(Infinity)
+    expect(titanRoamRadius(emptyArena(), 60)).toBe(emptyArena().wallRadius)
+  })
+
+  it('caps a titan to the rock above its head, tallest at the centre', () => {
+    const a = cavernArena()
+    expect(maxTitanHeightAt(a, 0, 0)).toBeCloseTo(44 - TITAN_HEADROOM)
+    // out at the rim the roof is low, so only a short titan fits
+    expect(maxTitanHeightAt(a, 240, 0)).toBeCloseTo(22 - TITAN_HEADROOM)
+    expect(maxTitanHeightAt(a, 120, 0)).toBeLessThan(maxTitanHeightAt(a, 0, 0))
+  })
+
+  it('inverts: a titan capped where it stands may stand exactly there', () => {
+    const a = cavernArena()
+    for (const r of [0, 40, 120, 200, 239]) {
+      const h = maxTitanHeightAt(a, r, 0)
+      expect(titanRoamRadius(a, h)).toBeCloseTo(r, 4)
+    }
+  })
+
+  it('pens a tall titan into the tall middle of the cavern', () => {
+    const a = cavernArena()
+    const tall = titanRoamRadius(a, 40)
+    const short = titanRoamRadius(a, 15)
+    expect(tall).toBeGreaterThan(0)
+    expect(tall).toBeLessThan(short)
+    expect(short).toBeLessThanOrEqual(a.wallRadius)
+  })
+
+  it('walks a titan back under the rock when it strays too far out', () => {
+    const a = cavernArena()
+    const pos = new Vector3(230, 0, 0) // rim: roof is 22m, way too low for a 40m titan
+    const vel = new Vector3(6, 0, 0)
+    clampTitanToArena(a, pos, vel, 40)
+    const r = Math.hypot(pos.x, pos.z)
+    expect(r).toBeCloseTo(titanRoamRadius(a, 40))
+    // and its head is genuinely under the rock now, which is the whole point
+    expect(40 + TITAN_HEADROOM).toBeLessThanOrEqual(ceilingHeightAt(a, pos.x, pos.z) + 1e-6)
+    expect(vel.x).toBeLessThanOrEqual(0) // outward speed killed, not reflected
+  })
+
+  it('still fences titans inside the wall on an open map', () => {
+    const a = emptyArena() // wallRadius 260, no roof
+    const pos = new Vector3(400, 0, 0)
+    clampTitanToArena(a, pos, new Vector3(1, 0, 0), 15)
+    expect(Math.hypot(pos.x, pos.z)).toBeLessThanOrEqual(260)
+  })
+
+  it('leaves a titan already under good rock alone', () => {
+    const a = cavernArena()
+    const pos = new Vector3(10, 0, 0)
+    const vel = new Vector3(3, 0, 2)
+    clampTitanToArena(a, pos, vel, 20)
+    expect(pos.x).toBe(10)
+    expect(vel.x).toBe(3)
   })
 })

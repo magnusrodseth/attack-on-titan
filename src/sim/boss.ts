@@ -1,4 +1,6 @@
 import { Vector3 } from 'three'
+import type { Arena } from './city'
+import { maxTitanHeightAt } from './city'
 import { GRAVITY } from './constants'
 import { createRng, hashSeed, resumeRng } from './rng'
 import type { KindStats, TitanState } from './titan'
@@ -226,21 +228,40 @@ export function isBossWave(wave: number, modeId: string): boolean {
   return bossSlot(wave, modeId) !== null
 }
 
+/**
+ * The Shifters that can actually stand up on this map. The Colossal is sixty metres of
+ * titan and the Underground's dome peaks at forty-four: it does not fit down there, and a
+ * Colossal shrunk until it fits is not a Colossal. So the cavern's ladder is simply the
+ * ladder without the ones that cannot walk in — eight Shifters under the rock, all nine
+ * under the sky. Every other map returns the full ladder.
+ */
+export function bossLadderFor(arena?: Arena): BossSpec[] {
+  if (!arena) return BOSS_LADDER
+  const [x, z] = bossSpawnPoint(arena)
+  const room = maxTitanHeightAt(arena, x, z)
+  const fits = BOSS_LADDER.filter((spec) => spec.height <= room)
+  return fits.length > 0 ? fits : BOSS_LADDER
+}
+
 /** A slot walks the ladder in order; past the Founding it laps, HP-scaled. */
-export function bossForSlot(slot: number): { spec: BossSpec; lap: number } {
-  const spec = BOSS_LADDER[slot % BOSS_LADDER.length]!
-  return { spec, lap: Math.floor(slot / BOSS_LADDER.length) }
+export function bossForSlot(slot: number, ladder: BossSpec[] = BOSS_LADDER): { spec: BossSpec; lap: number } {
+  const spec = ladder[slot % ladder.length]!
+  return { spec, lap: Math.floor(slot / ladder.length) }
 }
 
 /** The Shifter a wave fields in the given mode, or null on ordinary waves. */
-export function bossForMilestone(wave: number, modeId: string): { spec: BossSpec; lap: number } | null {
+export function bossForMilestone(
+  wave: number,
+  modeId: string,
+  arena?: Arena,
+): { spec: BossSpec; lap: number } | null {
   const slot = bossSlot(wave, modeId)
-  return slot === null ? null : bossForSlot(slot)
+  return slot === null ? null : bossForSlot(slot, bossLadderFor(arena))
 }
 
 /** Wave Survival's ladder view (slot every 5th wave); tests and docs speak in waves. */
-export function bossForWave(wave: number): { spec: BossSpec; lap: number } {
-  return bossForSlot(Math.round(wave / BOSS_WAVE_INTERVAL) - 1)
+export function bossForWave(wave: number, arena?: Arena): { spec: BossSpec; lap: number } {
+  return bossForSlot(Math.round(wave / BOSS_WAVE_INTERVAL) - 1, bossLadderFor(arena))
 }
 
 /** Each full lap of the Nine hardens the pools; the killSpeed bar never moves. */
@@ -248,10 +269,9 @@ export function partHpScale(lap: number): number {
   return 1 + 0.6 * lap
 }
 
-/** The breach point: just inside the wall on the sealed gate's side. */
-export function bossSpawnPoint(arena: { gateAngle: number; wallRadius: number }): [number, number] {
-  const r = arena.wallRadius * 0.88
-  return [Math.cos(arena.gateAngle) * r, Math.sin(arena.gateAngle) * r]
+/** Where the Shifter walks in — the map decides what that means (see Arena.bossEntry). */
+export function bossSpawnPoint(arena: Pick<Arena, 'bossEntry'>): [number, number] {
+  return [arena.bossEntry.x, arena.bossEntry.z]
 }
 
 export interface BossPartState {
@@ -339,6 +359,8 @@ export function createBossFight(
   z: number,
   lap = 0,
 ): BossFight {
+  // no height clamp here on purpose: a Shifter fights at its true scale, and any that
+  // cannot stand up on this map was never on its ladder (see bossLadderFor)
   const titan = createTitan({ id: titanId, kind: 'shifter', height: spec.height, x, z })
   const scale = partHpScale(lap)
   const parts: BossPartState[] = spec.parts.map((p) => ({
@@ -629,7 +651,9 @@ export function stepBoss(fight: BossFight, ctx: BossStepCtx): BossEvent[] {
           lat: -0.22,
         })
         const flight = Math.min(2.5, Math.max(1.0, dist / 28))
-        const targetY = ctx.groundY(ctx.playerPos.x, ctx.playerPos.z)
+        // aim at the soldier, not at the dirt beneath them: on a rooftop, and above all on
+        // a branch 40m up a giant tree, the ground under the player is nowhere near them
+        const targetY = ctx.playerPos.y
         const vel = new Vector3(
           (ctx.playerPos.x - hand.x) / flight,
           (targetY - hand.y - 0.5 * GRAVITY * flight * flight) / flight,

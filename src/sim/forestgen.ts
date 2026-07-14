@@ -17,6 +17,8 @@ import { createRng, hashSeed } from './rng'
  */
 
 export const FOREST_WALL_RADIUS = 300
+/** How far out a Shifter walks in from, as a fraction of the wall radius: in among the giants. */
+export const FOREST_BOSS_ENTRY_FRACTION = 0.55
 /** The crowns: the ceiling of the playable envelope, and the top gate band. */
 export const FOREST_CANOPY_Y = 72
 /** The clearing the run starts in: the meadow with the old tourist cabins. */
@@ -42,7 +44,14 @@ export function generateForest(seed: string): Arena {
     cavern: null,
     forest: { canopyY: FOREST_CANOPY_Y, rays: [] },
     gateAngle: 0,
+    // set below: out here there is no gate to breach, so a Shifter simply comes through
+    // the trees, and which way it comes is the seed's business
+    bossEntry: new Vector3(0, 0, 0),
   }
+
+  const bossBearing = createRng(hashSeed(`${seed}:forest:boss`))() * Math.PI * 2
+  const br = FOREST_WALL_RADIUS * FOREST_BOSS_ENTRY_FRACTION
+  arena.bossEntry.set(Math.cos(bossBearing) * br, 0, Math.sin(bossBearing) * br)
 
   const giants = placeGiants(arena, createRng(hashSeed(`${seed}:forest:giants`)))
   placeBranches(arena, giants, createRng(hashSeed(`${seed}:forest:branches`)))

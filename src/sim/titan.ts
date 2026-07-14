@@ -1,6 +1,13 @@
 import { Vector3 } from 'three'
 import type { Arena } from './city'
-import { baseGroundY, insideBuildingXZ, resolveBuildingCollision } from './city'
+import {
+  TITAN_HEADROOM,
+  baseGroundY,
+  clampTitanToArena,
+  clampToCeiling,
+  insideBuildingXZ,
+  resolveBuildingCollision,
+} from './city'
 import { GRAVITY } from './constants'
 import type { NavGrid } from './nav'
 import { findPath, lineWalkable, nearestWalkable } from './nav'
@@ -163,13 +170,20 @@ export function staggerTitan(t: TitanState): boolean {
   return !already
 }
 
+/** How wide a titan is at the ankles, for everything that has to push it out of a solid. */
+export function titanRadius(t: Pick<TitanState, 'height'>): number {
+  return Math.min(2.6, Math.max(1, t.height * 0.12))
+}
+
 /** Walks the titan forward and slides it out of any building it hits; corridors only. */
 function walkTitan(t: TitanState, distance: number, arena: Arena | undefined, rng: () => number): void {
   const before = t.pos.clone()
   t.pos.addScaledVector(forwardOf(t), distance)
   if (!arena || t.pos.y > 0.1) return
-  const radius = Math.min(2.6, Math.max(1, t.height * 0.12))
-  resolveBuildingCollision(arena, t.pos, t.vel, radius)
+  const radius = titanRadius(t)
+  resolveBuildingCollision(arena, t.pos, t.vel, radius, true)
+  // and keep it on ground it fits on: inside the wall, and under rock tall enough for it
+  clampTitanToArena(arena, t.pos, t.vel, t.height)
   if (t.pos.distanceTo(before) < distance * 0.4 && t.avoidTimer <= 0) {
     // pinned against a wall: commit to a sidestep for a moment instead of grinding
     t.avoidTimer = 0.5 + rng() * 0.5
@@ -329,6 +343,14 @@ export function stepTitan(
     case 'leap': {
       t.vel.y += GRAVITY * dt
       t.pos.addScaledVector(t.vel, dt)
+      if (arena) {
+        // a leap owns its arc, but not the world: airborne it still has to get past the
+        // bark and the rock like everything else. The ceiling margin is the titan's own
+        // height, because pos.y is its feet and it is the head that hits the roof.
+        resolveBuildingCollision(arena, t.pos, t.vel, titanRadius(t), true)
+        clampToCeiling(arena, t.pos, t.vel, t.height + TITAN_HEADROOM)
+        clampTitanToArena(arena, t.pos, t.vel, t.height)
+      }
       if (t.pos.y <= 0) {
         t.pos.y = 0
         t.vel.set(0, 0, 0)

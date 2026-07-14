@@ -74,7 +74,7 @@ export function createHuntMode(
   return {
     id: 'hunt',
     name: 'The Culling',
-    desc: 'Eternal timed levels: every titan in the district knows where you are and never stops coming. Cull the full roster before the countdown dies — each cleared level buys an upgrade and a tighter clock.',
+    desc: 'Eternal timed levels: every titan on the map knows where you are and never stops coming. Cull the full roster before the countdown dies — each cleared level buys an upgrade and a tighter clock.',
 
     start(g) {
       g.relentless = true

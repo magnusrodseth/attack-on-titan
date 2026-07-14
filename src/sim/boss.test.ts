@@ -8,6 +8,7 @@ import {
   type BossFight,
   bossForMilestone,
   bossForWave,
+  bossLadderFor,
   bossPartCenter,
   bossPartRadius,
   bossSpawnPoint,
@@ -16,8 +17,15 @@ import {
   litPartIndex,
   stepBoss,
 } from './boss'
+import { ceilingHeightAt, emptyArena, gateBossEntry, maxTitanHeightAt } from './city'
+import { generateCity } from './citygen'
+import { GRAVITY } from './constants'
+import { generateForest } from './forestgen'
+import { buildNavGrid, nearestWalkable } from './nav'
 import { DEFAULT_PLAYER_CONFIG } from './player'
+import { createRng, hashSeed } from './rng'
 import { STAGGER_DURATION } from './titan'
+import { generateUnderground } from './undergroundgen'
 
 const KILL_SPEED = DEFAULT_PLAYER_CONFIG.killSpeed
 
@@ -87,12 +95,90 @@ describe('the shifter titan', () => {
   })
 
   it('spawns at the gate side of the wall', () => {
-    const arena = { gateAngle: Math.PI / 2, wallRadius: 260 }
+    const arena = emptyArena()
+    arena.gateAngle = Math.PI / 2
+    arena.bossEntry = gateBossEntry(arena.wallRadius, arena.gateAngle)
     const [x, z] = bossSpawnPoint(arena)
     // gateAngle pi/2 points along +Z-ish in wall-angle convention (cos, sin)
     expect(Math.hypot(x, z)).toBeGreaterThan(arena.wallRadius * 0.7)
     expect(Math.hypot(x, z)).toBeLessThan(arena.wallRadius)
     expect(Math.abs(Math.atan2(z, x) - arena.gateAngle)).toBeLessThan(0.01)
+  })
+
+  /**
+   * The reason the Underground and the Forest were gated to time trials: a Shifter has to
+   * fit under the roof it walks in beneath, and its nape has to be somewhere a soldier can
+   * actually reach. The Colossal is the hard case — 60 m of it under a 44 m dome.
+   */
+  describe('a Shifter on every map', () => {
+    const colossal = BOSS_LADDER.find((s) => s.id === 'colossus-titan')!
+
+    it('walks the district in through the breached gate', () => {
+      const arena = generateCity(createRng(hashSeed('parity:city')))
+      const [x, z] = bossSpawnPoint(arena)
+      expect(Math.hypot(x, z)).toBeCloseTo(arena.wallRadius * 0.88)
+      // open sky: nothing shrinks, the Colossal is its full self
+      expect(maxTitanHeightAt(arena, x, z)).toBe(Infinity)
+    })
+
+    it('brings the cavern Shifter in under tall rock, not the low rim', () => {
+      const arena = generateUnderground('parity:ug')
+      const [x, z] = bossSpawnPoint(arena)
+      const r = Math.hypot(x, z)
+      // well inside the rim, where the dome still has height
+      expect(r).toBeLessThan(arena.wallRadius * 0.5)
+      expect(r).toBeGreaterThan(0)
+      // on the stairway's bearing: it comes down the stairs and walks in
+      expect(Math.abs(Math.atan2(z, x) - arena.gateAngle) % (Math.PI * 2)).toBeLessThan(0.01)
+    })
+
+    it('never sends the Colossal into a cavern it cannot stand up in', () => {
+      const arena = generateUnderground('parity:ug')
+      const ladder = bossLadderFor(arena)
+      expect(ladder).not.toContain(colossal)
+      expect(ladder.length).toBe(BOSS_LADDER.length - 1) // the Nine, less the one that cannot fit
+      // and it is genuinely the only one too big: everyone else walks in at full scale
+      for (const spec of ladder) {
+        const [x, z] = bossSpawnPoint(arena)
+        expect(spec.height).toBeLessThanOrEqual(maxTitanHeightAt(arena, x, z))
+      }
+    })
+
+    it('leaves every cavern Shifter a nape a soldier can actually reach', () => {
+      const arena = generateUnderground('parity:ug')
+      const [sx, sz] = bossSpawnPoint(arena)
+      const [x, z] = nearestWalkable(buildNavGrid(arena), sx, sz)
+      const roof = ceilingHeightAt(arena, x, z)
+
+      for (const spec of bossLadderFor(arena)) {
+        const fight = createBossFight(1, spec, 5, 's', x, z, 0)
+        expect(fight.titan.height).toBe(spec.height) // full scale, never shrunk
+        const nape = spec.parts.find((p) => p.id === 'nape')!
+        const napeY = bossPartCenter(fight.titan, nape).y
+        // clampToCeiling's 0.9 margin is the highest a hooked soldier may climb
+        expect(napeY).toBeLessThan(roof - 0.9)
+      }
+    })
+
+    it('walks every one of the Nine, Colossal included, among the giant trees', () => {
+      const arena = generateForest('parity:forest')
+      const [x, z] = bossSpawnPoint(arena)
+      expect(Math.hypot(x, z)).toBeLessThan(arena.wallRadius)
+      expect(maxTitanHeightAt(arena, x, z)).toBe(Infinity)
+      expect(bossLadderFor(arena)).toEqual(BOSS_LADDER)
+      const fight = createBossFight(1, colossal, 40, 's', x, z, 0)
+      expect(fight.titan.height).toBe(colossal.height)
+    })
+
+    it('laps the shortened cavern ladder without ever reaching for a missing slot', () => {
+      const arena = generateUnderground('parity:ug')
+      for (let wave = 1; wave <= 40; wave++) {
+        const milestone = bossForMilestone(wave, 'bossrush', arena)
+        expect(milestone).not.toBeNull()
+        expect(milestone!.spec).toBeDefined()
+        expect(milestone!.spec.id).not.toBe('colossus-titan')
+      }
+    })
   })
 
   it('every spec ends its part sequence at the nape', () => {
@@ -289,6 +375,41 @@ describe('abilities', () => {
     const impact = impacts[0]! as { type: 'projectileImpact'; pos: Vector3; radius: number }
     // aimed at where the player stood: lands near them
     expect(Math.hypot(impact.pos.x - player.x, impact.pos.z - player.z)).toBeLessThan(8)
+  })
+
+  /**
+   * The boulder used to be aimed at the ground under the player's feet, so anyone standing
+   * on anything simply watched it land below them. That is a dead ability in the Forest,
+   * where the whole game is played 40 m up a tree.
+   */
+  it('throws the boulder at a player perched high in a tree, not at the roots', () => {
+    const fight = fightFor('beast-titan')
+    fight.titan.pos.set(0, 0, 0)
+    const player = new Vector3(0, 42, 60) // up on a branch
+    const events = runFor(fight, player, 12)
+    const throws = events.filter((e) => e.type === 'throw')
+    expect(throws.length).toBeGreaterThan(0)
+
+    // fly the boulder and find where it passes the player's column
+    const proj = fight.state.projectiles[0]
+    expect(proj).toBeDefined()
+    const pos = proj!.pos.clone()
+    const vel = proj!.vel.clone()
+    let closestXZ = Infinity
+    let yThere = 0
+    const dt = 1 / 120
+    for (let i = 0; i < 600; i++) {
+      vel.y += GRAVITY * dt
+      pos.addScaledVector(vel, dt)
+      const d = Math.hypot(pos.x - player.x, pos.z - player.z)
+      if (d < closestXZ) {
+        closestXZ = d
+        yThere = pos.y
+      }
+    }
+    expect(closestXZ).toBeLessThan(3)
+    // it arrives at the branch, not on the forest floor 42m below
+    expect(Math.abs(yThere - player.y)).toBeLessThan(4)
   })
 
   it('breaking the throwing wrist silences the throw', () => {

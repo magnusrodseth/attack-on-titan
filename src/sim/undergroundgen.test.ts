@@ -112,7 +112,10 @@ describe('map registry', () => {
     expect(getMap('nope').id).toBe('district')
     expect(getMap(null).id).toBe('district')
     expect(mapsForMode('race').map((m) => m.id)).toEqual(['district', 'underground', 'forest'])
-    expect(mapsForMode('waves').map((m) => m.id)).toEqual(['district'])
+    // the cavern hosts the titan modes too now: the roof no longer gates it
+    expect(mapsForMode('waves').map((m) => m.id)).toContain('underground')
+    expect(mapsForMode('hunt').map((m) => m.id)).toContain('underground')
+    expect(mapsForMode('bossrush').map((m) => m.id)).toContain('underground')
   })
 
   it('scopes trial keys per map, leaving the district scope untouched', () => {

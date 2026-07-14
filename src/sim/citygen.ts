@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 import type { Arena, Building } from './city'
-import { emptyArena, ensureIndex, insideBuildingXZ } from './city'
+import { emptyArena, ensureIndex, gateBossEntry, insideBuildingXZ } from './city'
 import { shuffle } from './rng'
 
 /**
@@ -65,6 +65,8 @@ export function generateCity(rng: () => number): Arena {
     waterY: CANAL_WATER_Y,
   }
   arena.gateAngle = 0
+  // the Shifter comes through the breached gate, as it always has
+  arena.bossEntry = gateBossEntry(arena.wallRadius, arena.gateAngle)
 
   // district fields ride their own integer seeds drawn once from the run rng
   const heightSeed = Math.floor(rng() * 0xffffffff) | 0

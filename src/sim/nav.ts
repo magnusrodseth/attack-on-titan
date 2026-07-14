@@ -148,7 +148,18 @@ export function lineWalkable(
   return true
 }
 
-const MAX_EXPANSIONS = 20000
+/**
+ * The A* budget scales with the board. A flat cap means a bigger map gets to search a
+ * smaller fraction of itself: on the Forest's 300 m grid a fixed 20,000 covers barely a
+ * fifth of the cells, so long paths fail, findPath returns null, and the titan falls back
+ * to walking straight at you — into a tree. Calibrated so the district's 260-cell grid
+ * keeps exactly the 20,000 it has always had.
+ */
+const EXPANSIONS_PER_CELL = 20000 / (260 * 260)
+
+function expansionBudget(grid: NavGrid): number {
+  return Math.round(grid.size * grid.size * EXPANSIONS_PER_CELL)
+}
 
 /**
  * A* scratch buffers, reused across calls. Sixty titans repathing over the v2 grid
@@ -255,8 +266,9 @@ export function findPath(
   fScore[start] = octile(start % size, Math.floor(start / size))
   push(start)
   let expansions = 0
+  const maxExpansions = expansionBudget(grid)
 
-  while (heap.length > 0 && expansions < MAX_EXPANSIONS) {
+  while (heap.length > 0 && expansions < maxExpansions) {
     const current = pop()
     if (closed[current] === generation) continue
     if (current === goal) break

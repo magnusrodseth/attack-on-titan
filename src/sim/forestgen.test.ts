@@ -108,9 +108,11 @@ describe('generateForest', () => {
     expect(Math.hypot(fx - 180, fz - 180)).toBeLessThan(30)
   })
 
-  it('joins the map registry and offers itself to Signal Run', () => {
+  it('joins the map registry and offers itself to every mode', () => {
     expect(getMap('forest').id).toBe('forest')
     expect(mapsForMode('race').map((m) => m.id)).toEqual(['district', 'underground', 'forest'])
-    expect(mapsForMode('waves').map((m) => m.id)).toEqual(['district'])
+    for (const mode of ['waves', 'bossrush', 'hunt']) {
+      expect(mapsForMode(mode).map((m) => m.id)).toContain('forest')
+    }
   })
 })

@@ -1,4 +1,5 @@
 import { bossForMilestone, bossSpawnPoint, createBossFight } from './boss'
+import { maxTitanHeightAt } from './city'
 import type { GameState } from './game'
 import { saveBest } from './game'
 import { createHuntMode } from './hunt'
@@ -40,7 +41,8 @@ type Composition = (
 ) => TitanSpawn[]
 
 function spawnWave(g: GameState, composition: Composition): void {
-  const milestone = bossForMilestone(g.wave, g.mode.id)
+  // the arena picks the ladder: the Colossal does not walk into a cavern it cannot stand in
+  const milestone = bossForMilestone(g.wave, g.mode.id, g.arena)
   if (milestone) {
     // the milestone: one Shifter through the gate.
     // Solo-only by construction — the co-op server spawns via waveComposition directly.
@@ -55,7 +57,9 @@ function spawnWave(g: GameState, composition: Composition): void {
     g.titans = composition(g.wave, rng, 1, g.arena.wallRadius).map((s) => {
       // snap spawns onto walkable streets so no titan starts its life inside a house
       const [x, z] = nearestWalkable(g.nav, s.x, s.z)
-      return createTitan({ id: g.nextTitanId++, kind: s.kind, height: s.height, x, z })
+      // ...and duck it under the roof it stands beneath, so nothing spawns head-in-rock
+      const height = Math.min(s.height, maxTitanHeightAt(g.arena, x, z))
+      return createTitan({ id: g.nextTitanId++, kind: s.kind, height, x, z })
     })
   }
   // fresh spear caches each wave; spears riding last wave's corpses go with them
@@ -99,7 +103,7 @@ function waveLoop(composition: Composition): Pick<GameMode, 'start' | 'step' | '
 const wavesMode: GameMode = {
   id: 'waves',
   name: 'Wave Survival',
-  desc: 'Endless escalating waves. Clear the district, pick a field modification, and hold out as the titans grow bigger, faster and stranger.',
+  desc: 'Endless escalating waves. Clear the ground, pick a field modification, and hold out as the titans grow bigger, faster and stranger.',
   ...waveLoop(waveComposition),
 }
 

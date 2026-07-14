@@ -24,12 +24,21 @@ export interface GameMap {
 
 export const DEFAULT_MAP_ID = 'district'
 
+/**
+ * Every mode, on every map. The two new arenas shipped time-trial-only because the titan
+ * systems had only ever been asked to work in the district: a leap had no ceiling to duck
+ * and no trunk to hit, and a 60 m Colossal under a 44 m dome kept its nape inside the rock.
+ * Those are fixed at the source (see city.ts headroom, titan.ts leap, Arena.bossEntry), so
+ * the roster is no longer a per-map question.
+ */
+const ALL_MODES = ['waves', 'bossrush', 'race', 'hunt']
+
 export const GAME_MAPS: GameMap[] = [
   {
     id: 'district',
     name: 'The District',
     desc: 'The walled surface district — rooftops, boulevards and the canal under an open sky.',
-    modes: ['waves', 'race', 'hunt'],
+    modes: ALL_MODES,
     clockFraction: null,
     // the exact pre-maps rng stream: existing ?seed= URLs must replay unchanged
     generate: (seed) => generateCity(createRng(hashSeed(`${seed}:city`))),
@@ -38,7 +47,7 @@ export const GAME_MAPS: GameMap[] = [
     id: 'underground',
     name: 'The Underground',
     desc: 'The cavern city beneath the capital — torchlit streets, rock pillars, and a ceiling to swing from. Daylight falls through holes worn in the rock.',
-    modes: ['race'],
+    modes: ALL_MODES,
     // the shafts are open to the surface, so the cavern keeps the seeded day/night cycle:
     // sun through the holes by day, stars by night, torches burning through both
     clockFraction: null,
@@ -48,7 +57,7 @@ export const GAME_MAPS: GameMap[] = [
     id: 'forest',
     name: 'The Forest of Giant Trees',
     desc: 'Eighty metres of bark in every direction — swing the giants, rest on their limbs, and run the crown line. The definitive ODM playground.',
-    modes: ['race'],
+    modes: ALL_MODES,
     clockFraction: null,
     generate: generateForest,
   },

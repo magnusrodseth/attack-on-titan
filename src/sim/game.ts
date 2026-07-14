@@ -2,7 +2,13 @@ import { Vector3 } from 'three'
 import type { BossFight } from './boss'
 import { steamRadius, stepBoss } from './boss'
 import type { Arena } from './city'
-import { baseGroundY, nearestStationDist, raycastHookTarget } from './city'
+import {
+  baseGroundY,
+  clampToCeiling,
+  maxTitanHeightAt,
+  nearestStationDist,
+  raycastHookTarget,
+} from './city'
 import { EYE_HEIGHT } from './constants'
 import type { SlashResult } from './combat'
 import { stepSlashBuffer, trySlash } from './combat'
@@ -742,7 +748,9 @@ function stepBossFight(g: GameState, dt: number): void {
       case 'summon': {
         for (const spawn of event.spawns) {
           const [x, z] = nearestWalkable(g.nav, spawn.x, spawn.z)
-          const pure = createTitan({ id: g.nextTitanId++, kind: 'normal', height: spawn.height, x, z })
+          // a screamed-in pure ducks the roof like anything else that spawns
+          const height = Math.min(spawn.height, maxTitanHeightAt(g.arena, x, z))
+          const pure = createTitan({ id: g.nextTitanId++, kind: 'normal', height, x, z })
           pure.state = 'chase' // screamed straight onto the soldier, no wandering in
           g.titans.push(pure)
           boss.state.summonIds.push(pure.id)
@@ -865,11 +873,21 @@ function beginGrab(g: GameState, titan: TitanState): void {
   g.focus = 0
   g.strikeTargetId = null
   g.grab = startGrab(titan)
+  holdPlayer(g, p, titan)
+  p.bankedSpeed = 0
+  g.events.push({ type: 'grabbed', titanId: titan.id })
+}
+
+/**
+ * Pins the player in the titan's fist. A grab bypasses stepPlayer entirely, so the clamps
+ * that normally keep a soldier out of the cavern roof never run — without this, being
+ * picked up underground puts your head in the rock.
+ */
+function holdPlayer(g: GameState, p: PlayerState, titan: TitanState): void {
   p.pos.copy(grabHoldPoint(titan))
   p.vel.set(0, 0, 0)
   p.onGround = false
-  p.bankedSpeed = 0
-  g.events.push({ type: 'grabbed', titanId: titan.id })
+  clampToCeiling(g.arena, p.pos, p.vel, 0.9)
 }
 
 /**
@@ -891,9 +909,7 @@ function stepGrabHeld(g: GameState, input: InputState, dt: number): void {
   }
   // the fist is the only thing allowed to hurt you: swats and blasts pass over
   p.invulnTimer = Math.max(p.invulnTimer, 0.1)
-  p.pos.copy(grabHoldPoint(titan))
-  p.vel.set(0, 0, 0)
-  p.onGround = false
+  holdPlayer(g, p, titan)
   const result = stepGrab(grab, input.jump && !g.prevInput.jump, dt)
   if (result === 'held') return
   g.grab = null

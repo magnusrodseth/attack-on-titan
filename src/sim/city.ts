@@ -157,6 +157,13 @@ export interface Arena {
   forest: ForestSpec | null
   /** Wall angle (radians, +X = 0) of the sealed main gate; bastions hold the other cardinals. */
   gateAngle: number
+  /**
+   * Where a Shifter walks in. Each map means something different by it — the district's
+   * breached gate, the Underground's stairway down, a gap in the Forest's canopy — and in
+   * a cavern it sits well in from the rim, where the roof is tall enough for a big one to
+   * stand up straight. Read it instead of guessing from gateAngle.
+   */
+  bossEntry: Vector3
   /** Broadphase over buildings; rebuilt lazily whenever buildings.length changes. */
   index?: BuildingIndex
 }
@@ -172,7 +179,21 @@ export function emptyArena(): Arena {
     cavern: null,
     forest: null,
     gateAngle: 0,
+    bossEntry: new Vector3(260 * BOSS_ENTRY_FRACTION, 0, 0),
   }
+}
+
+/** How far out the breach sits, as a fraction of the wall radius. */
+export const BOSS_ENTRY_FRACTION = 0.88
+
+/**
+ * Where a Shifter enters on an open map: just inside the wall, on the gate's side. A
+ * cavern overrides this — see undergroundgen, which brings it down the stairway and in
+ * under the tall middle of the dome, since the rim has no headroom for a big one.
+ */
+export function gateBossEntry(wallRadius: number, gateAngle: number): Vector3 {
+  const r = wallRadius * BOSS_ENTRY_FRACTION
+  return new Vector3(Math.cos(gateAngle) * r, 0, Math.sin(gateAngle) * r)
 }
 
 /** Ceiling height at a point; Infinity under an open sky. */
@@ -192,6 +213,57 @@ export function inShaft(arena: Arena, x: number, z: number): boolean {
 
 /** How far up into an opening a soldier may climb before the surface stops them. */
 export const SHAFT_LIP = 8
+
+/** Clearance a titan keeps between the top of its head and the cavern roof. */
+export const TITAN_HEADROOM = 2
+
+/**
+ * The tallest titan that fits standing here — Infinity under an open sky. Spawns cap
+ * themselves with this, which is why the Colossal is the height of the cavern rather
+ * than 60m of nape buried in rock.
+ */
+export function maxTitanHeightAt(arena: Arena, x: number, z: number): number {
+  if (!arena.cavern) return Infinity
+  return ceilingHeightAt(arena, x, z) - TITAN_HEADROOM
+}
+
+/**
+ * How far from the centre a titan this tall may walk before the roof meets its head — the
+ * exact inverse of maxTitanHeightAt, so a titan capped to the headroom where it spawned
+ * may stand precisely there. The dome is tallest in the middle, so the bigger the titan
+ * the smaller its world: a Colossal is penned into the cavern's heart and the fight comes
+ * to it. Under an open sky the wall is the only bound.
+ */
+export function titanRoamRadius(arena: Arena, height: number): number {
+  const cavern = arena.cavern
+  if (!cavern) return arena.wallRadius
+  const need = height + TITAN_HEADROOM
+  if (need <= cavern.edgeY) return arena.wallRadius
+  if (need >= cavern.centerY) return 0
+  // invert ceilingHeightAt: y(r) = edgeY + (centerY - edgeY)(1 - r²/R²)
+  const frac = 1 - (need - cavern.edgeY) / (cavern.centerY - cavern.edgeY)
+  return arena.wallRadius * Math.sqrt(Math.max(0, frac))
+}
+
+/**
+ * Fences a titan into the ground it fits on: inside the wall, and (in a cavern) inside the
+ * radius where the roof still clears its head. Titans have no wall clamp of their own
+ * otherwise, which in the Forest — a map with no wall at all — means they simply leave.
+ */
+export function clampTitanToArena(arena: Arena, pos: Vector3, vel: Vector3, height: number): void {
+  const limit = Math.min(arena.wallRadius - 2, titanRoamRadius(arena, height))
+  const dist = Math.hypot(pos.x, pos.z)
+  if (dist <= limit || dist === 0) return
+  const nx = pos.x / dist
+  const nz = pos.z / dist
+  pos.x = nx * limit
+  pos.z = nz * limit
+  const outward = vel.x * nx + vel.z * nz
+  if (outward > 0) {
+    vel.x -= nx * outward
+    vel.z -= nz * outward
+  }
+}
 
 /**
  * Keeps airborne soldiers out of the cavern rock; a no-op under an open sky. There is no
@@ -327,13 +399,23 @@ export function insideBuildingXZ(
   return hit
 }
 
+/**
+ * Undergrowth a titan walks straight through. Nav keeps 1.6 m of clearance but a big titan
+ * is 2.6 m at the ankle, so it will happily be routed between two saplings it cannot fit
+ * between and grind there. A fifteen-metre giant does not squeeze past a young tree — it
+ * flattens it, and the Forest floor stops being a maze of snags.
+ */
+const TITAN_TRAMPLES: ReadonlySet<BuildingKind> = new Set<BuildingKind>(['sapling'])
+
 export function resolveBuildingCollision(
   arena: Arena,
   pos: Vector3,
   vel: Vector3,
   radius: number,
+  trample = false,
 ): void {
   forEachInRect(arena, pos.x - radius, pos.x + radius, pos.z - radius, pos.z + radius, (b) => {
+    if (trample && TITAN_TRAMPLES.has(b.kind)) return
     // walls only push between the base and the eaves; the ground clamp owns roof-slope
     // contact, and below an elevated deck you pass under freely. The epsilon keeps
     // ground-walkers (titans stand at y = 0 exactly) colliding with ground buildings.

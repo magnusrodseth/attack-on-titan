@@ -73,7 +73,7 @@ function inputActive(input: InputState): boolean {
 export const raceMode: GameMode = {
   id: 'race',
   name: 'Signal Run',
-  desc: 'The parkour time trial: chase the green flare across an empty district, ring to ring. Every gate refills your gas, only the clock judges you, and R relights the same line instantly.',
+  desc: 'The parkour time trial: chase the green flare across empty ground, ring to ring. Every gate refills your gas, only the clock judges you, and R relights the same line instantly.',
 
   start(g) {
     const course = generateCourse(g.seed, g.arena, g.nav)

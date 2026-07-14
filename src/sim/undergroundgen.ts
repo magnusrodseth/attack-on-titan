@@ -16,6 +16,12 @@ export const UG_WALL_RADIUS = 240
 export const UG_CEILING_CENTER_Y = 44
 export const UG_CEILING_EDGE_Y = 22
 export const UG_PLAZA_RADIUS = 20
+/**
+ * Where a Shifter stops once it is down the stairs, as a fraction of the wall radius. Well
+ * in from the rim: the dome is a paraboloid, so headroom is a function of radius, and this
+ * is the ring where even the Colossal can stand at something like its true scale.
+ */
+export const UG_BOSS_ENTRY_FRACTION = 0.3
 
 /** Tighter blocks than the surface district: a shelter colony, not a planned city. */
 const BLOCK = 26
@@ -69,6 +75,8 @@ export function generateUnderground(seed: string): Arena {
     cavern: { centerY: UG_CEILING_CENTER_Y, edgeY: UG_CEILING_EDGE_Y, shafts: [], torches: [] },
     forest: null,
     gateAngle: 0,
+    // placeStairway swings both of these onto the stairway's bearing
+    bossEntry: new Vector3(UG_WALL_RADIUS * UG_BOSS_ENTRY_FRACTION, 0, 0),
   }
 
   const layout = createRng(hashSeed(`${seed}:ug:layout`))
@@ -282,6 +290,11 @@ function placeStalactites(arena: Arena, rng: () => number): void {
 function placeStairway(arena: Arena, rng: () => number): void {
   const angle = rng() * Math.PI * 2
   arena.gateAngle = angle
+  // A Shifter comes down these stairs, but it does not stop at the bottom of them: out by
+  // the rim the roof is only ~22 m and a big one would be standing in rock. Walk it in to
+  // where the dome is tall, and the fight happens under the height of the cavern.
+  const br = UG_WALL_RADIUS * UG_BOSS_ENTRY_FRACTION
+  arena.bossEntry = new Vector3(Math.cos(angle) * br, 0, Math.sin(angle) * br)
   const r = UG_WALL_RADIUS - 30
   const x = Math.cos(angle) * r
   const z = Math.sin(angle) * r
