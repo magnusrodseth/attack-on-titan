@@ -13,6 +13,7 @@ import type { SpearState } from './spear'
 import { FIRE_COOLDOWN } from './spear'
 import type { TitanState } from './titan'
 import { createTitan } from './titan'
+import { checkSupplyWarnings } from './world'
 
 /**
  * The co-op client's half of the netcode: the local soldier still runs the full 120 Hz
@@ -85,6 +86,9 @@ export function stepCoopClient(g: GameState, input: InputState, dt: number): voi
   if (p.canisters < canistersBefore) {
     g.events.push({ type: 'canisterSwap', remaining: p.canisters })
   }
+  // the same warnings a lone soldier gets: gas is client-owned and never reaches the room,
+  // and blades mirror down from the snapshot, so both are read right here
+  checkSupplyWarnings(g, g.soldiers[0]!)
   copyInput(g.prevInput, input)
 }
 

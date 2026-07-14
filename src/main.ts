@@ -1264,6 +1264,16 @@ function handleEvents(events: GameEvent[]): void {
         hud.showBanner('Resupplied', 900)
         audio.refill()
         break
+      case 'gasLow':
+        hud.showBanner('Gas Running Low · Make for a Station', 2400)
+        audio.click()
+        break
+      case 'bladesLow':
+        // the warning is not "you will run out", it is "titans have stopped dying at your
+        // usual speed" — say the number, because that is the thing that will get you killed
+        hud.showBanner(`Blades Dulling · One-Cut at ${event.oneCutSpeed.toFixed(1)} m/s`, 2600)
+        audio.click()
+        break
       case 'lampLow':
         hud.showBanner('Lamp Fading · Recharge at the Station', 2200)
         audio.click()

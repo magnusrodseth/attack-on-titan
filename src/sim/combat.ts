@@ -140,6 +140,30 @@ function resolveSlash(
 export const SLASH_BUFFER_S = 0.15
 
 /**
+ * How much a spent pair of blades raises the one-cut bar. Fresh steel kills at killSpeed
+ * (17 m/s); a pair worn down to its last hit needs about 21.5. Nothing else moves: the
+ * sub-threshold chip curve stays keyed on the BASE killSpeed, so a dull blade is not
+ * punished twice, and the score multipliers keep paying against the base bar so wear can
+ * never inflate a kill's worth.
+ *
+ * This is the demand half of the resupply economy. Gas is only spent on dashes and every
+ * kill refunds a heart, so before this the station was decorative: there was nothing you
+ * could run out of that made you want to go back. Now there is, and it creeps up on you
+ * mid-wave instead of announcing itself.
+ */
+export const DULL_PENALTY = 0.32
+
+/**
+ * The speed a nape cut has to land at to take the head off, given the edge left on the
+ * pair currently in hand. The HUD reads this so a soldier can see the bar rising.
+ */
+export function oneCutSpeed(p: PlayerState): number {
+  if (p.blades <= 0) return Infinity // nothing to swing
+  const edge = Math.max(0, Math.min(1, p.bladeHp / p.config.bladeDurability))
+  return p.config.killSpeed * (1 + DULL_PENALTY * (1 - edge))
+}
+
+/**
  * Speed is damage: at or above killSpeed a nape hit is a one-cut kill, below it the cut
  * only chips. Body hits are a consolation prize that mostly costs you blade edge. A press
  * with nothing in reach arms the swing buffer instead of whiffing outright — call
@@ -199,8 +223,10 @@ function applySlash(p: PlayerState, target: SlashTarget, speed: number): SlashRe
   const t = target.titan
 
   if (target.kind === 'bossPart' && target.fight) {
+    // the bar rises with the edge here too: a clean cut on a Weak Point is the same cut
+    const bar = oneCutSpeed(p)
     const bladeBroke = wearBlade(p, 1)
-    const outcome = applyBossSlash(target.fight, speed, p.config.killSpeed)
+    const outcome = applyBossSlash(target.fight, speed, bar)
     return {
       hit: true,
       napeHit: false,
@@ -253,8 +279,11 @@ function applySlash(p: PlayerState, target: SlashTarget, speed: number): SlashRe
   }
 
   if (target.kind === 'nape') {
+    // read the bar BEFORE the swing wears the pair down: you are judged on the edge you
+    // swung with, not the edge you have left afterwards
+    const bar = oneCutSpeed(p)
     const bladeBroke = wearBlade(p, 1)
-    if (speed >= p.config.killSpeed) {
+    if (speed >= bar) {
       const oneCut = t.hp === t.maxHp
       const damage = t.hp
       t.hp = 0

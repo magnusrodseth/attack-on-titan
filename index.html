@@ -484,6 +484,14 @@
         border: 1px solid #241b0e; transform: rotate(45deg);
       }
 
+      /* blades that dull: the fill stains from bright steel toward a tired, brown edge, and
+         the label spells out the speed a nape now demands so the rise is never a mystery */
+      #blade-fill.dull { background: linear-gradient(90deg, #8d7b5f, #6f5f49) !important; }
+      #blade-threshold {
+        margin-left: 8px; color: #e0a355; font-size: 10px; letter-spacing: 1.5px;
+      }
+      #blade-threshold.hidden { display: none; }
+
       /* co-op: enlistment form, lobby roster, squad HUD, mission report */
       .coop-rows { display: flex; flex-direction: column; gap: 14px; align-items: center; }
       .coop-rows input[type='text'], .coop-rows input[type='password'] {
@@ -682,7 +690,7 @@
         <div id="hearts" class="combat"></div>
         <div class="meter-label">GAS <span id="gas-canisters"></span></div>
         <div id="gas-bar" class="bar segmented"><div id="gas-fill" class="fill"></div></div>
-        <div class="meter-label combat">BLADE <span id="blade-pairs"></span></div>
+        <div class="meter-label combat">BLADE <span id="blade-pairs"></span><span id="blade-threshold" class="hidden"></span></div>
         <div id="blade-bar" class="bar segmented combat"><div id="blade-fill" class="fill"></div></div>
         <div class="meter-label combat">SPEAR <span id="spear-count"></span></div>
         <div id="spear-bar" class="bar segmented combat"><div id="spear-fill" class="fill"></div></div>

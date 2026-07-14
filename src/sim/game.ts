@@ -23,6 +23,7 @@ import type { Upgrade } from './upgrades'
 import type { Soldier, StorageLike, World, WorldEvent } from './world'
 import {
   SOLO_ID,
+  checkSupplyWarnings,
   createSoldier,
   createWorld,
   soldierById,
@@ -279,6 +280,7 @@ export function stepGame(g: GameState, input: InputState, dt: number): void {
   // the shared world: titans, spears, the Shifter, the grab QTE, the mode's progression
   stepWorld(g, dt, input)
   grantFocusForKills(g, me.score.kills - killsBefore)
+  checkSupplyWarnings(g, me) // gas and edge are client-owned, so the warning lives here
 
   if (g.phase !== 'playing') {
     saveBest(g) // the run just ended or hit an intermission

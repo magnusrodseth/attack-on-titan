@@ -3,6 +3,8 @@ import type { CommendationRow } from './sim/commendations'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
+import { oneCutSpeed } from './sim/combat'
+import { GRAB_ESCAPE_PRESSES } from './sim/grab'
 import { loadHuntBest, HUNT_URGENCY_FRACTION } from './sim/hunt'
 import { DEFAULT_MAP_ID, coopMaps, mapScopedSeed } from './sim/maps'
 import { coopModes } from './sim/modes'
@@ -148,6 +150,7 @@ export class Hud {
   private grabTime = el('grab-time')
   private bladeFill = el('blade-fill')
   private bladePairs = el('blade-pairs')
+  private bladeThreshold = el('blade-threshold')
   private spearBar = el('spear-bar')
   private spearFill = el('spear-fill')
   private spearCount = el('spear-count')
@@ -572,8 +575,17 @@ export class Hud {
     const gasRatio = p.gas / p.config.maxGas
     this.gasFill.style.width = `${(gasRatio * 100).toFixed(1)}%`
     this.gasCanisters.textContent = `×${p.canisters}`
-    this.bladeFill.style.width = `${((p.bladeHp / p.config.bladeDurability) * 100).toFixed(1)}%`
+    // the edge left on the pair in hand, and the gauge stains toward dull as it goes: the
+    // blade you are swinging is visibly worse steel than the one you started the wave with
+    const edge = p.bladeHp / Math.max(1, p.config.bladeDurability)
+    this.bladeFill.style.width = `${(edge * 100).toFixed(1)}%`
+    this.bladeFill.classList.toggle('dull', edge <= 0.5)
     this.bladePairs.textContent = `×${p.blades}`
+    // and the bar it now takes to take a head off, whenever that is not the honest 17
+    const bar = oneCutSpeed(p)
+    const dulled = Number.isFinite(bar) && bar > p.config.killSpeed + 0.05
+    this.bladeThreshold.classList.toggle('hidden', !dulled)
+    if (dulled) this.bladeThreshold.textContent = `ONE-CUT ${bar.toFixed(1)} m/s`
     // segment the gauges into countable uses (upgrades can change both counts)
     this.gasBar.style.setProperty('--segs', String(Math.max(1, Math.floor(p.config.maxGas / BOOST_COST))))
     this.bladeBar.style.setProperty('--segs', String(Math.max(1, p.config.bladeDurability)))
@@ -625,8 +637,11 @@ export class Hud {
       this.prompt.textContent = ''
     } else {
       const kmh = Math.round(frame.speed * 3.6)
+      // "fast enough to kill" is a moving line now: it is the bar for the steel in hand
       this.speedo.innerHTML =
-        frame.speed >= p.config.killSpeed ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
+        // the bar moves with the edge on the blade in hand, so the "fast enough to kill"
+        // highlight has to move with it (dull blades, tf-002)
+        frame.speed >= oneCutSpeed(p) ? `<span class="fast">${kmh} km/h</span>` : `${kmh} km/h`
       // a Field Kit is a station you carry, so it has to prompt like one — otherwise the pick
       // works and the player never finds out, which is the same as it not working
       const kits = p.kits

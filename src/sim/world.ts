@@ -4,7 +4,7 @@ import { createBossFight, bossForMilestone, bossSpawnPoint, steamRadius, stepBos
 import type { Arena } from './city'
 import { baseGroundY, clampToCeiling, maxTitanHeightAt, nearestStationDist } from './city'
 import type { SlashResult } from './combat'
-import { stepSlashBuffer, trySlash } from './combat'
+import { oneCutSpeed, stepSlashBuffer, trySlash } from './combat'
 import { LAMP_BATTERY_SECONDS } from './flashlight'
 import type { GrabState, GrabWatch } from './grab'
 import {
@@ -104,6 +104,8 @@ export interface Soldier {
   grabWatch: GrabWatch
   /** Fresh mash presses banked since the last tick (solo: keyboard; co-op: intents). */
   mash: number
+  /** Latches for the supply warnings, so each one speaks once per emptying, not per tick. */
+  warned: { gas: boolean; blades: boolean }
 }
 
 export interface StorageLike {
@@ -241,6 +243,9 @@ export type WorldEvent =
   | { type: 'lampLow' }
   | { type: 'lampDead' }
   | { type: 'canisterSwap'; remaining: number }
+  // the supply warnings: you should be told to go back BEFORE you are dry, not after
+  | { type: 'gasLow'; fraction: number }
+  | { type: 'bladesLow'; fraction: number; oneCutSpeed: number }
   | { type: 'boost' }
   | { type: 'death' }
   // Signal Run: the clock arming, ordered ring passes with PB deltas, and the finish
@@ -287,6 +292,7 @@ export function createSoldier(id: string, body = createPlayer()): Soldier {
     grab: null,
     grabWatch: createGrabWatch(),
     mash: 0,
+    warned: { gas: false, blades: false },
   }
 }
 
@@ -1103,6 +1109,57 @@ function stepBossFight(w: World, dt: number): void {
         hurtSoldier(w, s, boss.titan.pos, 14, 8)
       }
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Supply warnings. Both are read off the LOCAL soldier's body, so both drivers call this
+// from the client side: gas and canisters never reach the server (they are client-owned,
+// see ADR 0003's ownership table), and a warning you get from a snapshot is a warning that
+// arrives 100 ms late. Edge-triggered with hysteresis, like the flashlight's lampLow.
+// ---------------------------------------------------------------------------
+
+/** Below this fraction of capacity the soldier is told to think about a station. */
+export const SUPPLY_LOW_FRACTION = 0.25
+/** Back above this, the warning re-arms. The gap stops a nagging flicker at the boundary. */
+const SUPPLY_REARM_FRACTION = 0.4
+
+/** Gas in the tank plus every full canister on the rig, as a fraction of the rig's capacity. */
+export function gasFraction(p: PlayerState): number {
+  const capacity = p.config.maxGas * (1 + p.config.gasCanisters)
+  if (capacity <= 0) return 0
+  return (p.gas + p.canisters * p.config.maxGas) / capacity
+}
+
+/** Edge left across every pair still on the rack, as a fraction of a full loadout. */
+export function bladeFraction(p: PlayerState): number {
+  const capacity = p.config.bladePairs * p.config.bladeDurability
+  if (capacity <= 0) return 0
+  const left = Math.max(0, p.blades - 1) * p.config.bladeDurability + p.bladeHp
+  return left / capacity
+}
+
+/**
+ * Warns once as gas or edge runs low, and re-arms when a resupply brings it back. The
+ * blades warning carries the risen one-cut bar with it, because that is the actual cost of
+ * fighting on worn steel: not "you will run out", but "titans stop dying at the speed you
+ * are used to".
+ */
+export function checkSupplyWarnings(w: World, s: Soldier): void {
+  const p = s.body
+  const gas = gasFraction(p)
+  if (gas <= SUPPLY_LOW_FRACTION && !s.warned.gas) {
+    s.warned.gas = true
+    w.events.push({ type: 'gasLow', fraction: gas })
+  } else if (gas >= SUPPLY_REARM_FRACTION && s.warned.gas) {
+    s.warned.gas = false
+  }
+  const edge = bladeFraction(p)
+  if (edge <= SUPPLY_LOW_FRACTION && !s.warned.blades) {
+    s.warned.blades = true
+    w.events.push({ type: 'bladesLow', fraction: edge, oneCutSpeed: oneCutSpeed(p) })
+  } else if (edge >= SUPPLY_REARM_FRACTION && s.warned.blades) {
+    s.warned.blades = false
   }
 }
 
