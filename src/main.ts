@@ -620,8 +620,19 @@ let spectating = false
 let coopInputTimer = 0
 const COOP_ERROR_KEY = 'aot-coop-error'
 
-function coopJoinUrl(code: string): string {
-  return `${location.origin}${location.pathname}?lobby=${encodeURIComponent(code)}`
+/**
+ * The invite link names the world, not just the room. A link that carries only the code lands
+ * the guest in The District, and the lobby then has to reload them into the squad's real arena
+ * — a reload that costs them their connection the moment they arrive (the leader watches them
+ * flicker in and straight back out). Naming the ground in the link means they build it on the
+ * first load and simply stay.
+ */
+function coopJoinUrl(lobby: LobbyMsg): string {
+  const url = new URL(`${location.origin}${location.pathname}`)
+  url.searchParams.set('lobby', lobby.code)
+  url.searchParams.set('map', lobby.mapId)
+  url.searchParams.set('mode', lobby.modeId)
+  return url.toString()
 }
 
 function gotoLobby(code: string | null): void {
@@ -640,12 +651,21 @@ function gotoLobby(code: string | null): void {
  */
 function syncWorldToLobby(lobby: LobbyMsg): boolean {
   if (lobby.mapId === mapId && lobby.modeId === modeId) return false
-  const params = new URLSearchParams(location.search)
-  params.set('lobby', lobby.code)
-  params.set('map', lobby.mapId)
-  params.set('mode', lobby.modeId)
-  location.search = params.toString()
+  reloadInto({ lobby: lobby.code, map: lobby.mapId, mode: lobby.modeId })
   return true
+}
+
+/**
+ * Leave the room on purpose, then reload into the given world. Closing the socket ourselves
+ * first is the whole point: an unannounced close on a page that is already navigating reads as
+ * "connection lost", and the handler for that used to send us to the main menu — cancelling the
+ * very reload that was carrying us into the squad's arena.
+ */
+function reloadInto(next: Record<string, string>): void {
+  coop?.leave()
+  const params = new URLSearchParams(location.search)
+  for (const [key, value] of Object.entries(next)) params.set(key, value)
+  location.replace(`${location.pathname}?${params.toString()}`)
 }
 
 function connectCoop(account: Account): void {
@@ -657,7 +677,7 @@ function connectCoop(account: Account): void {
       if (syncWorldToLobby(lobby)) return // reloading into the squad's chosen ground
       // the lobby overlay belongs to the lobby phase only; spectators watch the fight
       if (lobby.phase === 'lobby') {
-        hud.showLobby(lobby, coopJoinUrl(lobby.code))
+        hud.showLobby(lobby, coopJoinUrl(lobby))
         hud.hideResults()
         spectating = false
         soldierPool.clear()
@@ -672,10 +692,7 @@ function connectCoop(account: Account): void {
       // a late joiner can arrive on the wrong ground (the room changed maps before they
       // opened the link): reload into the real one rather than fight a mirage
       if (startMapId !== mapId || startModeId !== modeId) {
-        const params = new URLSearchParams(location.search)
-        params.set('map', startMapId)
-        params.set('mode', startModeId)
-        location.search = params.toString()
+        reloadInto({ map: startMapId, mode: startModeId })
         return
       }
       startCoopMatch(roster)
@@ -689,6 +706,14 @@ function connectCoop(account: Account): void {
       hud.setPickStatus('')
       hud.hideLobby()
       hud.showResults(results, coop?.me ?? '', coop?.isCreator ?? false)
+    },
+    onLinkLost() {
+      // partysocket is already retrying; say so and hold the lobby open rather than
+      // dumping the soldier back to the menu over a dropped socket
+      hud.showBanner('Link to the squad lost · reconnecting…', 60_000)
+    },
+    onLinkBack() {
+      hud.showBanner('Reconnected', 1400)
     },
     onFatal(message) {
       try {

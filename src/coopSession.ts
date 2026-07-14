@@ -19,7 +19,11 @@ export interface CoopHooks {
   onMatchStart(roster: string[], mapId: string, modeId: string): void
   onEvents(events: CoopEvent[]): void
   onResults(results: MatchResults): void
-  /** Unrecoverable for this room (bad session, full squad, connection lost). */
+  /** The socket dropped and partysocket is retrying. A blip, not an ejection. */
+  onLinkLost(): void
+  /** The room is answering again. */
+  onLinkBack(): void
+  /** Unrecoverable for this room: the room itself refused us (bad session, full squad, outdated). */
   onFatal(message: string): void
 }
 
@@ -42,6 +46,7 @@ export class CoopSession {
   private socket: RoomSocket | null = null
   private fatalSent = false
   private leftOnPurpose = false
+  private linkLost = false
   // snapshot arrival cadence — the server sends every 50 ms, so gaps well above that
   // mean a server stall or network jitter (remote entities rubber-band even at high fps)
   private lastSnapAt = 0
@@ -61,6 +66,10 @@ export class CoopSession {
   }
 
   private onMessage(msg: Parameters<Parameters<typeof connectRoom>[2]>[0]): void {
+    if (this.linkLost) {
+      this.linkLost = false
+      this.hooks.onLinkBack()
+    }
     switch (msg.type) {
       case 'lobby': {
         this.lobby = msg
@@ -111,8 +120,19 @@ export class CoopSession {
     }
   }
 
+  /**
+   * A closed socket is not an ejection. partysocket reconnects on its own, and sockets close
+   * for entirely survivable reasons: a wifi blip, a world reload in flight, the room swapping
+   * a duplicate connection. Treating the first close as fatal is what threw a soldier back to
+   * the menu the instant they joined a lobby whose arena differed from their URL — the reload
+   * they were told to do killed the socket, and the socket's death cancelled the reload.
+   *
+   * Only the room refusing us outright (see the 'error' case above) ends this session.
+   */
   private onSocketClose(): void {
-    if (!this.leftOnPurpose) this.fatal('Connection to the squad lost')
+    if (this.leftOnPurpose || this.fatalSent || this.linkLost) return
+    this.linkLost = true
+    this.hooks.onLinkLost()
   }
 
   private fatal(message: string): void {

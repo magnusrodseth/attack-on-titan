@@ -44,6 +44,21 @@ interface Member {
 }
 
 /**
+ * The room's identity, in Durable Object storage rather than only in memory.
+ *
+ * A world change reloads every client at once (the scene is built at page load), so the room
+ * really does drop to zero connections every time the leader picks a new arena — and a DO with
+ * no connections can be evicted. When it was memory-only, the room came back as The District
+ * and bounced everyone whose URL still said Forest. The ground a squad chose outlives the
+ * moment they are all reloading into it.
+ */
+interface SavedRoom {
+  mapId: string
+  modeId: string
+  founder: string | null
+}
+
+/**
  * One Durable Object per room code. Holds the Lobby roster and, during a match, ticks
  * the shared CoopWorld at 120 Hz in 30 Hz wall-clock slices. Deliberately not
  * hibernatable: a ticking match must stay in memory, and live websockets keep the DO
@@ -55,7 +70,8 @@ export class MatchRoom extends Server<Env> {
   private phase: RoomPhase = 'lobby'
   private members = new Map<string, Member>() // connection.id → member
   private ready = new Set<string>()
-  private creator: string | null = null
+  /** The soldier who raised this room. Persisted: a reload must not cost them the crown. */
+  private founder: string | null = null
   private world: CoopWorld | null = null
   private seed = ''
   // the world this room fights in: the creator picks it in the lobby, everyone builds it
@@ -68,6 +84,41 @@ export class MatchRoom extends Server<Env> {
   private lastSnap = 0
   private matchWritten = false
   private matchIndex = 0
+
+  /**
+   * The squad leader, derived rather than stored-and-mutated. The founder holds it whenever
+   * they are in the room; while they are away (a reload is a disconnect like any other) the
+   * longest-standing member stands in, so a room is never leaderless. Reassigning on close is
+   * what handed the crown to whoever reconnected first after a world change.
+   */
+  private get creator(): string | null {
+    const present = [...this.members.values()]
+    if (this.founder !== null && present.some((m) => m.handle === this.founder)) return this.founder
+    return present[0]?.handle ?? null
+  }
+
+  /** Runs before the first connection is served: recover the ground this room stands on. */
+  async onStart(): Promise<void> {
+    const saved = await this.ctx.storage.get<SavedRoom>('room')
+    if (!saved) return
+    // content can change under a sleeping room: a map or mode that no longer exists (or a pair
+    // that no longer fits) falls back rather than bricking the lobby
+    const map = coopMaps().find((m) => m.id === saved.mapId)
+    const mode = coopModes().find((m) => m.id === saved.modeId)
+    const pairs = map !== undefined && mode !== undefined && map.modes.includes(mode.id)
+    this.mapId = pairs ? saved.mapId : DEFAULT_MAP_ID
+    this.modeId = pairs ? saved.modeId : DEFAULT_MODE_ID
+    this.founder = saved.founder
+  }
+
+  private saveRoom(): void {
+    const room: SavedRoom = { mapId: this.mapId, modeId: this.modeId, founder: this.founder }
+    this.ctx.waitUntil(
+      this.ctx.storage
+        .put('room', room)
+        .catch((err) => console.error('room save failed', err instanceof Error ? err.message : err)),
+    )
+  }
 
   async onConnect(conn: Connection, ctx: ConnectionContext): Promise<void> {
     const url = new URL(ctx.request.url)
@@ -100,7 +151,10 @@ export class MatchRoom extends Server<Env> {
       userId: session.userId,
       spectator: midMatch && !combatant,
     })
-    if (!this.creator) this.creator = session.username
+    if (this.founder === null) {
+      this.founder = session.username
+      this.saveRoom()
+    }
     this.broadcastLobby()
     if (midMatch && this.world) {
       this.send(conn, {
@@ -140,6 +194,7 @@ export class MatchRoom extends Server<Env> {
         if (!map || !mode || !map.modes.includes(mode.id)) return
         this.mapId = map.id
         this.modeId = mode.id
+        this.saveRoom() // every client is about to reload into this; the room must not forget it
         this.ready.clear() // a new battlefield: everyone musters again
         this.broadcastLobby()
         return
@@ -204,9 +259,6 @@ export class MatchRoom extends Server<Env> {
     if (!member) return
     this.members.delete(conn.id)
     this.ready.delete(member.handle)
-    if (this.creator === member.handle) {
-      this.creator = [...this.members.values()][0]?.handle ?? null
-    }
     if (this.world && this.phase === 'match' && !member.spectator) {
       this.relayEvents(removePlayer(this.world, member.handle))
       if (this.world.phase === 'ended') this.finishMatch()
@@ -293,6 +345,11 @@ export class MatchRoom extends Server<Env> {
     this.broadcastLobby()
   }
 
+  /**
+   * Nobody is connected. Drop the match, but keep what the room *is*: its ground and its
+   * founder. An empty room is the normal state for the second everyone spends reloading into
+   * a new arena, not a room that never existed.
+   */
   private reset(): void {
     if (this.interval !== null) {
       clearInterval(this.interval)
@@ -302,7 +359,6 @@ export class MatchRoom extends Server<Env> {
     this.world = null
     this.seed = ''
     this.ready.clear()
-    this.creator = null
     this.members.clear()
     this.rosterIds.clear()
   }
