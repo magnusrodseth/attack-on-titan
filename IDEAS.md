@@ -11,6 +11,18 @@ When one graduates, move it to `wayfinder/map.md` (fog → ticket → decision) 
   streak) is the thing that accumulates. Ghost replays are ruled out of scope there — they return
   as their own effort.
 
+- **Dull blades** → **shipped 2026-07-14**. The one-cut bar rises with the edge left on the pair in
+  hand (`oneCutSpeed` in `src/sim/combat.ts`): fresh steel kills at killSpeed, a spent pair needs
+  about 21.5 m/s. Only the bar moves — chip damage and the score multipliers still key off the base
+  killSpeed. Shipped alongside the `gasLow`/`bladesLow` supply warnings, so worn steel tells you
+  what it is costing you before it costs you a run.
+
+- **Townsfolk** → built, shipped, and **REVERTED the same day** (2026-07-14, user call). There are
+  no civilians in the game and no Evacuation mode. The effort's map is kept with a REVERTED banner
+  ([The people in the streets](wayfinder/map-townsfolk.md)) because the reasoning outlives the
+  code: the design rulings, what the tuning probes actually measured, and the two silent bugs it
+  surfaced. **This is not a live idea. If it ever comes back, read the map first.**
+
 ## Close-quarters kill bonus (sparring idea, agreed 2026-07-09)
 
 A score multiplier tier for killing a titan while hooked to it. Hooks already anchor in
@@ -23,22 +35,6 @@ is one line at kill time in `trySlash`: some `hook.titanId === victim.id`.
   way) stay in sync.
 - **Why**: makes the iconic orbit-the-titan-you-are-killing move mechanically legible, and
   rewards hooking titans themselves instead of always hooking buildings.
-
-## Dull blades: wear raises the kill threshold (sparring idea, agreed 2026-07-09)
-
-Blades are currently binary until they snap (bladeHp 6 per pair, 4 pairs; nape/ankle wear 1,
-body wears 2, `wearBlade` in `src/sim/combat.ts`). Idea: the one-cut threshold scales with the
-current pair's remaining bladeHp — fresh pair kills at killSpeed 17 m/s, last-hit pair needs
-roughly 22.
-
-- **Why**: this is the fix for the weakest system in the game. Gas is only spent on dashes and
-  every kill refunds a heart, so the resupply station is nearly decorative; dull blades make
-  the mid-wave resupply run a real decision (dip in kill threshold vs travel time) without
-  touching the gas economy (free swinging stays sacred to the feel).
-- **Scope notes**: only the one-cut threshold moves; keep the sub-threshold damage curve keyed
-  on base killSpeed so chip damage is not double-punished. Deepens "Sharp Blades" and
-  "Extra Blades" upgrades. HUD: tint the segmented blade-gauge cells toward dull as bladeHp
-  drops, and surface the raised threshold near the kill-speed feedback.
 
 ## Rare titan kind: the Crawler (sparring idea, agreed 2026-07-09)
 
@@ -96,68 +92,6 @@ state the snapshots already carry.
   the spectator overlay; brief i-frames after revive.
 - Creates the rescue moments co-op currently lacks; pairs well with a possible grab-type titan
   (discussed, not yet adopted) where cutting the wrist frees a grabbed teammate.
-
-## Townsfolk: people in the streets, and titans that eat them (user idea, 2026-07-14)
-
-Supersedes the earlier "civilian evacuation events" sketch (2026-07-13), which framed rescue as
-a rare scripted event. The stronger version is ambient: the district simply **has people in it**,
-all the time, and titans eat them. The city is currently scenery, and the only thing at stake in
-a wave is your own hearts — which is the half of the AoT fantasy the game does not have.
-
-**The core loop it creates.** Aggro is a fixed pool: `MAX_CHASERS = 3` sticky tokens
-(`src/sim/game.ts`) decide which titans hunt the player, and today every other titan just
-wanders. Give the untokened ones a target and the whole wave reads differently: **every titan
-that is not chasing you is eating someone.** You cannot be everywhere, so a wave stops being
-"kill the roster" and becomes "where do I spend myself." That is the entire feature in one
-sentence, and it falls out of a system that already exists.
-
-**The devouring is a window, not an event.** A titan that reaches a townsperson **grabs**
-them (`src/sim/grab.ts` already models a grab-and-lift with an escape timer — point it at an
-NPC instead of the player), raises them, and there is a beat of maybe 3 seconds before the bite.
-In that window the victim is a lifted, screaming, *stationary* target held at nape height. Cut
-the nape, spear the titan, or sever the wrist and they drop, tumble, and flee. Miss the window
-and they are gone. This is the iconic AoT beat, and it is a rescue the player performs with the
-moveset they already have, at speed, under time pressure.
-
-**The dark bargain (the reason this is interesting).** A titan mid-meal is a titan standing
-still with an exposed nape: the easiest kill in the game. So the crowd is simultaneously the
-thing you protect and the bait that sets up your cleanest one-cuts. Letting a titan commit to a
-grab is *tactically correct* and *morally awful*, and the game should never resolve that tension
-for you. That beats any score bonus as a design payload.
-
-**Saves feed the supply line, not the scoreboard.** Do NOT pay points for rescues (it turns into
-a farm, and it cheapens the fiction). Instead: **rescued townsfolk run the resupply.** Survivors
-stream to the nearest station (`Arena.stations` already exists, cardinal + plaza) and what they
-carry restocks it — a wave that lost half its people leaves you a half-stocked station next wave.
-The district's headcount becomes a resource you maintain across a run, and it aims squarely at
-the game's weakest system: the resupply station is near-decorative today (gas is only spent on
-dashes, kills refund hearts). This pairs hard with the dull-blades idea above — the two together
-are what make a mid-wave resupply run a real decision.
-
-**A run's second scoreboard.** Track the headcount per run. Lose everyone and the district is
-empty: stations bare, streets silent, the ambient audio drops out. A soft, atmospheric fail
-state that is not death, and a run summary line that lands harder than a score ("Wall Rose, wave
-14. Civilians lost: 61."). Commendations already ride the event bus, so "Not one soul" (clear a
-wave with zero losses) and "Snatched from the jaws" (interrupt N grabs) cost nothing to add.
-
-**Scope notes.**
-
-- **Sim**: townsfolk as light agents on the baked NavGrid (`src/sim/nav.ts` `findPath`), walking
-  between doors, plaza and market. Titan targeting generalizes the chaser tokens into a second
-  token pool. Seeded via `hashSeed(seed + ':folk:wave')` so `?seed=` replays kill the same
-  people — determinism is not negotiable and the fiction makes that grim.
-- **Render**: the humanoid-pool pattern is proven by `SoldierPool` (`src/render/soldiers.ts`);
-  low-poly civilians on credited cloth/skin textures per the texture rule, white minimap blips.
-- **Per arena**: the district is the home case. The Underground gets them too (a hidden
-  population under the capital is very on-theme). The Forest deliberately has **none** — nobody
-  lives there, and its emptiness becomes a characteristic rather than an omission.
-- **Perf**: cap the population and instance it; the count is a budget knob, not a promise.
-- **Co-op later**: the token pool is server-side already, so it generalizes the same way.
-- **To scope**: do they flee toward the player (turning a rescue into a liability that draws
-  titans onto you)? does a panicking crowd make noise that pulls aggro? does the boss ladder
-  clear the streets first (a Colossal arriving to an empty district is its own statement)?
-- **The evacuation event survives as an escalation**: once ambient townsfolk work, a rare wave
-  where a column of them must cross the district to the gatehouse is a variant, not a new system.
 
 ## QoL: key rebinding and colorblind weak-point option (audit idea, agreed 2026-07-13)
 
