@@ -93,6 +93,21 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
   as black boulders. Textures: Japanese Cedar (sugi) bark for the giants — the tree the anime's
   groves are actually drawn from — plus Bark Brown 02, Forest Ground 06 and Leafy Grass, all CC0
   Poly Haven, credited. Race-only for now, like the Underground.
+- Per-arena boards, and the placebo upgrades killed (user requests, 2026-07-14, shipped): the
+  menu's Featured Course button promoted a *seed*, not a map, so once the registry grew it no
+  longer named one shared line — removed, and the Hall of the Fallen now renders one Signal Run /
+  Culling board pair per arena, built by walking `GAME_MAPS` so a new map brings its boards with
+  it. Fixed alongside: The Culling was never map-scoped the way Signal Run was (its PB and its
+  posted score both keyed off the bare seed, so a Forest cull contested the District's board).
+  Second, the placebo upgrades (IDEAS.md defect): `gasThrust`, `gasBurn` and `airBoostThrust`
+  were mutated by upgrades and read by nothing, making "Tuned Thrusters" a pure no-op — the dead
+  fields are deleted, the dash impulse (`boostImpulse`) and the air-control ceiling
+  (`airControlCeiling`) are live `PlayerConfig` fields the sim reads, and the two upgrades now
+  touch them. The guard that matters is in `upgrades.test.ts`: every upgrade is pinned by a probe
+  that runs real sim code and must move a number (dashes until dry, metres reeled, cuts before the
+  racks run out, a kill driven through `stepGame`), never a `p.config.x` read — asserting a config
+  number moved is exactly what let the placebos ship green. SAVE_VERSION 3 → 4 (the config shape
+  changed; old runs are discarded).
 
 ## Not yet specified
 

@@ -30,7 +30,7 @@ import { UPGRADE_POOL } from './upgrades'
  * v3 (footballer removal, 2026-07-13): the matchday mode and the striker/captain titan
  * kinds no longer exist, so any v2 save could reference them; old runs are discarded.
  */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 type V3 = [number, number, number]
 

@@ -9,12 +9,13 @@ import { applyRopeConstraint, createHook, reelHook } from './rope'
 export interface PlayerConfig {
   maxGas: number
   gasCanisters: number
-  gasThrust: number
-  gasBurn: number
-  airBoostThrust: number
+  /** Speed the Shift dash adds along the look direction. */
+  boostImpulse: number
   runSpeed: number
   runAccel: number
   airControl: number
+  /** Air input only ADDS speed below this; above it, steering redirects and nothing more. */
+  airControlCeiling: number
   jumpSpeed: number
   drag: number
   reelSpeed: number
@@ -37,12 +38,11 @@ export interface PlayerConfig {
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   maxGas: 100,
   gasCanisters: 3,
-  gasThrust: 12,
-  gasBurn: 22,
-  airBoostThrust: 16,
+  boostImpulse: 13,
   runSpeed: 8,
   runAccel: 40,
   airControl: 14,
+  airControlCeiling: 12,
   jumpSpeed: 9,
   drag: 0.05,
   reelSpeed: 10,
@@ -136,7 +136,6 @@ export function createPlayer(config: PlayerConfig = { ...DEFAULT_PLAYER_CONFIG }
   }
 }
 
-const BOOST_IMPULSE = 13
 export const BOOST_COST = 14 // the HUD segments the gas bar into taps of this size
 const BOOST_COOLDOWN = 0.5
 
@@ -152,7 +151,7 @@ export function tryBoost(p: PlayerState, lookDir: Vector3): boolean {
   const dir = lookDir.clone()
   if (dir.lengthSq() === 0) return false
   dir.normalize()
-  p.vel.addScaledVector(dir, BOOST_IMPULSE)
+  p.vel.addScaledVector(dir, p.config.boostImpulse)
   p.gas -= BOOST_COST
   p.boostCooldown = BOOST_COOLDOWN
   return true
@@ -239,7 +238,9 @@ export function stepPlayer(p: PlayerState, input: InputState, dt: number, arena:
   } else if (move.lengthSq() > 0) {
     steerHorizontal(p.vel, move, 1.5 * dt)
     // air input adds speed only at low speeds; past that it purely redirects
-    if (Math.hypot(p.vel.x, p.vel.z) < 12) p.vel.addScaledVector(move, cfg.airControl * dt)
+    if (Math.hypot(p.vel.x, p.vel.z) < cfg.airControlCeiling) {
+      p.vel.addScaledVector(move, cfg.airControl * dt)
+    }
   }
 
   if (!wasOnGround) {

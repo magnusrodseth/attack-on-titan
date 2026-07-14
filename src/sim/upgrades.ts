@@ -90,18 +90,18 @@ export const UPGRADE_POOL: Upgrade[] = [
   {
     id: 'wind-dancer',
     name: 'Wind Dancer',
-    desc: '+60% air control, +30% air boost',
+    desc: '+60% air control, and it keeps pulling to higher speeds',
     apply(p) {
       p.config.airControl *= 1.6
-      p.config.airBoostThrust *= 1.3
+      p.config.airControlCeiling *= 1.25
     },
   },
   {
     id: 'thrusters',
     name: 'Tuned Thrusters',
-    desc: '+20% gas thrust',
+    desc: '+25% dash impulse',
     apply(p) {
-      p.config.gasThrust *= 1.2
+      p.config.boostImpulse *= 1.25
     },
   },
 ]
