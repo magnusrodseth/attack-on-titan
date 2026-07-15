@@ -116,6 +116,18 @@ describe('serializeRun / restoreRun', () => {
     expect(fresh.nextSpearId).toBe(g.nextSpearId)
   })
 
+  it('carries the daily tag across a save so a refresh resumes it as a daily', () => {
+    const g = createGame('exp-abc', null)
+    startGame(g)
+    // no tag on an ordinary run
+    expect(JSON.parse(JSON.stringify(serializeRun(g))).daily).toBeUndefined()
+    // tagged: the date rides the save verbatim, opaque to the sim
+    const save = JSON.parse(JSON.stringify(serializeRun(g, undefined, '2026-07-15')))
+    expect(save.daily).toBe('2026-07-15')
+    // and a restore ignores it (the sim never reads it) while still restoring the run
+    expect(restoreRun(save, createGame('exp-abc', null))).toBe(true)
+  })
+
   it('restores the upgrade intermission with the same offers, still pickable', () => {
     const g = createGame('persist-upg', null)
     startGame(g)

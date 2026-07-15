@@ -1,9 +1,42 @@
 ---
 type: wayfinder:task
 status: open
-assignee: 
-blocked-by: [de-005, de-007]
+assignee: claude (built 2026-07-15, branch `daily-client`)
+blocked-by: []
 ---
+
+## Built and verified (2026-07-15, branch `daily-client`) — awaiting the ship decision
+
+Everything below the "Question" is done and driven end to end in a real browser against a local
+`wrangler dev` + a migrated D1. What remains is the outward-facing part: **merge to main (which
+auto-deploys the client and the Worker together now) and graduate the effort.** Held for a human
+green light because it ships a new headline mode and flips free play to a random seed in prod.
+
+- **Free play rolls a random seed** (`randomSeed`, de-002 §6). `?seed=` links and saved runs still
+  pin their course; only a fresh unpinned boot is random. The dead `wall-YYYY-MM-DD` daily seed is
+  gone. This is why it had to land *with* the daily: the daily's course (server double-written to
+  `trials`) is now the shared one that keeps the per-arena boards alive.
+- **The run-save daily flag** (`SAVE_VERSION` 5 → 6, `daily?` on `SavedRun`): a refresh mid-daily
+  resumes it as a daily — Restart suppressed, result still routed to the daily submit.
+- **The sealed seed never enters a URL.** The claim stashes it in localStorage (`aot-daily-active`)
+  and the daily reload carries only `?mode&map&daily=1`, so a link cannot hand someone today's
+  course unspent. The seed rides the save and the stash, both seed-gated.
+- **The local mark** (`aot-daily-marks`) is set on any daily deploy — ranked, unranked or signed
+  out — and a marked date refuses a fresh claim (the practice loophole costs a devtools command).
+- **Result routing**: a daily posts every mode through `POST /api/daily/submit` (which double-writes
+  the trial server-side); an ordinary run keeps its direct trial post. "Once More" becomes "Return
+  to Base" on a daily and drops to a clean menu where the plate reads spent.
+- **Hall restructure** and the **three unhappy states**: as de-005 describes.
+- **Verified**: claim → reload (no seed in URL) → run → death card daily line (`Score 4200 ·
+  Provisional #1 today · Streak now 1 day`) → spent plate → Hall (daily board + Standings, armin's
+  abandoned run showing as the finished/expeditions gap). `pnpm test` 624 green, `pnpm typecheck`
+  clean.
+
+### Remaining to ship (the human's call)
+- Merge `daily-client` to main (Vercel + the Worker workflow deploy together).
+- Confirm prod: the daily plate rolls, a real claim/run/submit posts to prod D1.
+- Graduate: strike the Daily entry from IDEAS.md and record it on `wayfinder/map.md` beside the
+  other shipped efforts.
 
 ## Question
 

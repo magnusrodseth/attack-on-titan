@@ -1,5 +1,14 @@
 import { PartySocket } from 'partysocket'
-import type { ClientMsg, Leaderboard, ServerMsg, TrialBoards } from './protocol'
+import type {
+  ClientMsg,
+  DailyBoard,
+  DailyOrdersResponse,
+  DailyPostedRun,
+  Leaderboard,
+  ServerMsg,
+  StandingsEntry,
+  TrialBoards,
+} from './protocol'
 import { PROTOCOL_VERSION, parseServerMsg } from './protocol'
 import { CONTENT_HASH } from '../sim/content'
 
@@ -113,6 +122,102 @@ export async function fetchTrials(seed: string): Promise<TrialBoards | null> {
     const res = await fetch(`${API_BASE}/api/trials?seed=${encodeURIComponent(seed)}`)
     if (!res.ok) return null
     return (await res.json()) as TrialBoards
+  } catch {
+    return null
+  }
+}
+
+// --- the Daily Expedition (de-008) ---------------------------------------------
+//
+// Claim is the moment the day is spent (de-001): the client asks, the Worker writes the row and
+// hands back the sealed orders, and only then can the client build today's course. Every branch
+// the UI has to tell apart is modelled here so main.ts reads a tag, not an HTTP status.
+
+export type DailyClaim =
+  /** the orders are yours; `ranked` is false when signed out or the claim wrote no row. */
+  | { status: 'ok'; orders: DailyOrdersResponse }
+  /** already spent today (409). `run` is what you posted, or null if you abandoned it. */
+  | { status: 'spent'; date: string; run: DailyPostedRun | null }
+  /** no orders to be had — the seed is sealed and Headquarters did not answer (503 / network). */
+  | { status: 'unreachable' }
+
+interface ClaimBody extends DailyOrdersResponse {
+  spent?: boolean
+  run?: DailyPostedRun | null
+}
+
+/**
+ * Take today's field. A token claims for real (ranked); no token still returns the orders so a
+ * signed-out visitor can play (de-003 amendment), just unranked. The seal means the client cannot
+ * even render the arena without this call, so a failure to reach it is a genuine "no daily today",
+ * not merely "unranked" — hence the explicit `unreachable`.
+ */
+export async function claimDaily(token: string | null): Promise<DailyClaim> {
+  try {
+    const res = await fetch(`${API_BASE}/api/daily/claim`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.status === 503) return { status: 'unreachable' }
+    const body = (await res.json()) as ClaimBody
+    if (res.status === 409) return { status: 'spent', date: body.date, run: body.run ?? null }
+    if (!res.ok || !body.seed) return { status: 'unreachable' }
+    return {
+      status: 'ok',
+      orders: {
+        date: body.date,
+        modeId: body.modeId,
+        mapId: body.mapId,
+        metric: body.metric,
+        seed: body.seed,
+        ranked: body.ranked,
+      },
+    }
+  } catch {
+    return { status: 'unreachable' }
+  }
+}
+
+export type DailySubmitBody = {
+  date: string
+  timeS?: number
+  level?: number
+  score?: number
+  wave?: number
+  splits?: number[]
+}
+
+/** Post a daily result. Fire-and-forget like the trial post: a lost submit costs a board row. */
+export async function submitDaily(token: string, body: DailySubmitBody): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/daily/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/** Today's board (or a past day's), fetched by date — the seed stays sealed while it is live. */
+export async function fetchDailyBoard(date?: string): Promise<DailyBoard | null> {
+  try {
+    const q = date ? `?date=${encodeURIComponent(date)}` : ''
+    const res = await fetch(`${API_BASE}/api/daily/board${q}`)
+    if (!res.ok) return null
+    return (await res.json()) as DailyBoard
+  } catch {
+    return null
+  }
+}
+
+export async function fetchStandings(): Promise<StandingsEntry[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/daily/standings`)
+    if (!res.ok) return null
+    return (await res.json()) as StandingsEntry[]
   } catch {
     return null
   }

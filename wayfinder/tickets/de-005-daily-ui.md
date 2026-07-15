@@ -1,11 +1,46 @@
 ---
 type: wayfinder:prototype
-status: open
-assignee: 
+status: closed
+assignee: claude (2026-07-15)
 blocked-by: []
 ---
 
-## Question
+## Resolution (built 2026-07-15, branch `daily-client`, verified in a real browser)
+
+The shape, and the taste calls made where the ticket left them open (flagged for the user to
+overrule on reaction):
+
+- **The plate is a headline, not a peer.** A chamfered brass-rimmed card sits between the title and
+  the controls wall, same construction language as the menu buttons: eyebrow "TODAY'S EXPEDITION",
+  the arena in Cloister Black, "SEALED ORDERS · ONE ATTEMPT", the streak object, a status line, and
+  its own "Take the Field" deploy. The discipline and arena come from the **public client-side
+  roll** (`dailyRoll`), so the plate is populated instantly, before any fetch — only the seed waits
+  on the claim.
+- **The commitment warning fires once per device, not every day** (`aot-daily-understood`). Daily
+  friction fights the habit the mode exists to build, and the plate already says "one attempt" in
+  plain sight. **Taste call — overrule to warn-every-day if the robbed-once risk feels worse.**
+- **The spent state** is the plate itself, restyled: the streak pips, "You ran today — provisional
+  #N. Next expedition in 14h 40m", and the deploy button steps back to "See the Standings".
+- **The streak is an object**: filled brass pips + "N-day streak", amber and "run today to keep it"
+  when alive but not yet extended.
+- **The result line** rides the existing death / finish card: "Daily Expedition · <course> ·
+  <result> · Provisional #N today · Streak now N days", posting live and refining once the board
+  and Standings come back.
+- **The three unhappy states** each explain themselves: signed-out ("playable, only enlisted post"),
+  Headquarters-unreachable at claim ("orders are sealed, try again shortly" — see the deviation
+  note below), and a spent day (the spent plate, or a 409 that opens straight to the Standings).
+- **The Hall leads with the daily**: today's board (provisional) and the Standings above the
+  all-time boards; the per-arena trial boards render only on a **contested** course (the daily's, or
+  a shared `?seed`), and collapse to the current arena alone on an unshared random seed.
+
+**One deviation from de-003 §2, on purpose.** The sealed-orders amendment (de-002/de-004) made the
+seed unreachable without a successful claim, so a claim that returns nothing (no `DAILY_SECRET`, or
+the Worker down) cannot start *today's* course at all — there is no line to run. That path therefore
+reads "Headquarters unreachable, try again shortly" rather than de-003 §2's "start unranked". The
+unranked-and-loud state still applies where it can: signed-out play, and a submit that fails after a
+good claim. Flagged for the user.
+
+## Original question
 
 What does the Daily Expedition look and feel like, from the menu plate to the moment the attempt
 is spent?

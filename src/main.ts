@@ -2,12 +2,34 @@ import { AdditiveBlending, Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeo
 import { initAnalytics, track } from './analytics'
 import { AudioSystem, FLINCHES, GRUNTS, ROARS, SLASHES } from './audio'
 import { CoopSession } from './coopSession'
-import type { SettingsValues, ThreatPing, TrialSection } from './hud'
+import type { DailyPlateView, SettingsValues, ThreatPing, TrialSection } from './hud'
 import { formatRaceTime, Hud } from './hud'
-import type { Account } from './net/client'
-import { clearAccount, fetchLeaderboard, fetchTrials, loadAccount, login, postTrial, register } from './net/client'
-import type { Leaderboard, LobbyMsg } from './net/protocol'
+import type { Account, DailySubmitBody } from './net/client'
+import {
+  claimDaily,
+  clearAccount,
+  fetchDailyBoard,
+  fetchLeaderboard,
+  fetchStandings,
+  fetchTrials,
+  loadAccount,
+  login,
+  postTrial,
+  register,
+  submitDaily,
+} from './net/client'
+import type { DailyBoard, Leaderboard, LobbyMsg, StandingsEntry } from './net/protocol'
 import { generateRoomCode, normalizeRoomCode } from './net/protocol'
+import {
+  clearActiveDaily,
+  dailyUnderstood,
+  hasDeployed,
+  loadActiveDaily,
+  markDeployed,
+  randomSeed,
+  rememberDailyUnderstood,
+  setActiveDaily,
+} from './dailyClient'
 import { BladeView } from './render/blade'
 import { Effects } from './render/effects'
 import { FlashlightBeam } from './render/flashlight'
@@ -25,7 +47,7 @@ import { LAMP_BATTERY_SECONDS, lampGlow, lampOn, lightAround } from './sim/flash
 import type { CoopEvent } from './sim/coop'
 import { musterPos } from './sim/coop'
 import { stepCoopClient } from './sim/coopClient'
-import { dailyDate } from './sim/daily'
+import { dailyDate, dailyRoll } from './sim/daily'
 import type { GameEvent } from './sim/game'
 import { chooseUpgrade, createGame, FOCUS_TIME_SCALE, gameClock, saveBest, startGame, stepGame } from './sim/game'
 import { DEFAULT_MAP_ID, GAME_MAPS, getMap, mapScopedSeed, mapsForMode } from './sim/maps'
@@ -51,16 +73,6 @@ import { createScore } from './sim/score'
 import { SPEAR_FUSE } from './sim/spear'
 import { anklePos, napeCenter } from './sim/titan'
 import { UPGRADE_POOL, applyUpgrade } from './sim/upgrades'
-
-/**
- * The course everyone shares today. UTC, not local: this used to build its date from
- * `new Date()`'s local getters, so two soldiers either side of a timezone were on different
- * cities at the same instant — and posting to different boards for what looked like the same
- * day. One world, one day. (`dailyDate` is the same clock the Daily Expedition rolls on.)
- */
-function dailySeed(): string {
-  return `wall-${dailyDate()}`
-}
 
 const MODE_KEY = 'aot-odm-mode'
 function storedModeId(): string | null {
@@ -101,7 +113,16 @@ const coopMode = lobbyCode !== null
 // dev playground: a statue gallery with free flight and nothing that bites; the
 // import.meta.env.DEV guard makes this a compile-time false in production builds
 const playgroundMode = import.meta.env.DEV && !coopMode && urlParams.get('playground') === '1'
-const seed = coopMode ? `coop-${lobbyCode.toLowerCase()}` : (urlParams.get('seed') ?? runSave?.seed ?? dailySeed())
+// a daily boot carries `?daily=1` but NOT the seed: the sealed course lives in localStorage, never
+// in a shareable URL, so it cannot be handed to someone who has not spent their attempt (de-004,
+// sealed orders). The stashed context supplies the seed here.
+const dailyBootCtx = !coopMode && urlParams.get('daily') === '1' ? loadActiveDaily() : null
+// free play now rolls a RANDOM seed (de-002 §6): the daily is the one shared course, and it is
+// server-sealed, so a plain Deploy can no longer land on today's line by accident. A `?seed=` link
+// and a saved run still pin their own course; only a fresh, unpinned boot is random.
+const seed = coopMode
+  ? `coop-${lobbyCode.toLowerCase()}`
+  : (dailyBootCtx?.seed ?? urlParams.get('seed') ?? runSave?.seed ?? randomSeed(Math.random))
 const modeId = urlParams.get('mode') ?? (coopMode ? DEFAULT_MODE_ID : (runSave?.modeId ?? storedModeId() ?? DEFAULT_MODE_ID))
 // the arena archetype resolves like the mode (URL → saved run → sticky choice), then
 // falls back to the district anywhere the chosen map cannot host the chosen mode
@@ -112,6 +133,18 @@ const requestedMapId = coopMode
   ? (urlParams.get('map') ?? DEFAULT_MAP_ID)
   : (urlParams.get('map') ?? runSave?.mapId ?? storedMapId() ?? DEFAULT_MAP_ID)
 const mapId = getMap(requestedMapId).modes.includes(modeId) ? getMap(requestedMapId).id : DEFAULT_MAP_ID
+
+// --- the Daily Expedition (de-008): is this boot a daily, and which one? ---------------------
+// The roll (mode + map) is public and derivable client-side; only the seed is sealed and comes
+// from the claim. `activeDaily` is the run currently under way as a daily, matched to this page's
+// seed — a stashed context for a different course is inert.
+const dailyToday = dailyDate()
+const dailyOrders = coopMode ? null : dailyRoll(dailyToday)
+let activeDaily = coopMode ? null : loadActiveDaily()
+if (activeDaily && activeDaily.seed !== seed) activeDaily = null
+let dailyBoardCache: DailyBoard | null = null
+let standingsCache: StandingsEntry[] | null = null
+
 initAnalytics()
 const game = createGame(seed, undefined, modeId, mapId)
 // the soldier's record: lifetime commendations riding the solo event bus (ticket 010)
@@ -305,6 +338,7 @@ function beginRun(): void {
   hud.hideStart()
   hud.hideDeath()
   hud.hideRaceResults()
+  dailyRunJustEnded = false
   pauseShown = false
   if (game.phase === 'menu' || game.phase === 'dead' || game.phase === 'finished') {
     startGame(game)
@@ -517,10 +551,22 @@ function submitTrial(body: Parameters<typeof postTrial>[1]): void {
 }
 
 hud.onStart = beginRun
-hud.onRetry = beginRun
+// a daily is one attempt: after it ends, "Return to Base" drops to a clean menu (where the plate
+// reads spent) instead of relighting the same course
+hud.onRetry = () => {
+  if (dailyRunJustEnded) {
+    location.href = location.pathname
+    return
+  }
+  beginRun()
+}
 // the finish screen's "Run It Again" relights the same line without a full startGame
 hud.onRaceAgain = () => {
   if (touchOnly) return
+  if (dailyRunJustEnded) {
+    location.href = location.pathname
+    return
+  }
   audio.init()
   hud.hideRaceResults()
   restartRace(game)
@@ -582,7 +628,8 @@ function persistRun(): void {
   if (coopMode || playgroundMode) return // neither belongs in the solo save slot
   if (game.phase !== 'playing' && game.phase !== 'upgrading') return
   try {
-    localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun(game, { yaw, pitch })))
+    // the daily tag rides the save so a plain refresh mid-daily resumes it AS a daily
+    localStorage.setItem(RUN_KEY, JSON.stringify(serializeRun(game, { yaw, pitch }, activeDaily?.date)))
   } catch {
     // storage full or private mode: the run simply is not refresh-proof
   }
@@ -601,6 +648,14 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') persistRun()
 })
 
+// a daily run (fresh from a claim, or resumed from a save) makes the menu the expedition's own:
+// the banner names it, Restart is suppressed, and the headline plate steps aside
+if (activeDaily) {
+  hud.setDailyRunContext(
+    `Today's Expedition · ${dailyCourseName(game.mode.id, game.map.id)}${activeDaily.ranked ? '' : ' · unranked'} · one attempt`,
+  )
+}
+
 const restored = !coopMode && !playgroundMode && runSave !== null && restoreRun(runSave, game)
 if (restored) {
   // the pre-restore boost history is gone: the current wave cannot vouch for Cold Steel
@@ -617,6 +672,11 @@ if (restored) {
   }
 } else if (!coopMode && !playgroundMode) {
   hud.showStart(false, game)
+  // the fresh, non-daily menu lights its headline plate and fetches the streak/board behind it
+  if (!activeDaily) {
+    refreshDailyPlate()
+    refreshDailyData()
+  }
 }
 
 // --- co-op: lobby flow, match mirrors, server events -------------------------
@@ -1071,21 +1131,234 @@ try {
 } catch {
   // corrupt cache: first open shows skeletons instead
 }
+// --- the Daily Expedition: plate, deploy, submit, hall (de-008) --------------
+
+/** "The Culling · The District" for a run's mode and map. */
+function dailyCourseName(runModeId: string, runMapId: string): string {
+  const modeName = GAME_MODES.find((m) => m.id === runModeId)?.name ?? runModeId
+  return `${modeName} · ${getMap(runMapId).name}`
+}
+
+/** Time to the next UTC midnight, when today's board closes and the next expedition rolls. */
+function untilNextExpedition(): string {
+  const now = new Date()
+  const ms = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) - now.getTime()
+  const h = Math.floor(ms / 3_600_000)
+  const m = Math.floor((ms % 3_600_000) / 60_000)
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+
+function myStreak(): number {
+  const you = loadAccount()?.username
+  return (you && standingsCache?.find((s) => s.username === you)?.streak) || 0
+}
+
+function myPlacement(): number | null {
+  const you = loadAccount()?.username
+  if (!you || !dailyBoardCache) return null
+  const i = dailyBoardCache.entries.findIndex((e) => e.username === you)
+  return i < 0 ? null : i + 1
+}
+
+/** Paint the headline plate from what is known right now; a later fetch refines streak/placement. */
+function refreshDailyPlate(): void {
+  // no plate in co-op, and none while a daily is already under way (the menu is the run's then)
+  if (coopMode || !dailyOrders || activeDaily) {
+    hud.showDailyPlate(null)
+    return
+  }
+  const account = loadAccount()
+  const spent = hasDeployed(dailyToday)
+  const streak = myStreak()
+  const finishedToday = myPlacement() !== null
+  let status: string
+  let statusKind: DailyPlateView['statusKind'] = ''
+  let deployLabel = 'Take the Field'
+  if (spent) {
+    const place = myPlacement()
+    status = `${place ? `You ran today — provisional #${place}. ` : 'You ran today. '}Next expedition in ${untilNextExpedition()}.`
+    statusKind = 'spent'
+    deployLabel = 'See the Standings'
+  } else if (!account) {
+    status = 'Playable now — but only enlisted soldiers post to the Standings.'
+  } else {
+    status = 'Sealed orders. One attempt — deploying spends today, and quitting still counts.'
+  }
+  hud.showDailyPlate({
+    headline: dailyCourseName(dailyOrders.modeId, dailyOrders.mapId),
+    streak,
+    streakAtRisk: streak > 0 && !finishedToday && !spent,
+    status,
+    statusKind,
+    deployLabel,
+    spent,
+  })
+}
+
+/** Fetch today's board and the Standings, then repaint whatever is open (plate or hall). */
+function refreshDailyData(): void {
+  const paint = (): void => {
+    const you = loadAccount()?.username ?? null
+    if (hud.leaderboardOpen) hud.showDailyHall(dailyBoardCache, standingsCache, you)
+    if (!activeDaily) refreshDailyPlate()
+  }
+  void fetchDailyBoard(dailyToday).then((b) => {
+    dailyBoardCache = b
+    paint()
+  })
+  void fetchStandings().then((s) => {
+    standingsCache = s
+    paint()
+  })
+}
+
+/** Claim today, spend the attempt, and reload into the sealed course. */
+async function deployDaily(): Promise<void> {
+  if (!dailyOrders) return
+  const account = loadAccount()
+  const claim = await claimDaily(account?.token ?? null)
+  if (claim.status === 'unreachable') {
+    hud.showDailyPlate({
+      headline: dailyCourseName(dailyOrders.modeId, dailyOrders.mapId),
+      streak: myStreak(),
+      streakAtRisk: false,
+      status: 'Headquarters is unreachable — today’s orders are sealed. Try again shortly.',
+      statusKind: 'unreachable',
+      deployLabel: 'Try Again',
+      spent: false,
+    })
+    return
+  }
+  if (claim.status === 'spent') {
+    // the server says the day is already spent (another device, or a lost local mark): trust it
+    markDeployed(dailyToday)
+    refreshDailyPlate()
+    hud.onOpenLeaderboard()
+    return
+  }
+  const o = claim.orders
+  markDeployed(o.date)
+  setActiveDaily({ date: o.date, seed: o.seed, ranked: o.ranked })
+  track('daily_claimed', { mode: o.modeId, map: o.mapId, ranked: o.ranked })
+  // the page rebuilds around the sealed seed, which travels in localStorage (set just above), NOT
+  // in the URL — so the reloaded link cannot be shared to hand someone today's course unspent. A
+  // clean param set drops any stale `?seed` the menu may have carried in.
+  const params = new URLSearchParams({ mode: o.modeId, map: o.mapId, daily: '1' })
+  location.replace(`${location.pathname}?${params.toString()}`)
+}
+
+hud.onDailyDeploy = () => {
+  if (coopMode || !dailyOrders) return
+  if (hasDeployed(dailyToday)) {
+    hud.onOpenLeaderboard() // spent: the plate's button becomes "See the Standings"
+    return
+  }
+  const go = (): void => void deployDaily()
+  if (dailyUnderstood()) {
+    go()
+    return
+  }
+  // the one-time commitment warning: after this, a returning player is trusted to know the rule
+  hud.showConfirm(
+    'The Daily Expedition is one attempt. Deploying spends today — there is no restart, and quitting still counts. Take the field?',
+    'Take the Field',
+    () => {
+      rememberDailyUnderstood()
+      go()
+    },
+  )
+}
+
+/** Post a finished daily run and show where it landed. Called once, at run end. */
+function endDailyRun(): void {
+  const daily = activeDaily
+  if (!daily) return
+  const runModeId = game.mode.id
+  const runMapId = game.map.id
+  const body: DailySubmitBody =
+    runModeId === 'race'
+      ? { date: daily.date, timeS: lastRaceFinish?.time ?? game.time, splits: lastRaceFinish?.splits ?? [] }
+      : runModeId === 'hunt'
+        ? { date: daily.date, level: Math.max(0, game.wave - 1), score: game.score.score }
+        : { date: daily.date, score: game.score.score, wave: game.wave }
+  const course = dailyCourseName(runModeId, runMapId)
+  const result =
+    runModeId === 'race'
+      ? body.timeS !== undefined
+        ? formatRaceTime(body.timeS)
+        : '—'
+      : runModeId === 'hunt'
+        ? `Level ${body.level ?? 0}`
+        : `Score ${body.score ?? 0}`
+  const card = runModeId === 'race' ? 'race' : 'death'
+  const account = loadAccount()
+  const canPost = daily.ranked && account !== null
+  // the attempt is over regardless of what happens to the post: stand down the daily context
+  clearActiveDaily()
+  activeDaily = null
+  dailyRunJustEnded = true
+  hud.setDailyRunContext(null)
+  hud.setRunOverLabels(true)
+
+  if (!canPost) {
+    hud.renderDailyResult(card, {
+      course,
+      result,
+      placement: account ? 'This expedition will not post.' : 'Enlist to post to the Standings.',
+      streakLine: '',
+      unranked: true,
+    })
+    return
+  }
+  hud.renderDailyResult(card, { course, result, placement: 'Posting to the board…', streakLine: '', unranked: false })
+  track('daily_submitted', { mode: runModeId })
+  void submitDaily(account.token, body).then((ok) => {
+    if (!ok) {
+      hud.renderDailyResult(card, {
+        course,
+        result,
+        placement: 'Headquarters unreachable — not posted.',
+        streakLine: '',
+        unranked: true,
+      })
+      return
+    }
+    void Promise.all([fetchDailyBoard(daily.date), fetchStandings()]).then(([board, standings]) => {
+      dailyBoardCache = board
+      standingsCache = standings
+      const you = account.username
+      const place = board?.entries.findIndex((e) => e.username === you) ?? -1
+      const streak = standings?.find((s) => s.username === you)?.streak ?? 0
+      hud.renderDailyResult(card, {
+        course,
+        result,
+        placement: place >= 0 ? `Provisional #${place + 1} today` : 'Posted to the board',
+        streakLine: streak > 0 ? `Streak now ${streak} day${streak === 1 ? '' : 's'}.` : '',
+        unranked: false,
+      })
+    })
+  })
+}
+
 hud.onOpenLeaderboard = () => {
   const you = loadAccount()?.username ?? null
   hud.setLeaderboardIdentity(you) // signed-out visitors learn how names get on the board
   hud.showLeaderboard(leaderboardCache, leaderboardCache ? 'ready' : 'loading', you)
-  // one board pair per arena in the registry, so a new map shows up here for free. Coop
-  // runs never post trials, so a lobby seed would only ever draw empty boards: skip them.
-  const sections: TrialSection[] = coopMode
-    ? []
-    : GAME_MAPS.map((map) => ({
-        mapName: map.name,
-        scope: mapScopedSeed(map.id, seed),
-        current: map.id === game.map.id,
-        boards: null,
-        state: 'loading' as const,
-      }))
+  // the Hall now leads with the daily: today's board and the Standings, painted from cache then
+  // refreshed live (de-004 §6)
+  hud.showDailyHall(dailyBoardCache, standingsCache, you)
+  refreshDailyData()
+  // trial boards render only on a CONTESTED course — the daily's, or a shared ?seed link. On an
+  // unshared random free-play seed the other arenas are meaningless, so only the current one shows.
+  const contested = activeDaily !== null || urlParams.has('seed')
+  const mapsShown = coopMode ? [] : contested ? GAME_MAPS : GAME_MAPS.filter((m) => m.id === game.map.id)
+  const sections: TrialSection[] = mapsShown.map((map) => ({
+    mapName: map.name,
+    scope: mapScopedSeed(map.id, seed),
+    current: map.id === game.map.id,
+    boards: null,
+    state: 'loading' as const,
+  }))
   hud.showTrialBoards(seed, sections, you)
   // each arena paints the moment its own fetch lands; a reopen supersedes the older flight
   const flight = ++trialsFlight
@@ -1439,7 +1712,12 @@ function handleEvents(events: GameEvent[]): void {
       case 'raceFinished':
         audio.chime()
         effects.addShake(0.25)
-        submitTrial({ mode: 'race', seed: mapScopedSeed(game.map.id, seed), timeS: event.time, splits: event.splits })
+        // captured so the daily can post it at run end; a daily posts via the daily submit (which
+        // double-writes the trial itself), so the direct trial post is only for ordinary runs
+        lastRaceFinish = { time: event.time, splits: event.splits }
+        if (!activeDaily) {
+          submitTrial({ mode: 'race', seed: mapScopedSeed(game.map.id, seed), timeS: event.time, splits: event.splits })
+        }
         track('trial_finished', { mode: game.mode.id, seed, map: game.map.id, time_s: event.time, pb: event.pb })
         break
       case 'raceArmed':
@@ -1515,6 +1793,10 @@ let acc = 0
 let prevPhase = game.phase
 let pauseShown = false
 let abandonedRun = false // a Give Up retitles the death report; a real death never does
+// the last Signal Run finish, captured from the event so a daily race can post it at run end
+let lastRaceFinish: { time: number; splits: number[] } | null = null
+// a daily is one attempt: once it ends, "Once More" becomes "Return to Base" and leads there
+let dailyRunJustEnded = false
 let prevCrippled = new Set<number>()
 let saveTimer = 0
 let hitstop = 0 // brief sim freeze on kills; rendering continues
@@ -1663,18 +1945,33 @@ renderer.setAnimationLoop(() => {
         persistRun()
       } else if (game.phase === 'finished') {
         hud.showRaceResults(game)
+        // a daily posts to the daily board (which double-writes the trial); an ordinary run's
+        // trial was already posted from the raceFinished event
+        if (activeDaily) endDailyRun()
+        else {
+          hud.renderDailyResult('race', null)
+          hud.setRunOverLabels(false)
+        }
         clearRun() // a finished run must not resurrect on refresh
       } else {
-        // the hunt posts its result when the run ends, however it ended
-        if (game.mode.id === 'hunt' && game.wave > 1) {
-          submitTrial({
-            mode: 'hunt',
-            seed: mapScopedSeed(game.map.id, seed),
-            level: game.wave - 1,
-            score: game.score.score,
-          })
+        if (activeDaily) {
+          // the daily posts every mode through one path (and double-writes the trial server-side)
+          hud.showDeath(game, abandonedRun)
+          endDailyRun()
+        } else {
+          // ordinary run: the hunt posts its result when it ends, however it ended
+          if (game.mode.id === 'hunt' && game.wave > 1) {
+            submitTrial({
+              mode: 'hunt',
+              seed: mapScopedSeed(game.map.id, seed),
+              level: game.wave - 1,
+              score: game.score.score,
+            })
+          }
+          hud.showDeath(game, abandonedRun)
+          hud.renderDailyResult('death', null)
+          hud.setRunOverLabels(false)
         }
-        hud.showDeath(game, abandonedRun)
         abandonedRun = false
         clearRun()
       }

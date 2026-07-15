@@ -35,8 +35,15 @@ import { UPGRADE_POOL } from './upgrades'
  * soldier whose config has no blastRadius, and every spear fired from it would then test its
  * blast against `distance <= undefined` — false for every titan, so the spear would flash and
  * kill nothing, silently. Discarded rather than migrated.
+ *
+ * v6 (the Daily Expedition, 2026-07-15): a run can now be tagged with the UTC date of the daily
+ * it belongs to (`daily`), so a plain refresh mid-daily resumes it *as* a daily — Restart stays
+ * suppressed and the result still routes to the daily submit. The tag is opaque metadata the sim
+ * never reads; it rides the save so it survives the reload that rebuilds the whole page. A v5 save
+ * simply has no tag, which reads as "not a daily", so bumping (not migrating) loses nothing but a
+ * mid-flight run's daily-ness on the one reload across the version change.
  */
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 type V3 = [number, number, number]
 
@@ -83,6 +90,12 @@ interface SavedPlayer {
 
 export interface SavedRun {
   v: number
+  /**
+   * The UTC date of the Daily Expedition this run is, if it is one (de-008). Opaque to the sim;
+   * main.ts sets it and reads it back to keep treating a resumed run as a daily. Absent on every
+   * ordinary run.
+   */
+  daily?: string
   seed: string
   modeId: string
   /** Arena archetype; absent in saves from before maps existed (those are the district). */
@@ -120,10 +133,15 @@ export interface SavedRun {
   hunt?: { timeLeft: number; budget: number; urgencyFired: boolean }
 }
 
-export function serializeRun(g: GameState, view?: { yaw: number; pitch: number }): SavedRun {
+export function serializeRun(
+  g: GameState,
+  view?: { yaw: number; pitch: number },
+  daily?: string,
+): SavedRun {
   const p = g.player
   return {
     v: SAVE_VERSION,
+    ...(daily ? { daily } : {}),
     seed: g.seed,
     modeId: g.mode.id,
     mapId: g.map.id,
