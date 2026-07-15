@@ -675,6 +675,73 @@
       .commend-tiers { letter-spacing: 3px; margin-left: 10px; font-size: 13px; }
       .commend-tiers .lit { color: var(--brass-bright); }
       .commend-tiers .unlit { opacity: 0.3; }
+
+      /* --- The Daily Expedition (de-005) --------------------------------------------------- */
+      /* The headline plate: a chamfered brass-rimmed card, same construction language as the
+         menu buttons, sitting between the title and the controls wall. It is the mode's front
+         door, so it reads as one object — eyebrow, arena, orders, streak, status, deploy. */
+      .daily-plate {
+        position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px;
+        padding: 22px 40px 26px; max-width: 560px; margin: 2px auto 4px;
+      }
+      .daily-plate.hidden { display: none; }
+      body.coop .daily-plate { display: none; } /* solo-only, like the other solo menu items */
+      .daily-plate::before {
+        content: ''; position: absolute; inset: 0; z-index: -1;
+        background: linear-gradient(180deg, #2a201ae8, #130d09f5), url('/textures/linen.jpg') center / 260px;
+        clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+        box-shadow: inset 0 0 34px #000c, inset 0 -22px 40px -18px #a3131d66;
+        filter: drop-shadow(0 0 0 var(--brass));
+        border: 1px solid #6b5124;
+      }
+      .daily-eyebrow {
+        font-family: var(--header-font); font-size: 13px; font-weight: 700; letter-spacing: 6px;
+        text-transform: uppercase; color: var(--brass-bright);
+      }
+      .daily-headline { font-family: var(--title-font); font-size: 40px; line-height: 1.05; color: #f4e8cf; text-shadow: 0 2px 6px #000b; }
+      .daily-orders { font-size: 15px; letter-spacing: 2px; color: #b9ac90; text-transform: uppercase; }
+      /* the streak object: filled pips + a count, sized to feel like a thing you can lose */
+      .daily-streak { display: flex; align-items: center; gap: 10px; font-family: var(--header-font); font-size: 15px; letter-spacing: 2px; color: #ffd57a; }
+      .daily-streak.hidden { display: none; }
+      .daily-streak .pips { letter-spacing: 3px; font-size: 17px; }
+      .daily-streak .pip-on { color: var(--brass-bright); }
+      .daily-streak .pip-off { color: #4d3d1f; }
+      .daily-streak.at-risk { color: #e8a04f; }
+      .daily-status { font-size: 15px; letter-spacing: 1px; color: var(--parchment); opacity: 0.85; min-height: 20px; max-width: 460px; line-height: 1.5; }
+      .daily-status.spent { color: #9fd08a; }
+      .daily-status.unranked { color: #e8a04f; }
+      .daily-status.unreachable { color: #d98a7a; }
+      .daily-plate #daily-deploy { margin-top: 4px; }
+      .daily-plate #daily-deploy.spent {
+        /* a spent day: the button steps back and reads as review, not a fresh attempt */
+        filter: drop-shadow(1.5px 0 0 #6b5124) drop-shadow(-1.5px 0 0 #6b5124)
+          drop-shadow(0 1.5px 0 #6b5124) drop-shadow(0 -1.5px 0 #6b5124) drop-shadow(0 8px 12px #000b);
+      }
+
+      /* the daily result line on the death / finish card */
+      .daily-result {
+        display: flex; flex-direction: column; gap: 4px; padding: 14px 26px; margin: 2px auto;
+        border: 1px solid #6b5124; background: linear-gradient(180deg, #241d15e0, #120d08f2);
+        max-width: 520px;
+      }
+      .daily-result.hidden { display: none; }
+      .daily-result .dr-title { font-family: var(--header-font); font-size: 14px; letter-spacing: 4px; text-transform: uppercase; color: var(--brass-bright); }
+      .daily-result .dr-place { font-size: 20px; font-weight: 700; color: #ffd57a; font-family: var(--header-font); letter-spacing: 1px; }
+      .daily-result .dr-streak { font-size: 15px; letter-spacing: 1px; color: var(--parchment); opacity: 0.9; }
+      .daily-result.unranked .dr-place { color: #e8a04f; }
+
+      /* Hall of the Fallen: the daily board + Standings lead, above the all-time boards */
+      .daily-hall { width: 100%; display: flex; flex-direction: column; align-items: center; }
+      .dh-cols { display: flex; gap: 34px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+      .dh-sub { font-size: 13px; color: #9b8a68; letter-spacing: 1px; margin: -6px 0 10px; text-align: left; }
+      .dh-standings .lb-row .lb-sub { font-variant-numeric: tabular-nums; }
+      .dh-rank { color: var(--brass-bright); font-family: var(--header-font); margin-right: 8px; }
+      .daily-hall .lb-rows { min-height: 0; }
+      /* a soft divider under the daily block so the all-time boards read as a second tier */
+      .daily-hall::after {
+        content: ''; display: block; width: 70%; max-width: 620px; height: 1px; margin: 24px auto 6px;
+        background: linear-gradient(90deg, transparent, #6b5124, transparent);
+      }
     </style>
   </head>
   <body>
@@ -760,6 +827,18 @@
         <h1 class="aot-title">Wings of Freedom</h1>
         <div class="sub" id="start-sub">First-person ODM wave survival. Hook the rooftops, build speed, and cut the nape. Slow blades bounce off; fast blades kill in one stroke.</div>
         <div class="seedline" id="start-context"></div>
+
+        <!-- The Daily Expedition (de-005): one shared run per UTC day. The discipline and arena are
+             announced from the public roll; the seed is sealed until you commit. -->
+        <div id="daily-plate" class="daily-plate solo-only hidden">
+          <div class="daily-eyebrow">Today's Expedition</div>
+          <div class="daily-headline" id="daily-headline"></div>
+          <div class="daily-orders" id="daily-orders">Sealed orders · one attempt</div>
+          <div class="daily-streak hidden" id="daily-streak"></div>
+          <div class="daily-status" id="daily-status"></div>
+          <button id="daily-deploy" class="primary">Take the Field</button>
+          <button id="daily-standings-btn" class="textlink">The Standings</button>
+        </div>
         <div class="keys">
           <div><span class="key-group">Move</span>
             <span class="key-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> run</span> ·
@@ -859,6 +938,24 @@
 
       <div id="leaderboard" class="overlay hidden">
         <h2 class="aot-title">Hall of the Fallen</h2>
+
+        <!-- de-004 §6: the Hall leads with the daily. Today's board (provisional until UTC
+             midnight) and the Standings sit above the all-time squad and soldier boards. -->
+        <div class="daily-hall" id="daily-hall">
+          <div class="dh-cols">
+            <div class="lb-col">
+              <h3 id="dh-board-title">Today's Expedition</h3>
+              <div class="dh-sub" id="dh-board-sub"></div>
+              <div class="lb-rows" id="dh-board"></div>
+            </div>
+            <div class="lb-col">
+              <h3>The Standings</h3>
+              <div class="dh-sub">Expeditions won and the streaks still standing.</div>
+              <div class="lb-rows dh-standings" id="dh-standings"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="lb-cols">
           <div class="lb-col">
             <h3>Longest Stands · Squads</h3>
@@ -956,6 +1053,8 @@
       <div id="death" class="overlay hidden">
         <h2 class="aot-title">Devoured</h2>
         <div class="stats" id="death-stats"></div>
+        <!-- filled only when the run was a daily: where it landed, and the streak it moved -->
+        <div class="daily-result hidden" id="death-daily"></div>
         <button id="retry-btn" class="primary">Once More</button>
         <div class="seedline" id="death-seed"></div>
       </div>
@@ -964,6 +1063,7 @@
         <h2 class="aot-title">Signal Run Complete</h2>
         <div class="stats" id="race-results-stats"></div>
         <div id="race-splits"></div>
+        <div class="daily-result hidden" id="race-daily"></div>
         <button id="race-again-btn" class="primary">Run It Again — R</button>
         <div class="seedline" id="race-seed"></div>
       </div>

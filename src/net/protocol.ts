@@ -193,6 +193,16 @@ export interface DailyBoard {
   entries: DailyBoardEntry[]
 }
 
+/** A result already on the board, as the claim hands it back on a spent day (409). */
+export interface DailyPostedRun {
+  metric: DailyMetric
+  timeS: number | null
+  level: number | null
+  score: number | null
+  wave: number | null
+  submittedAt: string
+}
+
 /** The thing that accumulates. No podium column until the field earns one (de-004 §4). */
 export interface StandingsEntry {
   username: string

@@ -1,12 +1,12 @@
-import type { Leaderboard, LobbyMsg, TrialBoards } from './net/protocol'
+import type { DailyBoard, DailyBoardEntry, Leaderboard, LobbyMsg, StandingsEntry, TrialBoards } from './net/protocol'
 import type { CommendationRow } from './sim/commendations'
 import type { MatchResults } from './sim/coop'
 import type { GameState } from './sim/game'
 import { FOCUS_KILLS_TO_FILL } from './sim/game'
 import { oneCutSpeed } from './sim/combat'
 import { loadHuntBest, HUNT_URGENCY_FRACTION } from './sim/hunt'
-import { DEFAULT_MAP_ID, coopMaps, mapScopedSeed } from './sim/maps'
-import { coopModes } from './sim/modes'
+import { DEFAULT_MAP_ID, GAME_MAPS, coopMaps, mapScopedSeed } from './sim/maps'
+import { GAME_MODES, coopModes } from './sim/modes'
 import { loadRaceBest } from './sim/race'
 import { BOOST_COST } from './sim/player'
 import type { Upgrade } from './sim/upgrades'
@@ -70,6 +70,54 @@ export interface TrialSection {
   current: boolean
   boards: TrialBoards | null
   state: 'loading' | 'ready' | 'error'
+}
+
+/**
+ * Everything the daily plate shows, computed by main.ts (which owns the roll, the account and the
+ * fetches) and handed here to render. The HUD stays dumb: it paints this, it decides nothing.
+ */
+export interface DailyPlateView {
+  /** "The Culling · The District" — the public roll, always shown even before any fetch lands. */
+  headline: string
+  /** 0 hides the streak object entirely. */
+  streak: number
+  /** streak alive but not yet extended today: the pips read amber, "don't lose it". */
+  streakAtRisk: boolean
+  status: string
+  statusKind: '' | 'spent' | 'unranked' | 'unreachable'
+  deployLabel: string
+  /** a spent day dims the button and turns Deploy into review. */
+  spent: boolean
+}
+
+/** The daily result line on the death / finish card. */
+export interface DailyResultView {
+  /** "The Culling · The District". */
+  course: string
+  /** what you scored, phrased for the metric: "Level 5", "1:32.40", "Score 1240". */
+  result: string
+  /** "Provisional #2 today" — placement text, or a "won't post" note when unranked. */
+  placement: string
+  streakLine: string
+  unranked: boolean
+}
+
+/** Display names for a mode / map id, straight from the registries (the board sends ids). */
+function modeName(id: string): string {
+  return GAME_MODES.find((m) => m.id === id)?.name ?? id
+}
+function mapName(id: string): string {
+  return GAME_MAPS.find((m) => m.id === id)?.name ?? id
+}
+
+/** One row of "Level 5 · score 800" style, phrased for whatever the day's metric is. */
+function dailyValue(e: Pick<DailyBoardEntry, 'metric' | 'timeS' | 'level' | 'score' | 'wave'>): {
+  main: string
+  sub: string
+} {
+  if (e.metric === 'time') return { main: e.timeS === null ? '—' : formatRaceTime(e.timeS), sub: '' }
+  if (e.metric === 'level') return { main: `Lv ${e.level ?? 0}`, sub: `score ${e.score ?? 0}` }
+  return { main: `${e.score ?? 0}`, sub: `wave ${e.wave ?? 0}` }
 }
 
 /** Three rows per board: enough to show the podium without burying the arena below. */
@@ -254,6 +302,7 @@ export class Hud {
   onCloseCommendations: () => void = () => {}
   onCloseLeaderboard: () => void = () => {}
   onRaceAgain: () => void = () => {}
+  onDailyDeploy: () => void = () => {}
 
   constructor(seed: string) {
     el('death-seed').textContent = `seed: ${seed}`
@@ -308,6 +357,9 @@ export class Hud {
     el<HTMLButtonElement>('results-leave').addEventListener('click', () => this.onLeaveLobby())
     el<HTMLButtonElement>('leaderboard-btn').addEventListener('click', () => this.onOpenLeaderboard())
     el<HTMLButtonElement>('leaderboard-back').addEventListener('click', () => this.onCloseLeaderboard())
+    el<HTMLButtonElement>('daily-deploy').addEventListener('click', () => this.onDailyDeploy())
+    // the plate's "Standings" is just the Hall, which now leads with them
+    el<HTMLButtonElement>('daily-standings-btn').addEventListener('click', () => this.onOpenLeaderboard())
     el<HTMLButtonElement>('commend-btn').addEventListener('click', () => this.onOpenCommendations())
     el<HTMLButtonElement>('commend-back').addEventListener('click', () => this.onCloseCommendations())
     for (const id of SLIDER_IDS) {
@@ -891,9 +943,29 @@ export class Hud {
     el<HTMLButtonElement>('restart-btn').classList.toggle('hidden', !resume) // mid-run only
     // no death report to file in a race: Restart already covers "start over"
     el<HTMLButtonElement>('giveup-btn').classList.toggle('hidden', !resume || g?.mode.id === 'race')
+    // a daily run suppresses Restart entirely (one attempt), paused or not (de-008)
+    if (this.dailyRunBanner !== null) el<HTMLButtonElement>('restart-btn').classList.add('hidden')
     // paused: the subtitle slot carries the run, not the sales pitch
     el('start-sub').innerHTML = resume && g ? this.runSummary(g) : this.startSubDefault
-    el('start-context').textContent = g ? this.menuContext(g) : ''
+    // a daily's menu announces the expedition; otherwise the usual mode/seed/best line
+    el('start-context').textContent = this.dailyRunBanner ?? (g ? this.menuContext(g) : '')
+    // the daily headline plate belongs to the fresh, non-daily menu only
+    this.renderDailyPlate(resume || this.dailyRunBanner !== null)
+  }
+
+  private dailyRunBanner: string | null = null
+
+  /** Marks the menu as belonging to an in-progress daily: banner text, no Restart, no plate. Null
+   *  clears it (an ordinary run, or the daily is over). */
+  setDailyRunContext(banner: string | null): void {
+    this.dailyRunBanner = banner
+  }
+
+  /** Relabels the death / finish primary button: a daily is one attempt, so it returns to base
+   *  rather than offering "Once More". */
+  setRunOverLabels(daily: boolean): void {
+    el<HTMLButtonElement>('retry-btn').textContent = daily ? 'Return to Base' : 'Once More'
+    el<HTMLButtonElement>('race-again-btn').textContent = daily ? 'Return to Base' : 'Run It Again — R'
   }
 
   /** One line of where the paused run stands, phrased per mode. */
@@ -926,6 +998,114 @@ export class Hud {
 
   hideStart(): void {
     this.start.classList.add('hidden')
+  }
+
+  // --- the Daily Expedition (de-005) -----------------------------------------
+
+  private dailyView: DailyPlateView | null = null
+
+  /**
+   * Light up (or refresh) the daily headline plate. Stored so `showStart` can re-paint it every
+   * time the fresh menu comes back up without main having to re-supply it. Null means "no daily
+   * here" (co-op), and hides the plate.
+   */
+  showDailyPlate(view: DailyPlateView | null): void {
+    this.dailyView = view
+    this.renderDailyPlate(false)
+  }
+
+  private renderDailyPlate(paused: boolean): void {
+    const plate = el('daily-plate')
+    if (!this.dailyView || paused) {
+      plate.classList.add('hidden')
+      return
+    }
+    const v = this.dailyView
+    plate.classList.remove('hidden')
+    el('daily-headline').textContent = v.headline
+    const streak = el('daily-streak')
+    streak.classList.toggle('hidden', v.streak <= 0)
+    streak.classList.toggle('at-risk', v.streakAtRisk)
+    if (v.streak > 0) {
+      const shown = Math.min(v.streak, 7)
+      const pips =
+        `<span class="pips">${'◆'.repeat(shown)}</span>` +
+        `<span>${v.streak}-day streak${v.streakAtRisk ? ' · run today to keep it' : ''}</span>`
+      streak.innerHTML = pips
+    }
+    const status = el('daily-status')
+    status.textContent = v.status
+    status.className = `daily-status${v.statusKind ? ` ${v.statusKind}` : ''}`
+    const deploy = el<HTMLButtonElement>('daily-deploy')
+    deploy.textContent = v.deployLabel
+    deploy.classList.toggle('spent', v.spent)
+  }
+
+  /** Fill (or clear) the daily result line on a death / finish card. */
+  renderDailyResult(card: 'death' | 'race', view: DailyResultView | null): void {
+    const box = el(card === 'death' ? 'death-daily' : 'race-daily')
+    if (!view) {
+      box.classList.add('hidden')
+      box.innerHTML = ''
+      return
+    }
+    box.classList.toggle('unranked', view.unranked)
+    box.classList.remove('hidden')
+    box.innerHTML =
+      `<div class="dr-title">Daily Expedition · ${view.course}</div>` +
+      `<div class="dr-place">${view.result} · ${view.placement}</div>` +
+      (view.streakLine ? `<div class="dr-streak">${view.streakLine}</div>` : '')
+  }
+
+  /**
+   * The Hall's daily block (de-004 §6): today's board and the Standings, above the all-time
+   * boards. Both may be null while a fetch is out or Headquarters is unreachable.
+   */
+  showDailyHall(board: DailyBoard | null, standings: StandingsEntry[] | null, you: string | null): void {
+    const boardTitle = el('dh-board-title')
+    const boardSub = el('dh-board-sub')
+    const boardRows = el('dh-board')
+    if (!board) {
+      boardTitle.textContent = "Today's Expedition"
+      boardSub.textContent = ''
+      boardRows.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
+    } else {
+      boardTitle.textContent = `${modeName(board.modeId)} · ${mapName(board.mapId)}`
+      boardSub.textContent = board.provisional ? 'Provisional — final at UTC midnight.' : 'Final.'
+      boardRows.innerHTML =
+        board.entries.length === 0
+          ? '<div class="lb-empty">No soldiers have finished today. Be the first.</div>'
+          : board.entries
+              .slice(0, 5)
+              .map((e, i) => {
+                const v = dailyValue(e)
+                const mine = e.username === you ? ' mine' : ''
+                return (
+                  `<div class="lb-row${mine}"><span><span class="dh-rank">${i + 1}</span><b>${v.main}</b> · ${e.username}</span>` +
+                  `<span class="lb-sub">${v.sub}</span></div>`
+                )
+              })
+              .join('')
+    }
+
+    const standingsRows = el('dh-standings')
+    if (!standings) {
+      standingsRows.innerHTML = '<div class="lb-empty">Headquarters is unreachable.</div>'
+    } else if (standings.length === 0) {
+      standingsRows.innerHTML = '<div class="lb-empty">No expeditions on record yet.</div>'
+    } else {
+      standingsRows.innerHTML = standings
+        .slice(0, 5)
+        .map((s) => {
+          const mine = s.username === you ? ' mine' : ''
+          const streak = s.streak > 0 ? ` · ${s.streak}-day streak` : ''
+          return (
+            `<div class="lb-row${mine}"><span><b>${s.won}</b> won · ${s.username}</span>` +
+            `<span class="lb-sub">${s.finished}/${s.expeditions} finished${streak}</span></div>`
+          )
+        })
+        .join('')
+    }
   }
 
   /** One shared "this ends your run" gate for every destructive menu action. */
