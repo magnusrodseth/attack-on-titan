@@ -21,16 +21,15 @@ and becomes a record.
 
 - **This effort carries execution in-map** (like the solo, multiplayer and time-trials maps):
   the decisions are ticketed HITL; the build slices graduate out of the fog once they land.
-- **State, 2026-07-15**: **the whole effort is built and verified end to end**, one step from live.
-  de-001 → de-004 settled; **de-006 merged** (`src/sim/daily.ts`, and the UTC fix it carried);
-  **de-007 built and deployed** (`server/daily.ts`, `server/db/daily.ts`, four routes, `daily_runs`,
-  `DAILY_SECRET`); **de-005 + de-008 built on branch `daily-client`** — the headline plate, the
-  streak object, the spent state, the three unhappy states, the daily-flagged run save, the local
-  anti-practice mark, result routing, free play's random seed, and the Hall restructure. Driven in a
-  real browser against a local Worker + D1: claim → run → submit → death-card result line → spent
-  plate → Hall. `pnpm test` 624 green, `pnpm typecheck` clean. **The one thing left is the ship
-  decision** (merge `daily-client` → main auto-deploys both halves; then graduate), held for a human
-  because it fronts a new headline mode and flips free play to a random seed in prod.
+- **State, 2026-07-15: SHIPPED.** Every ticket (de-001 → de-008) is closed and the mode is live on
+  attack-on-titan.magnusrodseth.com. `src/sim/daily.ts` (the roll + UTC fix), `server/daily.ts` +
+  `server/db/daily.ts` + four routes + `daily_runs` + `DAILY_SECRET` (the Worker), and the client
+  (`src/dailyClient.ts`, the headline plate, streak object, spent state, three unhappy states, the
+  daily-flagged run save, the local anti-practice mark, result routing, free play's random seed, and
+  the Hall restructure). Verified end to end in a real browser against a local Worker + D1, merged to
+  main, deployed by CI, and confirmed live in prod (the plate rolls, the endpoints answer). Recorded
+  on the solo map ([map.md](map.md)) beside the other shipped efforts. What remains is all *future*
+  fog, below: commendations, seasons, podiums, ghost replays.
 - Workflow: one worktree branch off main; `pnpm test` + `pnpm typecheck` before commits;
   playwriter + `window.__aot` for render/HUD verification; merge only after a prod-shape E2E.
 - Skills in play: tdd (sim seams first), grilling for any ticket carrying a real user decision,

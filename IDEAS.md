@@ -5,11 +5,12 @@ When one graduates, move it to `wayfinder/map.md` (fog → ticket → decision) 
 
 ## Graduated to the wayfinder
 
-- **Daily seed mode** → [The Daily Expedition](wayfinder/map-daily.md) (charted 2026-07-14).
-  The daily rolls a whole run (mode + map + seed) per UTC day, deploying spends the one attempt,
-  the worker claims it server-side, and a persistent Standings table (expeditions, wins, podiums,
-  streak) is the thing that accumulates. Ghost replays are ruled out of scope there — they return
-  as their own effort.
+- **Daily seed mode** → [The Daily Expedition](wayfinder/map-daily.md), **shipped 2026-07-15**.
+  One rolled run (mode + map + sealed seed) per UTC day, deploying spends the one attempt, the
+  Worker claims it server-side, and the persistent Standings (expeditions, finished, won, streak)
+  are what accumulate. Free play went to a random seed with it, so the daily's course is the shared
+  one now. Podiums are switched off until the field earns them; ghost replays stay out of scope,
+  returning as their own effort.
 
 - **Dull blades** → **shipped 2026-07-14**. The one-cut bar rises with the edge left on the pair in
   hand (`oneCutSpeed` in `src/sim/combat.ts`): fresh steel kills at killSpeed, a spent pair needs

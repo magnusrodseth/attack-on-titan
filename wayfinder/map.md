@@ -164,6 +164,26 @@ A playable, fun, replayable browser game: first-person Attack on Titan wave surv
   Two of them were green-and-worthless on the first pass (samples sat outside *both* radii, so the
   probe read zero either way) — a placebo guard that cannot fail is just a placebo with a test.
 
+- The Daily Expedition (user request, 2026-07-15, shipped): one rolled run per UTC day, its own
+  effort with its own map ([The Daily Expedition](map-daily.md), de-001 → de-008). The roll is a
+  closed-form Latin-square walk (`src/sim/daily.ts`, imported by both the client and the Worker so
+  neither trusts the other for what today is) over 3 modes × 3 maps, Bossrush excluded; consecutive
+  days never repeat mode or map. **Sealed orders**: the discipline and arena are public and painted
+  from the client roll, but the seed is `hashSeed(DAILY_SECRET + ':' + date)` — Worker-held, issued
+  only by the claim, and it never enters a URL (it rides localStorage + the run save, both
+  seed-gated), so the course cannot be rehearsed before the one attempt is spent. Deploying claims
+  server-side and spends the day; abandoning is a wasted day and breaks the streak; there is no
+  Restart. `daily_runs` keyed `(user_id, date)`; the board ranks by a metric table (time / level /
+  score), "won" is rank-at-read on a closed day so there is no cron, and the Standings (expeditions,
+  finished, won, streak) are the persistent record — the Hall now leads with them. A daily result
+  double-writes to the `trials` board, which is why free play could finally go to a **random seed**
+  (de-002 §6): the daily's course is the shared one now, so the per-arena boards stay alive. The
+  Worker/client deploy contract (`.github/workflows/deploy-worker.yml` + the `/api/health` content
+  hash) that this session also built is what makes a mode split across both halves safe to ship. The
+  UTC clock bug in the old `dailySeed()` — local getters put two soldiers on different cities at the
+  same instant — was fixed on the way in. Verified end to end in a real browser against a local
+  Worker + D1, then confirmed live on prod.
+
 ## Not yet specified
 
 - Additional game modes on the new registry (time trial with checkpoint rings, parkour with flags/markers) and per-mode best stats.
