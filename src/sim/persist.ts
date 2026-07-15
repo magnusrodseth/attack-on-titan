@@ -39,9 +39,10 @@ import { UPGRADE_POOL } from './upgrades'
  * v6 (the Daily Expedition, 2026-07-15): a run can now be tagged with the UTC date of the daily
  * it belongs to (`daily`), so a plain refresh mid-daily resumes it *as* a daily — Restart stays
  * suppressed and the result still routes to the daily submit. The tag is opaque metadata the sim
- * never reads; it rides the save so it survives the reload that rebuilds the whole page. A v5 save
- * simply has no tag, which reads as "not a daily", so bumping (not migrating) loses nothing but a
- * mid-flight run's daily-ness on the one reload across the version change.
+ * never reads; it rides the save so it survives the reload that rebuilds the whole page. Like every
+ * prior bump, v5 saves are discarded, not migrated — anyone mid-run at deploy time loses that run
+ * (the standard cost here). The field is additive and could have ridden v5 untouched, but the tag
+ * has to be trustworthy from the first daily, and a run saved by the old client cannot carry one.
  */
 export const SAVE_VERSION = 6
 
