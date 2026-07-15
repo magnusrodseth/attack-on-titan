@@ -1016,11 +1016,16 @@ export class Hud {
 
   private renderDailyPlate(paused: boolean): void {
     const plate = el('daily-plate')
-    if (!this.dailyView || paused) {
+    const v = this.dailyView
+    const showPlate = v !== null && !paused
+    // one primary CTA: when the plate is the headline it owns the glow, and free-play "Deploy Your
+    // Soldier" steps down to a normal button. Everywhere else (paused "Resume", a daily launch,
+    // co-op) there is no plate, so Deploy stays the primary.
+    el<HTMLButtonElement>('start-btn').classList.toggle('primary', !showPlate)
+    if (!v || paused) {
       plate.classList.add('hidden')
       return
     }
-    const v = this.dailyView
     plate.classList.remove('hidden')
     el('daily-headline').textContent = v.headline
     const streak = el('daily-streak')

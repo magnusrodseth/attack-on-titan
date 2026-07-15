@@ -1180,7 +1180,7 @@ function refreshDailyPlate(): void {
     statusKind = 'spent'
     deployLabel = 'See the Standings'
   } else if (!account) {
-    status = 'Playable now — but only enlisted soldiers post to the Standings.'
+    status = 'Sealed orders, one attempt. Playable now — but only enlisted soldiers post to the Standings.'
   } else {
     status = 'Sealed orders. One attempt — deploying spends today, and quitting still counts.'
   }

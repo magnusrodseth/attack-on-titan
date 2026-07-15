@@ -680,9 +680,12 @@
       /* The headline plate: a chamfered brass-rimmed card, same construction language as the
          menu buttons, sitting between the title and the controls wall. It is the mode's front
          door, so it reads as one object — eyebrow, arena, orders, streak, status, deploy. */
+      /* the menu is tall with the plate on it; #start tightens its own gap so plate + buttons +
+         controls fit a laptop viewport without scrolling */
+      #start { gap: 11px; }
       .daily-plate {
-        position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px;
-        padding: 22px 40px 26px; max-width: 560px; margin: 2px auto 4px;
+        position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px;
+        padding: 15px 38px 18px; max-width: 560px; margin: 0 auto 2px;
       }
       .daily-plate.hidden { display: none; }
       body.coop .daily-plate { display: none; } /* solo-only, like the other solo menu items */
@@ -698,8 +701,7 @@
         font-family: var(--header-font); font-size: 13px; font-weight: 700; letter-spacing: 6px;
         text-transform: uppercase; color: var(--brass-bright);
       }
-      .daily-headline { font-family: var(--title-font); font-size: 40px; line-height: 1.05; color: #f4e8cf; text-shadow: 0 2px 6px #000b; }
-      .daily-orders { font-size: 15px; letter-spacing: 2px; color: #b9ac90; text-transform: uppercase; }
+      .daily-headline { font-family: var(--title-font); font-size: 38px; line-height: 1.05; color: #f4e8cf; text-shadow: 0 2px 6px #000b; }
       /* the streak object: filled pips + a count, sized to feel like a thing you can lose */
       .daily-streak { display: flex; align-items: center; gap: 10px; font-family: var(--header-font); font-size: 15px; letter-spacing: 2px; color: #ffd57a; }
       .daily-streak.hidden { display: none; }
@@ -833,12 +835,26 @@
         <div id="daily-plate" class="daily-plate solo-only hidden">
           <div class="daily-eyebrow">Today's Expedition</div>
           <div class="daily-headline" id="daily-headline"></div>
-          <div class="daily-orders" id="daily-orders">Sealed orders · one attempt</div>
           <div class="daily-streak hidden" id="daily-streak"></div>
           <div class="daily-status" id="daily-status"></div>
           <button id="daily-deploy" class="primary">Take the Field</button>
           <button id="daily-standings-btn" class="textlink">The Standings</button>
         </div>
+        <div class="menu-col">
+          <button id="start-btn" class="primary">Deploy Your Soldier</button>
+          <button id="restart-btn" class="hidden solo-only">Restart Run</button>
+          <button id="giveup-btn" class="hidden solo-only">Abandon Run</button>
+          <button id="coop-btn" class="solo-only">Multiplayer</button>
+          <button id="modes-btn" class="solo-only">Game Mode</button>
+          <button id="maps-btn" class="solo-only hidden"></button>
+          <div class="menu-row" id="menu-row">
+            <button id="leaderboard-btn" class="compact">Leaderboard</button>
+            <button id="commend-btn" class="compact">Commendations</button>
+            <button id="settings-btn" class="compact">Settings</button>
+          </div>
+        </div>
+        <!-- controls reference sits BELOW the actions: a returning player scans the buttons first,
+             the key wall is there for a newcomer who reads on -->
         <div class="keys">
           <div><span class="key-group">Move</span>
             <span class="key-item"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> run</span> ·
@@ -856,19 +872,6 @@
             <span class="key-item"><kbd>R</kbd> resupply</span> ·
             <span class="key-item"><kbd>C</kbd> hold to zoom</span> ·
             <span class="key-item"><kbd>Esc</kbd> pause</span></div>
-        </div>
-        <div class="menu-col">
-          <button id="start-btn" class="primary">Deploy Your Soldier</button>
-          <button id="restart-btn" class="hidden solo-only">Restart Run</button>
-          <button id="giveup-btn" class="hidden solo-only">Abandon Run</button>
-          <button id="coop-btn" class="solo-only">Multiplayer</button>
-          <button id="modes-btn" class="solo-only">Game Mode</button>
-          <button id="maps-btn" class="solo-only hidden"></button>
-          <div class="menu-row" id="menu-row">
-            <button id="leaderboard-btn" class="compact">Leaderboard</button>
-            <button id="commend-btn" class="compact">Commendations</button>
-            <button id="settings-btn" class="compact">Settings</button>
-          </div>
         </div>
       </div>
 
